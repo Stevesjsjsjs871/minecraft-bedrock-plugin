@@ -1,26 +1,35 @@
 # Minecraft Bedrock Blockbench Bridge
 
-A Blockbench plugin that adds editor-side helpers to the current project.
+This plugin connects a Blockbench tab to a local Termux MCP server over HTTP loopback.
 
-## Current features
+## 1. Start Termux server
 
-- Create Bedrock Mob Blockout: makes a basic six-part humanoid starter model. If the project already contains elements, it asks before adding.
-- Export Project Summary (JSON): exports counts and basic transforms from the current project for diagnostics.
-- No remote JavaScript execution, network listener, or external connection.
+Update your checkout and install dependencies:
 
-## Install
+\`\`\`sh
+cd "$HOME/minecraft-bedrock-plugin"
+git pull
+cd mcp-server
+npm install
+npm run check
+npm start
+\`\`\`
 
-1. Download minecraft_bedrock_mcp_bridge.js from this repository.
-2. Open Blockbench and its Plugins dialog.
-3. Use Load Plugin from File if your Blockbench version offers it, then select the JavaScript file.
-4. Enable the plugin. Use the Tools menu to create a starter model or File > Export to export a project summary.
+Keep Termux running. The server's MCP stdio transport and a local HTTP bridge run together. The bridge binds only to \`127.0.0.1:8765\`; it is not exposed to your Wi-Fi or the public internet.
 
-## Android note
+## 2. Load the Blockbench plugin
 
-Blockbench Web runs in the browser and cannot host a local Node.js MCP server itself. This plugin currently runs inside the editor and adds actions; it does not yet provide a live MCP connection from ChatGPT to Blockbench. A secure live bridge requires a separate transport and an MCP client that supports it.
+Download \`minecraft_bedrock_mcp_bridge.js\` and load it through Blockbench's Plugins dialog if your browser version supports loading a local plugin file. The plugin polls the local bridge and currently supports:
+- Reading a summary of the active project
+- Creating a six-part starter humanoid blockout
 
-## Limitations
+## 3. Check connection
 
-- The blockout is a starter shape, not a finished textured mob.
-- Project summary is not a full model backup.
-- Check the target Bedrock format and test exported models in-game.
+In Blockbench, open Tools → Check Termux Bridge. If the browser blocks local-network requests or reports a CORS/Private Network Access error, this browser build cannot use the loopback bridge directly; do not disable browser security. We will need a secure relay or another supported client path instead.
+
+## Security
+
+- Server binds to IPv4 loopback only.
+- CORS is restricted to \`https://web.blockbench.net\`.
+- Only fixed, allowlisted editor commands are implemented; no arbitrary code execution.
+- This is an experimental bridge and has not yet been verified on every Android browser / Blockbench version.

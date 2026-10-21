@@ -1,8 +1,22 @@
 (function () {
   const ID = "minecraft_bedrock_mcp_bridge";
-  let createAction, exportAction, infoDialog;
+  const BASE = "http://127.0.0.1:8765";
+  let pollTimer = null;
+  let busy = false;
+  let statusAction = null;
+  let blockoutAction = null;
 
-  function projectSummary() {
+  async function api(path, options) {
+    const response = await fetch(BASE + path, {
+      cache: "no-store",
+      ...options,
+      headers: { "Content-Type": "application/json", ...(options && options.headers || {}) }
+    });
+    if (!response.ok) throw new Error("Bridge HTTP " + response.status);
+    return response.json();
+  }
+
+  function getProjectSummary() {
     const elements = Array.isArray(Project?.elements) ? Project.elements : [];
     const textures = Array.isArray(Project?.textures) ? Project.textures : [];
     const animations = Array.isArray(Project?.animations) ? Project.animations : [];
@@ -10,7 +24,7 @@
       name: Project?.name || "Untitled",
       format: Format?.id || Format?.name || null,
       counts: { elements: elements.length, textures: textures.length, animations: animations.length },
-      elements: elements.slice(0, 500).map(e => ({
+      elements: elements.slice(0, 300).map(e => ({
         name: e.name, type: e.type, uuid: e.uuid,
         from: Array.isArray(e.from) ? e.from : undefined,
         to: Array.isArray(e.to) ? e.to : undefined,
@@ -21,12 +35,11 @@
   }
 
   function createBlockout() {
-    if (typeof Cube === "undefined" || typeof Group === "undefined") {
-      Blockbench.showQuickMessage("Open a model project first.");
-      return;
-    }
+    if (typeof Cube === "undefined" || typeof Group === "undefined") throw new Error("Open a supported model project first.");
     const existing = Array.isArray(Project?.elements) ? Project.elements : [];
-    if (existing.length && !confirm("This project already has elements. Add a starter mob to it?")) return;
+    if (existing.length && !confirm("This project already contains elements. Add a starter mob to it?")) {
+      return { cancelled: true };
+    }
     Undo.initEdit({ elements: [], outliner: true, selection: true });
     const root = new Group({ name: "root", origin: [0, 0, 0] }).init();
     root.addTo();
@@ -42,59 +55,78 @@
     root.open();
     Canvas.updateAll();
     Undo.finishEdit("Create Bedrock mob blockout");
-    Blockbench.showQuickMessage("Starter mob blockout created. Add textures and verify export format.");
+    return { created: parts.length, group: "root" };
   }
 
-  function exportSummary() {
-    const blob = new Blob([JSON.stringify(projectSummary(), null, 2)], {type:"application/json"});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "blockbench-project-summary.json";
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    Blockbench.showQuickMessage("Project summary exported.");
+  async function handleCommand(command) {
+    let result;
+    try {
+      if (command.type === "get_project") result = getProjectSummary();
+      else if (command.type === "create_blockout") result = createBlockout();
+      else throw new Error("Unsupported command: " + command.type);
+      await api("/result", { method: "POST", body: JSON.stringify({ id: command.id, ok: true, result }) });
+    } catch (error) {
+      try { await api("/result", { method: "POST", body: JSON.stringify({ id: command.id, ok: false, error: String(error?.message || error) }) }); } catch (_) {}
+    }
+  }
+
+  async function poll() {
+    if (busy) return;
+    busy = true;
+    try {
+      const data = await api("/next");
+      if (data.command) await handleCommand(data.command);
+    } catch (error) {
+      // Bridge may not be running yet; retry quietly.
+    } finally {
+      busy = false;
+    }
   }
 
   Plugin.register(ID, {
     title: "Minecraft Bedrock MCP Bridge",
     author: "Stevesjsjsjs",
-    description: "Editor-side helpers for Bedrock models. No network listener or remote code execution.",
+    description: "Connects the active Blockbench tab to a loopback-only Termux MCP bridge. Allows project summary and a starter blockout.",
     icon: "cubes",
-    version: "0.1.0",
+    version: "0.2.0",
     variant: "both",
     tags: ["Minecraft: Bedrock Edition"],
     onload() {
-      createAction = new Action("bedrock_mcp_create_mob_blockout", {
+      statusAction = new Action("bedrock_mcp_bridge_status", {
+        name: "Check Termux Bridge",
+        description: "Check the local Termux bridge connection",
+        icon: "link",
+        click: async () => {
+          try {
+            const status = await api("/health");
+            Blockbench.showQuickMessage(status.client_connected ? "Termux bridge connected" : "Bridge server found; waiting for editor poll");
+          } catch (error) {
+            Blockbench.showQuickMessage("Termux bridge unavailable. Start npm start in Termux.");
+          }
+        }
+      });
+      blockoutAction = new Action("bedrock_mcp_create_mob_blockout", {
         name: "Create Bedrock Mob Blockout",
         description: "Create a simple six-part humanoid starter model",
         icon: "cubes",
-        click: createBlockout
+        click: () => {
+          try {
+            const result = createBlockout();
+            if (!result.cancelled) Blockbench.showQuickMessage("Created starter blockout");
+          } catch (error) {
+            Blockbench.showQuickMessage("Could not create model: " + error.message);
+          }
+        }
       });
-      exportAction = new Action("bedrock_mcp_export_summary", {
-        name: "Export Project Summary (JSON)",
-        description: "Export a safe summary of the current project",
-        icon: "file_json",
-        click: exportSummary
-      });
-      MenuBar.addAction(createAction, "tools");
-      MenuBar.addAction(exportAction, "file.export");
-      infoDialog = new Dialog({
-        id: "bedrock_mcp_bridge_info",
-        title: "Minecraft Bedrock MCP Bridge",
-        width: 440,
-        lines: [
-          "This first bridge adds editor-side actions; it is not yet a live MCP connection.",
-          "Use Tools > Create Bedrock Mob Blockout to create a starter model.",
-          "Use File > Export > Export Project Summary (JSON) to save a summary for analysis."
-        ],
-        buttons: ["Close"]
-      });
+      MenuBar.addAction(statusAction, "tools");
+      MenuBar.addAction(blockoutAction, "tools");
+      pollTimer = setInterval(poll, 700);
+      poll();
     },
     onunload() {
-      createAction?.delete();
-      exportAction?.delete();
-      infoDialog?.hide?.();
+      if (pollTimer) clearInterval(pollTimer);
+      statusAction?.delete();
+      blockoutAction?.delete();
     }
   });
 })();

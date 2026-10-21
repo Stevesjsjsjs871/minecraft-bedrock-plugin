@@ -423,5 +423,31 @@ server.tool(
   async () => textResult(await sendBlockbenchCommand("create_blockout"))
 );
 
+server.tool(
+  "blockbench_bridge_command",
+  "Send one allowlisted command to the Blockbench plugin connected to the local Termux bridge. Requires the private token printed by npm run bridge and the plugin connected in Blockbench.",
+  {
+    token: z.string().min(16).describe("Private Bearer token printed by blockbench-bridge-server.js"),
+    command: z.enum(["project_summary", "create_mob_blockout", "add_cube"]),
+    args_json: z.string().default("{}").describe("JSON args for add_cube, e.g. {\"name\":\"test_cube\",\"from\":[0,0,0],\"to\":[2,2,2]}")
+  },
+  async ({ token, command, args_json }) => {
+    let args;
+    try { args = JSON.parse(args_json || "{}"); }
+    catch (error) { return textResult({ error: "args_json is invalid JSON: " + error.message }); }
+    try {
+      const response = await fetch("http://127.0.0.1:8765/command", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+        body: JSON.stringify({ command, args }),
+        signal: AbortSignal.timeout(17000)
+      });
+      const data = await response.json().catch(() => ({}));
+      return textResult({ http_status: response.status, ...data });
+    } catch (error) {
+      return textResult({ error: "Cannot reach local Blockbench bridge at 127.0.0.1:8765: " + error.message + ". Start npm run bridge in a second Termux session." });
+    }
+  }
+);
 const transport = new StdioServerTransport();
 await server.connect(transport);

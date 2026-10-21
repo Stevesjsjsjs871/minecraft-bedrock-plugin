@@ -87,3 +87,24 @@ The server is designed to grow into a read-only developer toolkit first: diagnos
 - Directory inspection skips symbolic links and caps results at 500 files by default.
 - It does not unpack ZIP, `.mcpack`, or `.mcaddon` archives yet; extract the archive first.
 - It does not modify files, execute user scripts, or test in-game behavior.
+
+## Live Blockbench bridge (experimental on Android)
+
+The repository includes `blockbench-bridge-server.js` and an updated Blockbench plugin. The local server binds only to `127.0.0.1:8765`, generates a private token at startup, and accepts only three allowlisted commands. It does not expose a public port.
+
+1. In the Termux session currently running `npm start`, press `Ctrl+C`.
+2. Update the repo and check syntax:
+   ```sh
+   cd "$HOME/minecraft-bedrock-plugin"
+   git pull
+   cd mcp-server
+   npm run check
+   ```
+3. In Termux session A, start the HTTP bridge with `npm run bridge`. Keep it open and copy the long Bearer token printed in Termux. Treat it like a password.
+4. In Termux session B, start the MCP server with `npm start`. It must be launched by an MCP client supporting local stdio. ChatGPT on Android does not automatically attach to a process in Termux.
+5. Install/reload `blockbench-bridge/minecraft_bedrock_mcp_bridge.js` in Blockbench. Open Tools → Connect to Termux MCP Bridge and paste the token.
+6. If the browser blocks access to `127.0.0.1` because of CORS, private-network restrictions, or secure-context rules, connection may fail in mobile web Blockbench. Do not disable browser security or expose the port publicly. A remote HTTPS relay would be a separate authenticated deployment.
+
+The MCP tool `blockbench_bridge_command` accepts `project_summary`, `create_mob_blockout`, and `add_cube`. Pass the private token as its `token` argument. For `add_cube`, `args_json` can be `{"name":"test_cube","from":[0,0,0],"to":[2,2,2]}`.
+
+This is experimental; syntax checking does not prove the browser permits localhost requests or that Blockbench's current mobile UI exposes plugin loading.

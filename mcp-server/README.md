@@ -8,6 +8,10 @@ A local Model Context Protocol (MCP) server with read-only static-analysis tools
 - `validate_manifest_file` — read and validate a local `manifest.json`.
 - `inspect_pack_directory` — list a BP/RP folder and report manifest issues and common folder hints.
 - `compare_pack_versions` — compare two three-part version arrays.
+- `inspect_blockbench_model_json` / `inspect_blockbench_model_file` — inspect .bbmodel elements, texture metadata, outliner UUIDs, duplicate UUIDs and suspicious coordinates.
+- `validate_bedrock_geometry_json` — check exported geometry identifiers, bones, parents and cube bounds.
+- `inspect_png_texture_file` — read PNG dimensions and bit-depth metadata.
+- `validate_json_file` — parse arbitrary local JSON and report top-level structure.
 
 ## Install on Android
 
@@ -65,6 +69,17 @@ For a client that supports local stdio MCP servers, use the path to the Termux N
 ```
 
 Not every Android or ChatGPT client supports launching local MCP servers. ChatGPT's remote MCP connection requires a reachable HTTPS server; this local stdio implementation alone does not make the server publicly reachable. Do not expose a phone service to the internet without adding authentication and a secure remote transport.
+
+## Blockbench workflow
+
+1. Save or export the project as a `.bbmodel` file.
+2. Call `inspect_blockbench_model_file` with the real path, or use `inspect_blockbench_model_json` with its JSON text.
+3. Export Bedrock geometry JSON from Blockbench and pass its contents to `validate_bedrock_geometry_json`.
+4. Use `inspect_png_texture_file` to check texture dimensions. This tool does not decode image pixels or edit textures.
+
+## More utilities
+
+The server is designed to grow into a read-only developer toolkit first: diagnostics before any destructive repair tools. Future candidates include safe ZIP/.mcpack/.mcaddon inventory, cross-file reference checks, animation-controller validation, and packaging checks.
 
 ## Limitations
 

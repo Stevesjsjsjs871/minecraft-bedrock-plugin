@@ -34,6 +34,7 @@ This public repository contains initial documentation for the project. The publi
 - [Usage guide](docs/USAGE.md)
 - [Compatibility notes](docs/COMPATIBILITY.md)
 - [Preliminary privacy audit](docs/PRIVACY-AUDIT.md)
+- [Public release readiness checklist](docs/PUBLIC-RELEASE-CHECKLIST.md)
 - [Bug report template](support/BUG_REPORT.md)
 - [Security reporting guidance](support/SECURITY.md)
 

@@ -326,5 +326,102 @@ server.tool(
   }
 );
 
+
+
+// Local-only Blockbench browser bridge. The HTTP listener is restricted to loopback.
+import http from "node:http";
+const bridgePending = [];
+const bridgeWaiters = new Map();
+let bridgeClientSeenAt = null;
+let bridgeNextId = 1;
+const BRIDGE_PORT = Number(process.env.BLOCKBENCH_BRIDGE_PORT || 8765);
+const BRIDGE_ORIGIN = "https://web.blockbench.net";
+
+function sendBridgeJson(res, status, payload) {
+  res.writeHead(status, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Access-Control-Allow-Origin": BRIDGE_ORIGIN,
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Private-Network": "true",
+    "Vary": "Origin",
+    "Cache-Control": "no-store"
+  });
+  res.end(JSON.stringify(payload));
+}
+function readBridgeBody(req) {
+  return new Promise((resolve, reject) => {
+    let raw = "";
+    req.on("data", chunk => { raw += chunk; if (raw.length > 128 * 1024) { reject(new Error("Body too large")); req.destroy(); } });
+    req.on("end", () => { try { resolve(JSON.parse(raw || "{}")); } catch { reject(new Error("Invalid JSON")); } });
+    req.on("error", reject);
+  });
+}
+const bridgeHttp = http.createServer(async (req, res) => {
+  const origin = req.headers.origin;
+  if (req.method === "OPTIONS") {
+    if (origin !== BRIDGE_ORIGIN) return sendBridgeJson(res, 403, { error: "Origin not allowed" });
+    return sendBridgeJson(res, 204, {});
+  }
+  if (origin && origin !== BRIDGE_ORIGIN) return sendBridgeJson(res, 403, { error: "Origin not allowed" });
+  const url = new URL(req.url || "/", "http://127.0.0.1");
+  if (req.method === "GET" && url.pathname === "/health") {
+    return sendBridgeJson(res, 200, { ok: true, service: "minecraft-bedrock-blockbench-bridge", client_connected: !!bridgeClientSeenAt && Date.now() - bridgeClientSeenAt < 5000, client_last_seen: bridgeClientSeenAt });
+  }
+  if (req.method === "GET" && url.pathname === "/next") {
+    bridgeClientSeenAt = Date.now();
+    const command = bridgePending.shift();
+    return sendBridgeJson(res, 200, { command: command || null });
+  }
+  if (req.method === "POST" && url.pathname === "/result") {
+    let body;
+    try { body = await readBridgeBody(req); } catch (e) { return sendBridgeJson(res, 400, { error: e.message }); }
+    if (!body.id || !bridgeWaiters.has(body.id)) return sendBridgeJson(res, 404, { error: "Unknown command id" });
+    bridgeWaiters.get(body.id)({ ok: !!body.ok, result: body.result ?? null, error: body.error ?? null });
+    bridgeWaiters.delete(body.id);
+    return sendBridgeJson(res, 200, { ok: true });
+  }
+  return sendBridgeJson(res, 404, { error: "Not found" });
+});
+bridgeHttp.on("error", error => console.error("[Blockbench bridge]", error.message));
+bridgeHttp.listen(BRIDGE_PORT, "127.0.0.1", () => {
+  console.error("[Blockbench bridge] listening on http://127.0.0.1:" + BRIDGE_PORT + " (loopback only)");
+});
+
+function sendBlockbenchCommand(type, args = {}) {
+  return new Promise((resolve) => {
+    const id = "bb-" + bridgeNextId++;
+    const timer = setTimeout(() => {
+      bridgeWaiters.delete(id);
+      resolve({ ok: false, error: "Timed out waiting for Blockbench. Is the bridge plugin enabled and its tab open?" });
+    }, 12000);
+    bridgeWaiters.set(id, result => { clearTimeout(timer); resolve(result); });
+    bridgePending.push({ id, type, args });
+  });
+}
+
+server.tool(
+  "blockbench_bridge_status",
+  "Check whether the Blockbench browser plugin has recently contacted the local Termux bridge.",
+  {},
+  async () => {
+    let health = null;
+    try { health = await (await fetch("http://127.0.0.1:" + BRIDGE_PORT + "/health")).json(); } catch (e) { health = { ok: false, error: e.message }; }
+    return textResult(health);
+  }
+);
+server.tool(
+  "blockbench_get_active_project",
+  "Read a summary of the active Blockbench project through the browser bridge.",
+  {},
+  async () => textResult(await sendBlockbenchCommand("get_project"))
+);
+server.tool(
+  "blockbench_create_mob_blockout",
+  "Ask the active Blockbench editor to create a basic six-part humanoid starter model. The editor may ask before adding to a non-empty project.",
+  {},
+  async () => textResult(await sendBlockbenchCommand("create_blockout"))
+);
+
 const transport = new StdioServerTransport();
 await server.connect(transport);

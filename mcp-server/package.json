@@ -1,0 +1,19 @@
+{
+  "name": "minecraft-bedrock-mcp-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local MCP tools for validating and inspecting Minecraft Bedrock add-ons on Android/Termux.",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.5",
+    "zod": "^3.25.76"
+  }
+}

@@ -1,8 +1,8 @@
 {
   "name": "minecraft-bedrock-mcp-server",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Local MCP tools for validating and inspecting Minecraft Bedrock add-ons on Android/Termux.",
+  "description": "Android/Termux MCP utilities for Minecraft Bedrock packs, Blockbench models, geometry, textures and JSON validation.",
   "type": "module",
   "main": "server.js",
   "scripts": {

@@ -162,5 +162,169 @@ server.tool(
   }
 );
 
+
+function inspectBlockbenchModel(model) {
+  const errors = [];
+  const warnings = [];
+  if (!model || typeof model !== "object" || Array.isArray(model)) {
+    return { valid: false, errors: ["Model root must be a JSON object."], warnings };
+  }
+  if (!Array.isArray(model.elements)) warnings.push("No elements array found; this may not be a standard Blockbench cube model.");
+  if (!Array.isArray(model.outliner)) warnings.push("No outliner array found.");
+  if (!Array.isArray(model.textures)) warnings.push("No textures array found.");
+  const elements = Array.isArray(model.elements) ? model.elements : [];
+  const textures = Array.isArray(model.textures) ? model.textures : [];
+  const uuids = new Set();
+  const duplicateUuids = [];
+  for (let i = 0; i < elements.length; i++) {
+    const el = elements[i];
+    if (!el || typeof el !== "object") { errors.push(`elements[${i}] is not an object.`); continue; }
+    if (el.uuid) {
+      if (uuids.has(el.uuid)) duplicateUuids.push(el.uuid);
+      uuids.add(el.uuid);
+    }
+    if (!Array.isArray(el.from) || el.from.length !== 3 || !el.from.every(Number.isFinite)) errors.push(`elements[${i}].from must contain 3 numbers.`);
+    if (!Array.isArray(el.to) || el.to.length !== 3 || !el.to.every(Number.isFinite)) errors.push(`elements[${i}].to must contain 3 numbers.`);
+    if (Array.isArray(el.from) && Array.isArray(el.to) && el.from.length === 3 && el.to.length === 3) {
+      if (el.from.some((v, j) => v > el.to[j])) warnings.push(`Element ${el.name ?? i}: one or more 'from' coordinates exceed 'to'.`);
+      if ([0,1,2].some(j => Math.abs(el.from[j]) > 256 || Math.abs(el.to[j]) > 256)) warnings.push(`Element ${el.name ?? i}: coordinate outside ±256; check model scale.`);
+    }
+    if (el.faces && typeof el.faces === "object") {
+      for (const [faceName, face] of Object.entries(el.faces)) {
+        if (!face || typeof face !== "object") continue;
+        if (Number.isInteger(face.texture) && (face.texture < 0 || face.texture >= textures.length)) {
+          warnings.push(`Element ${el.name ?? i}, face ${faceName}: texture index ${face.texture} is outside textures array (review candidate; format variants may differ).`);
+        }
+      }
+    }
+  }
+  if (duplicateUuids.length) errors.push(`Duplicate element UUIDs: ${[...new Set(duplicateUuids)].join(", ")}`);
+  const referenced = new Set();
+  function walkOutliner(nodes) {
+    if (!Array.isArray(nodes)) return;
+    for (const node of nodes) {
+      if (typeof node === "string") referenced.add(node);
+      else if (node && typeof node === "object") {
+        if (node.uuid) referenced.add(node.uuid);
+        if (Array.isArray(node.children)) walkOutliner(node.children);
+      }
+    }
+  }
+  walkOutliner(model.outliner);
+  const missingOutlinerRefs = [...referenced].filter(id => !uuids.has(id));
+  if (missingOutlinerRefs.length) warnings.push(`Outliner references UUIDs not found in elements: ${missingOutlinerRefs.join(", ")}`);
+  const unusedElements = elements.filter(el => el?.uuid && !referenced.has(el.uuid)).map(el => el.name || el.uuid);
+  if (unusedElements.length) warnings.push(`Elements not referenced by outliner: ${unusedElements.slice(0, 30).join(", ")}${unusedElements.length > 30 ? "…" : ""}`);
+  const animations = Array.isArray(model.animations) ? model.animations.length : 0;
+  return {
+    valid: errors.length === 0,
+    format_version: model.meta?.format_version ?? model.format_version ?? null,
+    name: model.name ?? null,
+    model_format: model.meta?.model_format ?? null,
+    resolution: model.resolution ?? null,
+    counts: { elements: elements.length, textures: textures.length, outliner_roots: Array.isArray(model.outliner) ? model.outliner.length : 0, animations },
+    texture_summary: textures.slice(0, 100).map(t => ({ name: t?.name ?? null, relative_path: t?.relative_path ?? null, width: t?.width ?? null, height: t?.height ?? null, source_embedded: typeof t?.source === "string" && t.source.startsWith("data:") })),
+    errors, warnings,
+    note: "Heuristic static inspection only. It does not render the model in Blockbench or prove Minecraft compatibility."
+  };
+}
+
+server.tool(
+  "inspect_blockbench_model_json",
+  "Inspect a Blockbench .bbmodel JSON supplied as text: summarize elements, textures, outliner, duplicate UUIDs, coordinate anomalies, and suspicious references.",
+  { model_json: z.string().min(2).describe("Complete text of a Blockbench .bbmodel JSON file") },
+  async ({ model_json }) => {
+    try { return textResult(inspectBlockbenchModel(JSON.parse(model_json))); }
+    catch (error) { return textResult({ valid: false, errors: [`Invalid JSON: ${error.message}`], warnings: [] }); }
+  }
+);
+
+server.tool(
+  "inspect_blockbench_model_file",
+  "Read and inspect a local Blockbench .bbmodel file. Useful in Termux on Android after storage permission is granted.",
+  { file_path: z.string().min(1).describe("Path to a .bbmodel file") },
+  async ({ file_path }) => {
+    const absolute = path.resolve(file_path);
+    try {
+      const raw = await fs.readFile(absolute, "utf8");
+      return textResult({ file_path: absolute, ...inspectBlockbenchModel(JSON.parse(raw)) });
+    } catch (error) {
+      return textResult({ file_path: absolute, valid: false, errors: [`Could not read or parse Blockbench model: ${error.message}`], warnings: [] });
+    }
+  }
+);
+
+server.tool(
+  "validate_bedrock_geometry_json",
+  "Check common Minecraft Bedrock geometry JSON structure, bone names, cube bounds, and duplicate bone identifiers. This is not a complete schema validator.",
+  { geometry_json: z.string().min(2).describe("Contents of an exported Bedrock geometry JSON file") },
+  async ({ geometry_json }) => {
+    let doc;
+    try { doc = JSON.parse(geometry_json); }
+    catch (error) { return textResult({ valid: false, errors: [`Invalid JSON: ${error.message}`], warnings: [] }); }
+    const errors = [], warnings = [];
+    const geometries = Array.isArray(doc?.["minecraft:geometry"]) ? doc["minecraft:geometry"] : [];
+    if (!geometries.length) errors.push('Expected a non-empty "minecraft:geometry" array.');
+    const identifiers = new Set();
+    let boneCount = 0, cubeCount = 0;
+    for (let gi = 0; gi < geometries.length; gi++) {
+      const geo = geometries[gi];
+      const id = geo?.description?.identifier;
+      if (typeof id !== "string" || !id.trim()) errors.push(`minecraft:geometry[${gi}] is missing description.identifier.`);
+      if (id && identifiers.has(id)) errors.push(`Duplicate geometry identifier: ${id}`);
+      if (id) identifiers.add(id);
+      if (!Array.isArray(geo?.bones)) { errors.push(`Geometry ${id ?? gi} has no bones array.`); continue; }
+      const boneNames = new Set();
+      for (const bone of geo.bones) {
+        boneCount++;
+        if (!bone || typeof bone.name !== "string" || !bone.name.trim()) errors.push(`Geometry ${id ?? gi} contains a bone without a name.`);
+        else if (boneNames.has(bone.name)) errors.push(`Geometry ${id ?? gi} has duplicate bone name: ${bone.name}`);
+        else boneNames.add(bone.name);
+        if (bone.parent && !geo.bones.some(b => b?.name === bone.parent)) warnings.push(`Geometry ${id ?? gi}, bone ${bone.name}: parent '${bone.parent}' not found in this geometry.`);
+        if (bone.cubes !== undefined && !Array.isArray(bone.cubes)) errors.push(`Bone ${bone.name}: cubes must be an array when present.`);
+        for (const cube of Array.isArray(bone.cubes) ? bone.cubes : []) {
+          cubeCount++;
+          if (!Array.isArray(cube.origin) || cube.origin.length !== 3 || !cube.origin.every(Number.isFinite)) errors.push(`Bone ${bone.name}: cube origin must contain 3 numbers.`);
+          if (!Array.isArray(cube.size) || cube.size.length !== 3 || !cube.size.every(n => Number.isFinite(n) && n >= 0)) errors.push(`Bone ${bone.name}: cube size must contain 3 non-negative numbers.`);
+          if (Array.isArray(cube.size) && cube.size.some(n => n > 128)) warnings.push(`Bone ${bone.name}: unusually large cube dimension; review scale.`);
+        }
+      }
+    }
+    return textResult({ valid: errors.length === 0, counts: { geometries: geometries.length, bones: boneCount, cubes: cubeCount }, identifiers: [...identifiers], errors, warnings, note: "Static structural checks only; validate against the target Bedrock version and test in-game." });
+  }
+);
+
+server.tool(
+  "inspect_png_texture_file",
+  "Read PNG header metadata (dimensions and bit depth) without decoding or modifying the texture.",
+  { file_path: z.string().min(1).describe("Path to a PNG texture file") },
+  async ({ file_path }) => {
+    const absolute = path.resolve(file_path);
+    try {
+      const handle = await fs.open(absolute, "r");
+      try {
+        const buffer = Buffer.alloc(26);
+        const { bytesRead } = await handle.read(buffer, 0, 26, 0);
+        const signature = Buffer.from([137,80,78,71,13,10,26,10]);
+        if (bytesRead < 26 || !buffer.subarray(0, 8).equals(signature)) return textResult({ valid_png: false, file_path: absolute, error: "File is too short or is not a PNG." });
+        return textResult({ valid_png: true, file_path: absolute, width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20), bit_depth: buffer[24], color_type: buffer[25], note: "Header-only inspection; pixel data and transparency have not been decoded." });
+      } finally { await handle.close(); }
+    } catch (error) { return textResult({ valid_png: false, file_path: absolute, error: error.message }); }
+  }
+);
+
+server.tool(
+  "validate_json_file",
+  "Parse any local JSON file and return valid JSON plus its top-level type and keys; does not apply a Minecraft-specific schema.",
+  { file_path: z.string().min(1).describe("Path to a JSON file") },
+  async ({ file_path }) => {
+    const absolute = path.resolve(file_path);
+    try {
+      const parsed = JSON.parse(await fs.readFile(absolute, "utf8"));
+      return textResult({ valid: true, file_path: absolute, top_level_type: Array.isArray(parsed) ? "array" : parsed === null ? "null" : typeof parsed, keys: parsed && !Array.isArray(parsed) && typeof parsed === "object" ? Object.keys(parsed) : [], array_length: Array.isArray(parsed) ? parsed.length : null });
+    } catch (error) { return textResult({ valid: false, file_path: absolute, error: error.message }); }
+  }
+);
+
 const transport = new StdioServerTransport();
 await server.connect(transport);

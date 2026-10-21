@@ -205,7 +205,7 @@ function inspectBlockbenchModel(model) {
     for (const node of nodes) {
       if (typeof node === "string") referenced.add(node);
       else if (node && typeof node === "object") {
-        if (node.uuid) referenced.add(node.uuid);
+        // Group UUIDs are not element UUIDs; only string entries in children point to elements.
         if (Array.isArray(node.children)) walkOutliner(node.children);
       }
     }

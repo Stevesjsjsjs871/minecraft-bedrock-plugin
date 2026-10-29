@@ -1,4 +1,12 @@
-# Minecraft Bedrock Engineer — 0.9.1
+# Minecraft Bedrock Engineer — 0.9.2
+
+## 0.9.2: coordinated custom entity authoring
+
+- Adds the write-capable `create_addon_entity` tool: one validated operation creates the BP entity, RP client-entity, geometry model and render controller with consistent identifiers.
+- Verifies the existing BP/RP scaffold and version link before writing; validates optional texture paths and PNG signature; refuses any output collision and removes partial outputs if a write fails.
+- Never creates fake textures. Without a supplied PNG the output explicitly reports `texture_file_not_created` and the expected path.
+- Adds regression tests for all cross-file identifiers, provided PNG mapping, path safety, collisions, no partial output and MCP annotations.
+- Synchronizes package, MCP server, tests and CI at 0.9.2. Gameplay, entity rendering and AI behavior in Minecraft remain `NOT RUN`.
 
 ## 0.9.1: sample-index resilience and reproducible checks
 

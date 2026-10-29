@@ -741,12 +741,12 @@ class CreatorToolsIntegrationTests(unittest.TestCase):
                         "description": {"identifier": "test_addon:swamp_golem", "is_spawnable": True, "is_summonable": True},
                         "components": {"minecraft:health": {"value": 20, "max": 20}, "minecraft:physics": {}},
                     },
-                }) + "\\n", encoding="utf-8")
+                }) + "\n", encoding="utf-8")
                 (staged / "resource_packs/test-addon_RP/entity/swamp_golem.entity.json").write_text(json.dumps({
                     "format_version": "1.10.0",
                     "minecraft:client_entity": {"description": {"identifier": "test_addon:swamp_golem"}},
-                }) + "\\n", encoding="utf-8")
-                return {"exit_code": 0, "timed_out": False, "stdout": "{\\"success\\":true}", "stderr": ""}
+                }) + "\n", encoding="utf-8")
+                return {"exit_code": 0, "timed_out": False, "stdout": "ok", "stderr": ""}
 
             with (
                 patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": td}),

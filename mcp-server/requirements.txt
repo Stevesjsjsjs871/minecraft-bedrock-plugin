@@ -1,2 +1,0 @@
-# No third-party dependencies are required for the 0.6.7 stdio MCP server.
-# Python 3.10+ standard library only.

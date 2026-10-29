@@ -26,7 +26,10 @@
           "type": "string"
         },
         "sha256": {
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "archive_valid": {
           "type": [
@@ -163,6 +166,7 @@
     "recommendation": {
       "enum": [
         "HOLD",
+        "REVIEW",
         "STATIC CHECKS PASSED — RUNTIME NOT VERIFIED",
         "INSUFFICIENT EVIDENCE",
         "READY FOR RUNTIME TEST"

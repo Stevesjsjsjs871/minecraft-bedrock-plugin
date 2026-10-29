@@ -1,0 +1,75 @@
+{
+  "fixture": "valid",
+  "description": "Expected deterministic reference-edge projection for the valid synthetic BP/RP pack. Random manifest UUIDs are deliberately excluded.",
+  "expected_edge_count": 8,
+  "expected_status_counts": {
+    "resolved": 7,
+    "alias_or_heuristic": 1
+  },
+  "edges": [
+    {
+      "source_file": "RP/render_controllers/test.render_controllers.json",
+      "source_pointer": "$/render_controllers/controller.render.regression_test/geometry/value",
+      "reference_kind": "render_controller_geometry",
+      "referenced_value": "geometry.regression_test",
+      "target_domain": "geometry",
+      "status": "resolved"
+    },
+    {
+      "source_file": "RP/render_controllers/test.render_controllers.json",
+      "source_pointer": "$/render_controllers/controller.render.regression_test/textures/0",
+      "reference_kind": "render_controller_textures",
+      "referenced_value": "default",
+      "target_domain": "textures",
+      "status": "alias_or_heuristic"
+    },
+    {
+      "source_file": "RP/entity/test.entity.json",
+      "source_pointer": "$/minecraft:client_entity/description/geometry/default",
+      "reference_kind": "geometry",
+      "referenced_value": "geometry.regression_test",
+      "target_domain": "geometry",
+      "status": "resolved"
+    },
+    {
+      "source_file": "RP/entity/test.entity.json",
+      "source_pointer": "$/minecraft:client_entity/description/animations/idle",
+      "reference_kind": "animations",
+      "referenced_value": "animation.regression_test",
+      "target_domain": "animations",
+      "status": "resolved"
+    },
+    {
+      "source_file": "RP/entity/test.entity.json",
+      "source_pointer": "$/minecraft:client_entity/description/render_controllers/0",
+      "reference_kind": "render_controllers",
+      "referenced_value": "controller.render.regression_test",
+      "target_domain": "render_controllers",
+      "status": "resolved"
+    },
+    {
+      "source_file": "RP/entity/test.entity.json",
+      "source_pointer": "$/minecraft:client_entity/description/textures/default",
+      "reference_kind": "texture_path",
+      "referenced_value": "textures/entity/test",
+      "target_domain": "textures",
+      "status": "resolved"
+    },
+    {
+      "source_file": "RP/ui/_ui_defs.json",
+      "source_pointer": "$/ui_defs/0",
+      "reference_kind": "ui_definition_import",
+      "referenced_value": "ui/test_screen.json",
+      "target_domain": "ui_files",
+      "status": "resolved"
+    },
+    {
+      "source_file": "RP/ui/test_screen.json",
+      "source_pointer": "$/test_screen/text",
+      "reference_kind": "ui_localization_key",
+      "referenced_value": "gui.regression_title",
+      "target_domain": "localization_keys",
+      "status": "resolved"
+    }
+  ]
+}

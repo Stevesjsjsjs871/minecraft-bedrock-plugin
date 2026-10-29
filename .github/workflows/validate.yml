@@ -17,17 +17,38 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Compile analyzer, MCP server and regression harness
+      - name: Install report-schema validator
+        run: python -m pip install jsonschema
+      - name: Compile analyzer, MCP server and evaluation tools
         run: |
+          python -m py_compile archive_safety.py
+          python -m py_compile server/mcp_server.py server/tests/test_mcp_server.py
           python -m py_compile skills/automated-validation/scripts/bedrock_audit.py
+          python -m py_compile skills/automated-validation/scripts/validate_report.py
           python -m py_compile skills/regression-evals/scripts/regression_tests.py
-          python -m py_compile mcp-server/server.py mcp-server/tests/test_server.py
-      - name: Test MCP server schemas, protocol and safety
-        run: python -m unittest discover -s mcp-server/tests -v
-      - name: Run regression cases
+          python -m py_compile skills/audit-benchmark/scripts/evaluate_benchmark.py
+          python -m py_compile skills/audit-benchmark/scripts/test_evaluate_benchmark.py
+      - name: Test MCP server schemas, protocol, diff tool and safety
+        run: python -m unittest discover -s server/tests -v
+      - name: Test benchmark evaluator safety and metrics
+        run: python -m unittest discover -s skills/audit-benchmark/scripts -p 'test_*.py' -v
+      - name: Run analyzer regression cases and report-schema checks
         run: python skills/regression-evals/scripts/regression_tests.py --auditor skills/automated-validation/scripts/bedrock_audit.py
-      - name: Check package and MCP server versions
+      - name: Check package, compatibility manifest and server versions
         run: |
-          python -c "import json; p=json.load(open('plugin.json')); assert p['version']=='0.6.7' and p['name']=='minecraft-bedrock-engineer'"
-          python -c "import json; p=json.load(open('.codex-plugin/plugin.json')); assert p['version']=='0.6.7' and p['name']=='minecraft-bedrock-engineer'"
-          python -c "import runpy; m=runpy.run_path('mcp-server/server.py'); assert m['SERVER_VERSION']=='0.6.7'"
+          python - <<'PY'
+          import json
+          import runpy
+          from pathlib import Path
+
+          expected = "0.8.0"
+          assert Path("VERSION").read_text(encoding="utf-8").strip() == expected
+          root = json.loads(Path("plugin.json").read_text(encoding="utf-8"))
+          compat = json.loads(Path(".codex-plugin/plugin.json").read_text(encoding="utf-8"))
+          assert root["name"] == compat["name"] == "minecraft-bedrock-engineer"
+          assert root["version"] == compat["version"] == expected
+          assert root["extensions"]["com.openai"]["interface"]["defaultPrompt"] == compat["interface"]["defaultPrompt"]
+          server = runpy.run_path("server/mcp_server.py")
+          assert server["SERVER_VERSION"] == expected
+          print("PASS: package, manifests, prompts and MCP server are synchronized at", expected)
+          PY

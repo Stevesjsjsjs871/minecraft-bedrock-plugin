@@ -5,10 +5,16 @@ Python 3 standard library only. Model-format assumptions are intentionally conse
 """
 from __future__ import annotations
 import argparse, hashlib, json, re, sys, zipfile
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 from typing import Any
 
-TOOL_VERSION = "0.6.4"
+ROOT = Path(__file__).resolve().parents[3]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+from archive_safety import validate_zip_limits
+
+VERSION_FILE = ROOT / "VERSION"
+TOOL_VERSION = VERSION_FILE.read_text(encoding="utf-8").strip()
 PATH_KEYS = {"texture", "texture_path", "path", "file", "sound", "particle_effect"}
 IDENTIFIER_KEYS = {"geometry", "animation", "animations", "animation_controller", "animation_controllers", "render_controllers", "materials"}
 
@@ -29,8 +35,10 @@ def walk(obj, pointer='$'):
     elif isinstance(obj,list):
         for i,v in enumerate(obj): yield from walk(v,f'{pointer}/{i}')
 def load_archive(path, findings):
-    meta={"path":path,"sha256":sha256_file(path),"archive_valid":False}; files={}
+    meta={"path":path,"sha256":None,"archive_valid":False}; files={}
     try:
+        validate_zip_limits(path)
+        meta["sha256"] = sha256_file(path)
         with zipfile.ZipFile(path) as z:
             bad=z.testzip()
             if bad:
@@ -46,8 +54,8 @@ def load_archive(path, findings):
                 try: files[name]=z.read(info)
                 except Exception as e: findings.append(finding('HIGH','HIGH','Could not read archive member',str(e),name,'Member could not be audited.','Repair the archive.'))
             meta['archive_valid']=True
-    except (OSError,zipfile.BadZipFile,RuntimeError) as e:
-        findings.append(finding('BLOCKER','HIGH','Archive cannot be opened',str(e),path,'Archive contents unavailable.','Supply a valid ZIP-compatible archive.'))
+    except (OSError,zipfile.BadZipFile,RuntimeError,ValueError) as e:
+        findings.append(finding('BLOCKER','HIGH','Archive cannot be opened safely',str(e),path,'Archive contents unavailable or exceeded the declared resource limits.','Supply a valid ZIP-compatible archive within documented limits.'))
     return files,meta
 def parse_json(files,findings):
     parsed={}
@@ -163,6 +171,102 @@ def audit_animation(path,data,findings):
             for channel,val in channels.items():
                 if channel not in ('position','rotation','scale'): continue
                 if isinstance(val,list) and not valid_vec(val): findings.append(finding('INFO','MEDIUM','Unusual animation vector',f'{aid}/{bn}/{channel}: {val!r}.',path,'Could be valid Molang/keyframe syntax.','Check actual schema; not auto-rejected.'))
+
+def audit_animation_controllers(path, data, findings):
+    """Check literal controller state targets without evaluating Molang conditions."""
+    controllers = data.get('animation_controllers') if isinstance(data, dict) else None
+    if not isinstance(controllers, dict):
+        return
+    for controller_id, controller in controllers.items():
+        if not isinstance(controller, dict):
+            continue
+        states = controller.get('states')
+        if not isinstance(states, dict):
+            findings.append(finding(
+                'MEDIUM', 'MEDIUM', 'Animation controller states malformed',
+                f'{controller_id}: expected an object at animation_controllers/{controller_id}/states.',
+                path, 'State transitions cannot be checked because the state map is unavailable.',
+                'Verify the controller against the target-version animation-controller schema.'))
+            continue
+        initial = controller.get('initial_state')
+        if isinstance(initial, str) and initial not in states:
+            findings.append(finding(
+                'MEDIUM', 'HIGH', 'Unresolved animation controller initial state',
+                f'{controller_id}: initial_state={initial!r} is not a key in states ({sorted(str(k) for k in states)}).',
+                path, 'The controller may begin in a state that is not defined.',
+                'Correct the initial_state spelling or add the intended state.'))
+        for state_name, state in states.items():
+            if not isinstance(state, dict):
+                continue
+            transitions = state.get('transitions', [])
+            if transitions is None:
+                continue
+            if not isinstance(transitions, list):
+                findings.append(finding(
+                    'INFO', 'MEDIUM', 'Animation controller transitions unusual',
+                    f'{controller_id}/{state_name}: transitions should be an array for this check; received {type(transitions).__name__}.',
+                    path, 'Transition targets were not fully inspected.',
+                    'Confirm the transition structure for the selected Bedrock version.'))
+                continue
+            for transition_index, transition in enumerate(transitions):
+                if not isinstance(transition, dict):
+                    continue
+                # In the usual Bedrock form, the transition target is the key and
+                # the value is a Molang condition. Never evaluate the condition.
+                for target_state in transition:
+                    if isinstance(target_state, str) and target_state not in states:
+                        findings.append(finding(
+                            'MEDIUM', 'HIGH', 'Unresolved animation controller transition state',
+                            f'{controller_id}/{state_name}/transitions/{transition_index}: target state {target_state!r} is not defined in this controller.',
+                            path, 'When the transition condition becomes true, its target may not exist.',
+                            'Fix the target state name or add the intended state.'))
+
+
+def audit_animation_bone_references(parsed, findings):
+    """Report bone targets absent from all indexed geometry as INFO/LOW only."""
+    geometry_bones = set()
+    geometry_count = 0
+    for data in parsed.values():
+        if not isinstance(data, dict):
+            continue
+        geometries = data.get('minecraft:geometry')
+        if not isinstance(geometries, list):
+            continue
+        for geometry in geometries:
+            if not isinstance(geometry, dict):
+                continue
+            geometry_count += 1
+            bones = geometry.get('bones', [])
+            if isinstance(bones, list):
+                geometry_bones.update(
+                    bone.get('name') for bone in bones
+                    if isinstance(bone, dict) and isinstance(bone.get('name'), str)
+                )
+    # No geometry means no safe in-archive comparison can be made.
+    if geometry_count == 0:
+        return
+    for animation_path, data in parsed.items():
+        if not isinstance(data, dict):
+            continue
+        animations = data.get('animations')
+        if not isinstance(animations, dict):
+            continue
+        for animation_id, animation in animations.items():
+            if not isinstance(animation, dict):
+                continue
+            bones = animation.get('bones')
+            if not isinstance(bones, dict):
+                continue
+            for bone_name in bones:
+                if not isinstance(bone_name, str) or bone_name in geometry_bones:
+                    continue
+                if any(token in bone_name for token in ('{', '}', 'query.', 'variable.', '$')):
+                    continue
+                findings.append(finding(
+                    'INFO', 'LOW', 'Possible unresolved animation bone target',
+                    f'animations/{animation_id}/bones/{bone_name}: bone name was not found in any of {geometry_count} indexed geometry definition(s). Cross-geometry association is not inferred.',
+                    animation_path, 'This can be a typo, but the animation may belong to an external/omitted geometry or an alternate model context.',
+                    'Check the animation against every geometry that can use it before changing the bone name.'))
 
 def resolve_ref_name(value, definitions):
     if isinstance(value,str):
@@ -315,6 +419,24 @@ def audit_reference_graph(files, parsed, findings):
         if '/attachables/' in '/'+low: add_file_def('attachables', path, 'file')
         if '/particles/' in '/'+low: add_file_def('particles', path, 'file')
         if '/sounds/' in '/'+low or low.endswith('sounds.json'): add_file_def('sounds', path, 'file')
+    # Recognizable UI-definition import edges (heuristic path resolution only).
+    for path, data in parsed.items():
+        if not isinstance(data, dict) or 'ui_defs' not in data:
+            continue
+        refs = data.get('ui_defs')
+        if not isinstance(refs, list):
+            continue
+        source_parent = str(PurePosixPath(path).parent)
+        for index, ref in enumerate(refs):
+            if not isinstance(ref, str) or not ref.strip():
+                continue
+            candidates = [ref]
+            if not ref.lower().endswith('.json'):
+                candidates.append(ref + '.json')
+            candidates.extend('ui/' + cand for cand in list(candidates))
+            if source_parent not in ('', '.'):
+                candidates.extend(str(PurePosixPath(source_parent) / cand) for cand in list(candidates))
+            resolve_path(path, ptr(['ui_defs', index]), 'ui_definition_import', ref, candidates, 'ui_files')
     # Index explicit definitions from JSON structures.
     for path, data in parsed.items():
         if not isinstance(data, dict): continue
@@ -338,6 +460,39 @@ def audit_reference_graph(files, parsed, findings):
             if isinstance(data.get(rtype),dict):
                 ident=data[rtype].get('description',{}).get('identifier') if isinstance(data[rtype].get('description'),dict) else None
                 add_def('recipes',ident,path,ptr([rtype,'description','identifier']))
+    # Localization references from known UI text properties; literal-only and heuristic.
+    lang_keys = {}
+    for lang_path, raw in files.items():
+        if not lang_path.lower().endswith('.lang'):
+            continue
+        try:
+            lang_text = raw.decode('utf-8-sig')
+        except UnicodeDecodeError:
+            continue
+        for line_no, line in enumerate(lang_text.splitlines(), 1):
+            stripped = line.strip()
+            if not stripped or stripped.startswith('#') or '=' not in stripped:
+                continue
+            localization_key = stripped.split('=', 1)[0].strip()
+            if localization_key:
+                lang_keys.setdefault(localization_key, []).append({'file': lang_path, 'pointer': f'line:{line_no}'})
+    # Record possible UI localization uses in the same graph as other cross-resource refs.
+    for ui_path, ui_data in parsed.items():
+        low = ui_path.lower().replace('\\', '/')
+        if not ('/ui/' in '/' + low or low.startswith('ui/')):
+            continue
+        for pointer, key_name, value in walk(ui_data):
+            if str(key_name).lower() != 'text' or not isinstance(value, str):
+                continue
+            match = re.fullmatch(r'\$([A-Za-z0-9_.-]+)', value.strip())
+            if not match:
+                continue
+            key_value = match.group(1)
+            target_files = [loc['file'] for loc in lang_keys.get(key_value, [])]
+            record(ui_path, pointer, 'ui_localization_key', key_value, 'localization_keys',
+                   'resolved' if target_files else 'heuristic_unresolved', target_files, 'HIGH' if target_files else 'LOW',
+                   '' if target_files else 'Literal UI lookup was not found in indexed in-archive .lang files; external/dynamic sources may satisfy it.')
+    # Known client-entity graph edges.
     # Known client-entity graph edges.
     for path, data in parsed.items():
         if not isinstance(data, dict): continue
@@ -432,17 +587,162 @@ def audit_reference_graph(files, parsed, findings):
             if k in ('path','texture','texture_path','file','include','$include') and ('/' in value or value.lower().endswith(('.json','.png','.tga','.jpg'))):
                 norm=value.replace('\\','/').lstrip('./')
                 resolve_path(path,pointer,'ui_resource_path',value,[norm,norm+'.json'], 'ui_files')
+    # Literal BP/RP identifier links from common item and block component fields.
+    # This deliberately checks an allowlist of exact component/field paths and skips expressions.
+    for path, data in parsed.items():
+        if not isinstance(data, dict):
+            continue
+        # Items and blocks declare identifiers in BP; only resolve against explicit in-pack definitions.
+        entity = data.get('minecraft:entity')
+        item = data.get('minecraft:item')
+        block_data = data.get('minecraft:block')
+        for root_key, root_data, domain in (
+            ('minecraft:item', item, 'items'),
+            ('minecraft:block', block_data, 'blocks'),
+            ('minecraft:entity', entity, 'entities'),
+        ):
+            if not isinstance(root_data, dict):
+                continue
+            components = root_data.get('components')
+            if not isinstance(components, dict):
+                continue
+            for component_name, component_value in components.items():
+                if not isinstance(component_value, (str, dict, list)):
+                    continue
+                if component_name == 'minecraft:entity' and isinstance(component_value, dict):
+                    ident = component_value.get('identifier')
+                    if isinstance(ident, str):
+                        resolve_id(path, ptr([root_key, 'components', component_name, 'identifier']),
+                                   'component_entity_identifier', ident, 'entities')
+                if component_name == 'minecraft:loot':
+                    # Current documentation uses {"table": "loot_tables/...json"};
+                    # keep literal string values readable for legacy/custom inputs too.
+                    loot_ref = component_value.get('table') if isinstance(component_value, dict) else component_value
+                    if isinstance(loot_ref, str) and loot_ref.strip():
+                        loot_ref = loot_ref.replace('\\', '/').lstrip('./')
+                        candidates = [loot_ref]
+                        if not loot_ref.lower().endswith('.json'):
+                            candidates.append(loot_ref + '.json')
+                        if not loot_ref.startswith('loot_tables/'):
+                            candidates.append('loot_tables/' + loot_ref + ('' if loot_ref.lower().endswith('.json') else '.json'))
+                        pointer_parts = [root_key, 'components', component_name]
+                        if isinstance(component_value, dict):
+                            pointer_parts.append('table')
+                        resolve_path(path, ptr(pointer_parts),
+                                     'component_loot_table_path', loot_ref, candidates, 'loot_tables')
+                    elif isinstance(component_value, dict):
+                        findings.append(finding('INFO', 'MEDIUM', 'Loot component table path has an unusual shape',
+                            'minecraft:loot is an object but its table field is not a non-empty string.', path,
+                            'The analyzer cannot resolve the intended loot-table resource from this shape.',
+                            'Check the minecraft:loot component against the target-version Creator documentation.'))
+                if component_name == 'minecraft:icon':
+                    icon_value = component_value.get('texture') if isinstance(component_value, dict) else component_value
+                    if isinstance(icon_value, str) and not is_expr(icon_value):
+                        # Item icons are generally aliases in item_texture.json, so retain alias-like status.
+                        record(path, ptr([root_key, 'components', component_name]), 'item_icon_alias', icon_value,
+                               'textures', 'alias_or_heuristic', [], 'LOW',
+                               'Icon values commonly refer to aliases in textures/item_texture.json; alias expansion is not modeled.')
+                if component_name == 'minecraft:display_name' and isinstance(component_value, dict):
+                    value = component_value.get('value')
+                    if isinstance(value, str) and value.startswith('$') and not is_expr(value[1:]):
+                        key = value[1:]
+                        targets = lang_keys.get(key, [])
+                        record(path, ptr([root_key, 'components', component_name, 'value']),
+                               'component_localization_key', key, 'localization_keys',
+                               'resolved' if targets else 'heuristic_unresolved',
+                               [t['file'] for t in targets], 'HIGH' if targets else 'LOW',
+                               '' if targets else 'No matching in-archive .lang key; external or alternate localization providers may exist.')
+    # Nested loot-table entry references. These are literal path candidates only;
+    # dynamic expressions and external packs are not resolved.
+    for path, data in parsed.items():
+        normalized_path = path.lower().replace('\\', '/')
+        if '/loot_tables/' not in '/' + normalized_path or not isinstance(data, dict):
+            continue
+        pools = data.get('pools')
+        if not isinstance(pools, list):
+            continue
+        for pool_index, pool in enumerate(pools):
+            if not isinstance(pool, dict) or not isinstance(pool.get('entries'), list):
+                continue
+            for entry_index, entry in enumerate(pool['entries']):
+                if not isinstance(entry, dict) or entry.get('type') != 'loot_table':
+                    continue
+                value = entry.get('name')
+                if not isinstance(value, str) or not value.strip():
+                    continue
+                ref = value.replace('\\', '/').lstrip('./')
+                candidates = [ref]
+                if not ref.lower().endswith('.json'):
+                    candidates.append(ref + '.json')
+                if not ref.startswith('loot_tables/'):
+                    candidates.append('loot_tables/' + ref + ('' if ref.lower().endswith('.json') else '.json'))
+                resolve_path(path, ptr(['pools', pool_index, 'entries', entry_index, 'name']),
+                             'loot_table_entry_reference', value, candidates, 'loot_tables')
+
+    # Report cycles only when every edge in the detected cycle resolved to one
+    # in-archive target. This is a bounded static graph check, not an engine simulation.
+    adjacency = {}
+    for edge in edges:
+        if edge.get('reference_kind') != 'loot_table_entry_reference' or edge.get('status') != 'resolved':
+            continue
+        targets = edge.get('target_files', [])
+        if len(targets) == 1:
+            adjacency.setdefault(edge['source_file'], []).append(targets[0])
+    visit_state = {}
+    reported_cycles = set()
+    all_loot_nodes = sorted(set(adjacency) | {t for targets in adjacency.values() for t in targets})
+    for root_node in all_loot_nodes:
+        if visit_state.get(root_node, 0) != 0:
+            continue
+        node_stack = [root_node]
+        stack_positions = {root_node: 0}
+        visit_state[root_node] = 1
+        frames = [(root_node, iter(adjacency.get(root_node, [])))]
+        while frames:
+            node, children = frames[-1]
+            try:
+                target = next(children)
+            except StopIteration:
+                frames.pop()
+                finished = node_stack.pop()
+                stack_positions.pop(finished, None)
+                visit_state[finished] = 2
+                continue
+            state = visit_state.get(target, 0)
+            if state == 0:
+                visit_state[target] = 1
+                stack_positions[target] = len(node_stack)
+                node_stack.append(target)
+                frames.append((target, iter(adjacency.get(target, []))))
+            elif state == 1 and target in stack_positions:
+                cycle_nodes = node_stack[stack_positions[target]:]
+                signature = tuple(sorted(set(cycle_nodes)))
+                if signature not in reported_cycles:
+                    reported_cycles.add(signature)
+                    chain = cycle_nodes + [target]
+                    findings.append(finding('MEDIUM', 'HIGH', 'Recursive loot-table reference cycle',
+                        'Resolved in-archive loot-table references form a cycle: ' + ' -> '.join(chain) + '.',
+                        node, 'Recursive loot tables can cause the referenced loot branch to return no loot.',
+                        'Break the cycle or replace one nested loot_table entry with a non-recursive table.'))
+
     # Counts and coverage metadata are part of the public report contract.
     counts={}
     for edge in edges: counts[edge['status']]=counts.get(edge['status'],0)+1
     indexed={domain:len(items) for domain,items in defs.items()}
     coverage={
         'client_entity_geometry_animation_controller_texture':'partial',
+        'animation_controller_state_targets':'literal_targets_checked_molang_not_evaluated',
+        'animation_bone_targets':'heuristic_global_geometry_inventory',
         'attachable_references':'partial',
         'render_controller_aliases':'heuristic',
-        'ui_paths':'partial',
-        'localization':'heuristic',
-        'recipes_and_loot':'inventory_only_partial',
+        'ui_paths':'partial_with_ui_defs_import_edges_and_literal_text_lookup_checks',
+        'localization':'heuristic_per_file_duplicate_and_literal_ui_lookup_checks',
+        'ui_control_references':'heuristic_recognizable_namespace_candidates_only',
+        'bp_item_block_entity_components':'partial_allowlisted_literal_fields_only',
+        'item_icon_aliases':'not_expanded_alias_or_heuristic',
+        'recipes_and_loot':'partial_literal_component_and_nested_loot_table_path_checks',
+        'loot_table_structure':'conservative_common_fields_only',
+        'loot_table_cycles':'resolved_in_archive_nested_reference_cycles_only',
         'script_api_references':'not_implemented',
         'external_packs':'not_resolved',
         'runtime':'not_tested'
@@ -451,6 +751,246 @@ def audit_reference_graph(files, parsed, findings):
             "edges":edges,"edge_count":len(edges),"status_counts":counts,
             "scope":{"indexed_files":len(files),"parsed_json_files":len(parsed),"definitions_by_domain":indexed,
                      "coverage":coverage,"static_only":True}}
+
+
+def audit_ui_localization(files, parsed, findings):
+    """Conservative UI file and .lang checks; never treats heuristics as engine proof."""
+    known_paths = set(files)
+
+    def is_ui_path(path):
+        low = path.lower().replace('\\', '/')
+        return '/ui/' in '/' + low or low.startswith('ui/')
+
+    def resolve_ui_path(value, source_path):
+        norm = value.replace('\\', '/').lstrip('./')
+        candidates = [norm]
+        if not norm.lower().endswith('.json'):
+            candidates.append(norm + '.json')
+        # Common pack-root and UI-root path interpretations only; no extraction or I/O.
+        candidates.extend('ui/' + candidate for candidate in list(candidates))
+        source_parent = str(PurePosixPath(source_path).parent)
+        if source_parent not in ('', '.'):
+            candidates.extend(str(PurePosixPath(source_parent) / candidate) for candidate in list(candidates))
+        hits = []
+        for candidate in candidates:
+            for path in known_paths:
+                if path == candidate or path.lower() == candidate.lower() or path.lower().endswith('/' + candidate.lower()):
+                    if path not in hits:
+                        hits.append(path)
+        return hits
+
+    # Duplicates are checked per file, not across locale files: translations
+    # routinely define the same key in en_US.lang, fr_FR.lang, and others.
+    lang_keys = {}
+    for path, raw in files.items():
+        if not path.lower().endswith('.lang'):
+            continue
+        try:
+            content = raw.decode('utf-8-sig')
+        except UnicodeDecodeError:
+            findings.append(finding('INFO', 'MEDIUM', 'Localization file is not UTF-8',
+                'Could not decode .lang file as UTF-8; key checks were skipped.', path,
+                'Localization coverage is incomplete for this file.',
+                'Confirm the file encoding and expected game format.'))
+            continue
+        seen_in_file = {}
+        for line_no, line in enumerate(content.splitlines(), 1):
+            stripped = line.strip()
+            if not stripped or stripped.startswith('#') or '=' not in line:
+                continue
+            key = line.split('=', 1)[0].strip()
+            if not key:
+                findings.append(finding('INFO', 'MEDIUM', 'Empty localization key',
+                    f'Line {line_no} contains an assignment but the key before "=" is empty.', path,
+                    'The entry cannot be addressed by a named localization lookup.',
+                    'Add the intended key or remove the empty assignment.'))
+                continue
+            lang_keys.setdefault(key, []).append({'file': path, 'pointer': f'line:{line_no}'})
+            if key in seen_in_file:
+                findings.append(finding('MEDIUM', 'HIGH', 'Duplicate localization key in file',
+                    f'Key {key!r} appears more than once in the same file (lines {seen_in_file[key]} and {line_no}).', path,
+                    'Duplicate assignments can make the effective value dependent on parser ordering.',
+                    'Keep one definition for this key in this language file.'))
+            else:
+                seen_in_file[key] = line_no
+
+    namespaces = set()
+    for ui_data in parsed.values():
+        if isinstance(ui_data, dict) and isinstance(ui_data.get('namespace'), str) and ui_data['namespace'].strip():
+            namespaces.add(ui_data['namespace'].strip())
+    for path, data in parsed.items():
+        if not is_ui_path(path):
+            continue
+        if not isinstance(data, dict):
+            findings.append(finding('INFO', 'LOW', 'UI JSON top-level shape is unusual',
+                f'Expected an object for common UI JSON; found {type(data).__name__}.', path,
+                'The analyzer cannot reliably inspect controls or declarations in this file.',
+                'Check the file against the target-version UI format; this may be a valid alternate resource.'))
+            continue
+        if 'namespace' in data and not isinstance(data.get('namespace'), str):
+            findings.append(finding('INFO', 'MEDIUM', 'UI namespace has an unusual type',
+                f'Expected a string when namespace is supplied; found {type(data.get("namespace")).__name__}.', path,
+                'Namespace-based control references may not resolve as intended.',
+                'Check the namespace field against the target-version UI conventions.'))
+        if 'ui_defs' in data:
+            ui_defs = data.get('ui_defs')
+            if not isinstance(ui_defs, list):
+                findings.append(finding('INFO', 'MEDIUM', 'UI ui_defs has an unusual type',
+                    f'Expected an array when ui_defs is supplied; found {type(ui_defs).__name__}.', path,
+                    'Imported UI definitions were not fully inspected.',
+                    'Check ui_defs against the target-version UI format.'))
+            else:
+                seen_refs = {}
+                for index, ref in enumerate(ui_defs):
+                    if not isinstance(ref, str) or not ref.strip():
+                        findings.append(finding('INFO', 'MEDIUM', 'UI ui_defs entry is not a path string',
+                            f'ui_defs[{index}] must be a non-empty string; found {ref!r}.', path,
+                            'The import entry cannot be resolved by this static checker.',
+                            'Use the expected relative UI JSON path.'))
+                        continue
+                    # An exact repeated import entry is almost always accidental; keep it INFO until engine behavior is proven.
+                    normalized_ref = ref.strip().replace('\\', '/').lower()
+                    if normalized_ref in seen_refs:
+                        findings.append(finding('INFO', 'MEDIUM', 'Duplicate UI definition entry',
+                            f'ui_defs entry {ref!r} repeats an earlier entry at index {seen_refs[normalized_ref]} (also index {index}).', path,
+                            'Repeated imports may be redundant or may alter definition precedence.',
+                            'Review whether the repeated entry is intentional.'))
+                    else:
+                        seen_refs[normalized_ref] = index
+                    hits = resolve_ui_path(ref, path)
+                    if not hits:
+                        findings.append(finding('INFO', 'LOW', 'Possible unresolved UI definition path',
+                            f'ui_defs[{index}] references {ref!r}; no matching in-archive path was found after common relative-path variants.', path,
+                            'The target may be external, injected by another pack, or use a path convention not modeled here.',
+                            'Verify path spelling/case and inspect the complete resource-pack UI folder.'))
+                    elif len(hits) > 1:
+                        findings.append(finding('INFO', 'LOW', 'Ambiguous UI definition path',
+                            f'ui_defs[{index}] references {ref!r}; candidate paths are {hits}.', path,
+                            'Multiple in-archive paths match common path variants.',
+                            'Confirm the intended file under target-version loading conventions.'))
+        # Common control-reference patterns are only checked when they are recognizable literal strings.
+        # The Bedrock UI schema is broad and varies by version, so all results stay INFO/LOW heuristics.
+        control_reference_keys = {'extends', 'controls', 'control_name', 'control'}
+        for pointer, key, value in walk(data):
+            if str(key).lower() not in control_reference_keys:
+                continue
+            refs = value if isinstance(value, list) else [value]
+            for ref in refs:
+                if not isinstance(ref, str) or not ref.strip():
+                    continue
+                literal = ref.strip()
+                if any(token in literal for token in ('{', '}', '$', 'query.', 'variable.', 'math.')):
+                    continue
+                # `controls` frequently contains arrays/maps of full control declarations;
+                # do not treat arbitrary control bodies as names.
+                if str(key).lower() == 'controls':
+                    if not isinstance(value, list):
+                        continue
+                # A control name normally uses namespace.control; avoid flagging ordinary identifiers.
+                if '.' not in literal or '/' in literal or literal.endswith('.json'):
+                    continue
+                namespace_prefix = literal.split('.', 1)[0]
+                if namespace_prefix not in namespaces:
+                    findings.append(finding('INFO', 'LOW', 'Possible unresolved UI control reference',
+                        f'{pointer} references {literal!r}; no matching namespace was declared in indexed UI JSON files.', path,
+                        'The name may be defined externally, via an implicit namespace, or with a format not modeled here.',
+                        'Search all UI definitions and verify naming and namespace rules for the target version.'))
+        # Keep localization checks to simple `$key` literals in `text` properties.
+        # Do not treat variable expressions or arbitrary strings as missing keys.
+        for pointer, key, value in walk(data):
+            if str(key).lower() != 'text' or not isinstance(value, str):
+                continue
+            match = re.fullmatch(r'\$([A-Za-z0-9_.-]+)', value.strip())
+            if not match:
+                continue
+            localization_key = match.group(1)
+            if localization_key not in lang_keys:
+                findings.append(finding('INFO', 'LOW', 'Possible unresolved UI localization key',
+                    f'{pointer} uses literal localization lookup {value!r}, but no matching key was found in indexed .lang files.', path,
+                    'Text may fall back to the key, or the key may be supplied by an external pack or unsupported localization format.',
+                    'Check all locale files and external dependencies before adding or renaming a key.'))
+
+
+
+def audit_loot_table_structure(parsed, findings):
+    """Check common loot-table structure without claiming full versioned-schema validation."""
+    def is_loot_path(path):
+        low = path.lower().replace('\\', '/')
+        return '/loot_tables/' in '/' + low
+
+    def issue(title, evidence, path, recommendation):
+        findings.append(finding('MEDIUM', 'HIGH', title, evidence, path,
+            'The file shape conflicts with common documented Bedrock loot-table fields.', recommendation))
+
+    for path, data in parsed.items():
+        if not is_loot_path(path):
+            continue
+        if not isinstance(data, dict):
+            issue('Loot table root has an invalid type',
+                  f'Expected a JSON object for loot table; found {type(data).__name__}.', path,
+                  'Use a root JSON object and verify it against the target-version loot-table format.')
+            continue
+        if 'pools' not in data:
+            # Keep absent pools as a low-risk advisory: the analyzer doesn't model every version/context.
+            findings.append(finding('INFO', 'MEDIUM', 'Loot table has no pools field',
+                'No top-level pools array was found in this loot-table-like file.', path,
+                'This may be an incomplete table or a schema/context not modeled by the static checker.',
+                'Check the file against a version-matched loot-table example.'))
+            continue
+        pools = data.get('pools')
+        if not isinstance(pools, list):
+            issue('Loot table pools has an invalid type',
+                  f'Expected top-level pools to be an array; found {type(pools).__name__}.', path,
+                  'Set pools to an array of loot pool objects.')
+            continue
+        for pool_index, pool in enumerate(pools):
+            pool_path = f'$.pools/{pool_index}'
+            if not isinstance(pool, dict):
+                issue('Loot table pool has an invalid type',
+                      f'{pool_path} should be an object; found {type(pool).__name__}.', path,
+                      'Use an object for each pool.')
+                continue
+            if 'entries' not in pool or not isinstance(pool.get('entries'), list):
+                actual = 'missing' if 'entries' not in pool else type(pool.get('entries')).__name__
+                issue('Loot table pool entries has an invalid type',
+                      f'{pool_path}/entries should be an array; found {actual}.', path,
+                      'Add an entries array containing loot entry objects.')
+                continue
+            rolls = pool.get('rolls')
+            if rolls is not None:
+                valid_rolls = isinstance(rolls, int) and not isinstance(rolls, bool) and rolls >= 1
+                if isinstance(rolls, dict):
+                    mn, mx = rolls.get('min', 1), rolls.get('max', 1)
+                    valid_rolls = (isinstance(mn, int) and not isinstance(mn, bool) and mn >= 1
+                                   and isinstance(mx, int) and not isinstance(mx, bool) and mx >= mn)
+                if not valid_rolls:
+                    issue('Loot table pool rolls has an invalid shape',
+                          f'{pool_path}/rolls has unsupported value {rolls!r}; expected a positive integer or a valid min/max range.', path,
+                          'Use a positive integer or an object with integer min/max values where max is at least min.')
+            for entry_index, entry in enumerate(pool['entries']):
+                entry_path = f'{pool_path}/entries/{entry_index}'
+                if not isinstance(entry, dict):
+                    issue('Loot table entry has an invalid type',
+                          f'{entry_path} should be an object; found {type(entry).__name__}.', path,
+                          'Use an object for each loot entry.')
+                    continue
+                entry_type = entry.get('type')
+                if entry_type is not None and not isinstance(entry_type, str):
+                    issue('Loot table entry type has an invalid type',
+                          f'{entry_path}/type should be a string; found {type(entry_type).__name__}.', path,
+                          'Set type to a supported loot entry string for the target game version.')
+                if entry_type in ('item', 'loot_table'):
+                    name = entry.get('name')
+                    if not isinstance(name, str) or not name.strip():
+                        issue('Loot table entry name is missing',
+                              f'{entry_path} has type {entry_type!r} but no non-empty string name.', path,
+                              'Supply the item identifier or loot-table path required by this entry type.')
+                weight = entry.get('weight')
+                if weight is not None and (not isinstance(weight, int) or isinstance(weight, bool) or weight < 1):
+                    issue('Loot table entry weight has an invalid value',
+                          f'{entry_path}/weight should be a positive integer; found {weight!r}.', path,
+                          'Use a positive integer weight.')
+
 
 def diff_files(cand,base):
     if base is None:return {'added':[],'removed':[],'modified':[]}
@@ -462,6 +1002,10 @@ def main():
     for p,d in parsed.items():
         if p.lower().endswith('.geo.json') or 'geometry' in PurePosixPath(p).parts: audit_geometry(p,d,findings)
         if 'animations' in PurePosixPath(p).parts or 'animation' in PurePosixPath(p).name.lower(): audit_animation(p,d,findings)
+        if isinstance(d, dict) and isinstance(d.get('animation_controllers'), dict): audit_animation_controllers(p,d,findings)
+    audit_animation_bone_references(parsed,findings)
+    audit_ui_localization(files,parsed,findings)
+    audit_loot_table_structure(parsed,findings)
     audit_reference_inventory(files,parsed,findings)
     reference_graph=audit_reference_graph(files,parsed,findings)
     basefiles=basemeta=None
@@ -475,8 +1019,8 @@ def main():
     diff=diff_files(files,basefiles)
     for p in diff['removed']: findings.append(finding('HIGH','HIGH','File removed relative to baseline',f'Candidate no longer contains {p!r}.',p,'Potential destructive regression.','Review intended scope; do not ignore unexplained removal.'))
     for p in diff['modified']: findings.append(finding('INFO','MEDIUM','File changed relative to baseline',f'Content hash differs for {p!r}.',p,'May be expected but needs review.','Confirm the edit is in scope.'))
-    blocker=any(f['severity']=='BLOCKER' for f in findings); high=any(f['severity']=='HIGH' for f in findings)
-    recommendation='HOLD' if blocker or high else ('INSUFFICIENT EVIDENCE' if not meta.get('archive_valid') else 'STATIC CHECKS PASSED — RUNTIME NOT VERIFIED')
+    blocker=any(f['severity']=='BLOCKER' for f in findings); high=any(f['severity']=='HIGH' for f in findings); medium=any(f['severity']=='MEDIUM' for f in findings)
+    recommendation='HOLD' if blocker or high else ('REVIEW' if medium else ('INSUFFICIENT EVIDENCE' if not meta.get('archive_valid') else 'STATIC CHECKS PASSED — RUNTIME NOT VERIFIED'))
     checks=[
       {'name':'archive_integrity_and_paths','status':'PASS' if meta.get('archive_valid') and not any(f['title'] in ('Archive CRC failure','Unsafe archive member path','Archive cannot be opened') for f in findings) else 'FAIL','details':'ZIP CRC and safe relative paths; no extraction.'},
       {'name':'json_parse','status':'FAIL' if any(f['title']=='Invalid JSON' for f in findings) else 'PASS','details':f'Parsed {sum(p.lower().endswith(".json") for p in files)} JSON files.'},
@@ -484,6 +1028,9 @@ def main():
       {'name':'geometry_bone_uv_checks','status':'WARN' if any(any(x in f['title'].lower() for x in ('geometry','bone','cube','uv')) for f in findings) else 'PASS','details':'Conservative geometry/bone/vector/cube/UV structural checks; not a complete engine validator.'},
       {'name':'animation_resource_checks','status':'WARN' if any('animation' in f['title'].lower() or 'identifier' in f['title'].lower() for f in findings) else 'PASS','details':'Animation shape and selected cross-resource reference checks.'},
       {'name':'reference_paths','status':'WARN' if any('path' in f['title'].lower() or 'texture reference' in f['title'].lower() or 'identifier' in f['title'].lower() for f in findings) else 'PASS','details':'Known fields only; identifiers and paths are separated conservatively.'},
+      {'name':'ui_localization_checks','status':'WARN' if any(('ui ' in f['title'].lower() or 'ui_' in f['title'].lower() or 'localization' in f['title'].lower()) for f in findings) else 'PASS','details':'Recognizable UI file shapes, ui_defs paths, duplicate per-file .lang keys, and literal text=$key lookups; heuristic only.'},
+      {'name':'loot_table_structure','status':'WARN' if any('loot table' in f['title'].lower() for f in findings) else 'PASS','details':'Conservative checks of common loot table pools, entries, rolls and weights; not a complete versioned schema.'},
+      {'name':'loot_table_reference_cycles','status':'WARN' if any('recursive loot-table reference cycle' in f['title'].lower() for f in findings) else 'PASS','details':'Checks only cycles among nested loot-table references uniquely resolved inside the archive.'},
       {'name':'baseline_comparison','status':'NOT RUN' if not args.baseline or basefiles is None else 'PASS','details':'File inventory and SHA-256 comparison.'},
       {'name':'reference_graph','status':'PASS' if reference_graph.get('edge_count',0)>=0 else 'WARN','details':f"Indexed {reference_graph.get('edge_count',0)} edges; partial coverage is listed in reference_graph.scope.coverage."},
       {'name':'minecraft_runtime','status':'NOT RUN','details':'This script does not launch Minecraft.'}]

@@ -17,7 +17,7 @@
     ]
   },
   "name": "minecraft-bedrock-engineer",
-  "version": "0.6.7",
+  "version": "0.8.0",
   "description": "A version-aware Minecraft Bedrock engineering toolkit with read-only local MCP tools for pack audits, manifests, geometry, animations, resource graphs and baseline comparisons.",
   "author": {
     "name": "Plugin owner"
@@ -39,7 +39,10 @@
     "resource-graph",
     "controller-validation",
     "mcp",
-    "read-only-tools"
+    "read-only-tools",
+    "real-pack-benchmark",
+    "minecraft-creator-tools",
+    "audit-quality"
   ],
   "skills": "./skills",
   "mcpServers": "./.mcp.json"

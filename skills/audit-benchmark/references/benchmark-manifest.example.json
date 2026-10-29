@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "dataset_id": "bedrock-real-pack-benchmark",
+  "dataset_version": "0.1.0",
+  "target_game_version": "1.26.50",
+  "notes": "Template only. No real packs, findings, or benchmark results are included.",
+  "cases": []
+}

@@ -11,21 +11,30 @@ import zipfile
 from pathlib import Path
 from typing import Any
 
-SERVER_VERSION = "0.6.7"
-MAX_ARCHIVE_BYTES = 256 * 1024 * 1024
-MAX_UNCOMPRESSED_BYTES = 512 * 1024 * 1024
-MAX_ARCHIVE_MEMBERS = 50_000
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+from archive_safety import (  # noqa: E402
+    MAX_ARCHIVE_BYTES,
+    MAX_ARCHIVE_MEMBERS,
+    MAX_MEMBER_BYTES,
+    MAX_UNCOMPRESSED_BYTES,
+    validate_zip_limits,
+)
+
+VERSION_FILE = ROOT / "VERSION"
+SERVER_VERSION = VERSION_FILE.read_text(encoding="utf-8").strip()
 MAX_MEMBERS_RETURNED = 2000
 SUPPORTED_SUFFIXES = {".mcaddon", ".mcpack", ".mcworld", ".zip"}
-ROOT = Path(__file__).resolve().parents[1]
 AUDITOR = ROOT / "skills" / "automated-validation" / "scripts" / "bedrock_audit.py"
 
 # Keep the priority workflow short and front-loaded for clients that expose it.
 WORKFLOW_INSTRUCTIONS = (
-    "Use audit_pack for a general audit; compare_baseline for regressions; "
-    "get_resource_graph for reference questions; and validate_manifest, audit_geometry, "
-    "or audit_animation for focused checks. Results are static evidence only. "
-    "Never claim runtime verification unless performed; never modify or delete pack files."
+    "Use inspect_archive for archive structure; audit_pack for static checks; "
+    "diff_packs for concise file/finding/reference regressions; compare_baseline for full baseline reports; "
+    "get_resource_graph for references; and validate_manifest/audit_geometry/audit_animation for focused checks. "
+    "Cite paths/evidence, disclose coverage gaps, treat heuristics as unconfirmed, never claim in-game tests unless run, "
+    "and never modify/delete files. Creation requires a separate approved MCT CLI; this MCP stays read-only."
 )
 
 
@@ -53,6 +62,7 @@ _DOMAIN = {"type": "string", "enum": ["all", "geometry", "animations", "controll
 TOOLS = [
     _tool("audit_pack", "Run all supported static checks against a Bedrock ZIP-compatible archive. Returns the full structured report; runtime remains NOT RUN.", {"candidate_path": _PATH}, ["candidate_path"]),
     _tool("compare_baseline", "Compare a candidate archive against a baseline and report additions, removals, modifications and audit findings.", {"candidate_path": _PATH, "baseline_path": _PATH}, ["candidate_path", "baseline_path"]),
+    _tool("diff_packs", "Summarize changes between two Bedrock pack archives: file additions/removals/modifications, newly introduced findings, severity changes and unresolved resource-graph regressions. Read-only; no patch is applied.", {"candidate_path": _PATH, "baseline_path": _PATH}, ["candidate_path", "baseline_path"]),
     _tool("get_resource_graph", "Return the static resource reference graph. Choose a fixed domain or all; unresolved/dynamic references are not runtime proof.", {"archive_path": _PATH, "domain": _DOMAIN}, ["archive_path"]),
     _tool("validate_manifest", "Return manifest, UUID and dependency checks and related findings from the static report.", {"archive_path": _PATH}, ["archive_path"]),
     _tool("audit_geometry", "Return geometry, bone, cube, vector and UV checks/findings from the static report.", {"archive_path": _PATH}, ["archive_path"]),
@@ -78,6 +88,7 @@ def _workspace_root() -> Path:
         raise ValueError(f"Configured workspace does not exist: {base}") from exc
 
 
+
 def _resolve_archive(raw: Any) -> Path:
     if not isinstance(raw, str) or not raw.strip() or len(raw) > 4096:
         raise ValueError("archive path must be a non-empty string no longer than 4096 characters")
@@ -96,23 +107,7 @@ def _resolve_archive(raw: Any) -> Path:
         raise ValueError("archive path must identify a regular file")
     if resolved.suffix.lower() not in SUPPORTED_SUFFIXES:
         raise ValueError(f"unsupported archive extension {resolved.suffix!r}; expected one of {sorted(SUPPORTED_SUFFIXES)}")
-    size = resolved.stat().st_size
-    if size > MAX_ARCHIVE_BYTES:
-        raise ValueError(f"archive exceeds the {MAX_ARCHIVE_BYTES}-byte size limit")
-    if not zipfile.is_zipfile(resolved):
-        raise ValueError("file is not a valid ZIP-compatible archive")
-    try:
-        with zipfile.ZipFile(resolved) as archive:
-            entries = archive.infolist()
-            if len(entries) > MAX_ARCHIVE_MEMBERS:
-                raise ValueError(
-                    f"archive member count {len(entries)} exceeds the {MAX_ARCHIVE_MEMBERS}-entry limit"
-                )
-            declared_uncompressed = sum(info.file_size for info in entries if not info.is_dir())
-    except (OSError, zipfile.BadZipFile, RuntimeError) as exc:
-        raise ValueError(f"archive central directory is invalid: {exc}") from exc
-    if declared_uncompressed > MAX_UNCOMPRESSED_BYTES:
-        raise ValueError(f"archive declares {declared_uncompressed} uncompressed bytes; limit is {MAX_UNCOMPRESSED_BYTES}")
+    validate_zip_limits(resolved)
     return resolved
 
 
@@ -213,26 +208,62 @@ def _select_report(report: dict[str, Any], kind: str) -> dict[str, Any]:
 
 
 def _filter_graph(graph: dict[str, Any], domain: str) -> dict[str, Any]:
+    """Filter graph data by its explicit domain fields before using heuristics.
+
+    When an edge has a target_domain, that declared domain is authoritative. This
+    avoids cross-contamination such as a UI path containing the word "geometry"
+    appearing in the geometry filter. Field-name heuristics are a fallback only
+    for edges whose analyzer output has no target domain.
+    """
     if domain == "all":
         return graph
-    needles = {
-        "geometry": ("geometry",),
-        "animations": ("animation",),
-        "controllers": ("controller",),
-        "textures": ("texture",),
-        "ui": ("ui",),
-        "localization": ("localization", "lang", "locres"),
-    }[domain]
-    edges = []
-    for edge in graph.get("edges", []):
-        text = " ".join(str(edge.get(k, "")) for k in ("reference_kind", "kind", "referenced_domain", "domain", "referenced_value", "source_path", "source")).lower()
-        if any(n in text for n in needles):
-            edges.append(edge)
+
+    target_domains = {
+        "geometry": {"geometry"},
+        "animations": {"animation", "animations"},
+        "controllers": {"animation_controllers", "render_controllers", "controllers", "controller"},
+        "textures": {"texture", "textures"},
+        "ui": {"ui", "ui_files"},
+        "localization": {"localization", "localization_keys"},
+    }
+    accepted_targets = target_domains[domain]
+
+    def norm(value: Any) -> str:
+        return str(value or "").replace("\\", "/").strip().lower()
+
+    def fallback_match(edge: dict[str, Any]) -> bool:
+        kind = norm(edge.get("reference_kind"))
+        value = norm(edge.get("referenced_value"))
+        source = norm(edge.get("source_file"))
+        pointer = norm(edge.get("source_pointer"))
+        if domain == "geometry":
+            return "geometry" in kind or value.startswith("geometry.") or "geometry" in pointer
+        if domain == "animations":
+            return ("animation" in kind and "controller" not in kind) or value.startswith("animation.") or "animations/" in pointer
+        if domain == "controllers":
+            return "controller" in kind or "controller" in value or "controller" in pointer
+        if domain == "textures":
+            return "texture" in kind or "textures/" in value or "texture" in pointer
+        if domain == "ui":
+            return "ui" in kind or "/ui/" in source or source.startswith("ui/") or "ui" in pointer
+        if domain == "localization":
+            return "localization" in kind or source.endswith((".lang", ".locres")) or "localization" in pointer
+        return False
+
+    def matches(edge: dict[str, Any]) -> bool:
+        target = norm(edge.get("target_domain"))
+        # Never let a heuristic override a known, different target domain.
+        if target:
+            return target in accepted_targets
+        return fallback_match(edge)
+
+    edges = [edge for edge in graph.get("edges", []) if isinstance(edge, dict) and matches(edge)]
     definitions = graph.get("definitions", {})
     filtered_defs = {
         key: value for key, value in definitions.items()
-        if any(n in key.lower() for n in needles)
+        if key in accepted_targets
     }
+
     out = dict(graph)
     out["edges"] = edges
     out["edge_count"] = len(edges)
@@ -285,6 +316,160 @@ def _inspect_archive(path: Path) -> dict[str, Any]:
     }
 
 
+_SEVERITY_RANK = {"INFO": 0, "LOW": 1, "MEDIUM": 2, "HIGH": 3, "BLOCKER": 4}
+_UNRESOLVED_GRAPH_STATES = {"unresolved", "heuristic_unresolved", "ambiguous"}
+_DIFF_SAMPLE_LIMIT = 100
+
+def _finding_key(item: dict[str, Any]) -> tuple[str, str | None]:
+    path = item.get("path")
+    return str(item.get("title", "")), path if isinstance(path, str) else None
+
+def _edge_key(edge: dict[str, Any]) -> tuple[str, str, str, str, str]:
+    return tuple(str(edge.get(key, "")) for key in (
+        "source_file", "source_pointer", "reference_kind", "referenced_value", "target_domain"
+    ))  # type: ignore[return-value]
+
+def _sample(items: list[Any]) -> dict[str, Any]:
+    return {"count": len(items), "items": items[:_DIFF_SAMPLE_LIMIT], "truncated": len(items) > _DIFF_SAMPLE_LIMIT}
+
+def _summarize_pack_diff(comparison: dict[str, Any], baseline_report: dict[str, Any]) -> dict[str, Any]:
+    """Build an actionable diff without writing files or treating heuristics as confirmed defects."""
+    raw_diff = comparison.get("file_diff")
+    candidate_graph = comparison.get("reference_graph")
+    baseline_graph = baseline_report.get("reference_graph")
+    if not isinstance(raw_diff, dict) or not isinstance(candidate_graph, dict) or not isinstance(baseline_graph, dict):
+        raise RuntimeError("analyzer reports are missing file_diff or reference_graph required for diff_packs")
+
+    file_diff = {}
+    for bucket in ("added", "removed", "modified"):
+        values = raw_diff.get(bucket, [])
+        if not isinstance(values, list) or not all(isinstance(value, str) for value in values):
+            raise RuntimeError(f"analyzer file_diff.{bucket} has an invalid shape")
+        file_diff[bucket] = _sample(sorted(values))
+
+    def scoped_findings(report: dict[str, Any]) -> list[dict[str, Any]]:
+        values = report.get("findings", [])
+        if not isinstance(values, list):
+            raise RuntimeError("analyzer findings has an invalid shape")
+        # Baseline notes and inventory-level diffs are excluded from the static-rule comparison.
+        excluded = {"File removed relative to baseline", "File changed relative to baseline"}
+        return [f for f in values if isinstance(f, dict) and not str(f.get("title", "")).startswith("Baseline: ") and f.get("title") not in excluded]
+
+    current_findings = scoped_findings(comparison)
+    baseline_findings = scoped_findings(baseline_report)
+    current_group: dict[tuple[str, str | None], list[dict[str, Any]]] = {}
+    baseline_group: dict[tuple[str, str | None], list[dict[str, Any]]] = {}
+    for item in current_findings:
+        current_group.setdefault(_finding_key(item), []).append(item)
+    for item in baseline_findings:
+        baseline_group.setdefault(_finding_key(item), []).append(item)
+
+    new_findings: list[dict[str, Any]] = []
+    resolved_findings: list[dict[str, Any]] = []
+    severity_escalations: list[dict[str, Any]] = []
+    severity_deescalations: list[dict[str, Any]] = []
+    all_finding_keys = set(current_group) | set(baseline_group)
+    for key in sorted(all_finding_keys, key=lambda v: (v[0], v[1] or "")):
+        old_items = sorted(baseline_group.get(key, []), key=lambda f: _SEVERITY_RANK.get(str(f.get("severity", "INFO")), -1))
+        new_items = sorted(current_group.get(key, []), key=lambda f: _SEVERITY_RANK.get(str(f.get("severity", "INFO")), -1))
+        shared = min(len(old_items), len(new_items))
+        for item in new_items[shared:]:
+            new_findings.append({k: item.get(k) for k in ("title", "path", "severity", "confidence", "evidence", "impact", "recommendation")})
+        for item in old_items[shared:]:
+            resolved_findings.append({k: item.get(k) for k in ("title", "path", "severity", "confidence", "evidence")})
+        for old, new in zip(old_items[:shared], new_items[:shared]):
+            old_rank = _SEVERITY_RANK.get(str(old.get("severity", "INFO")), -1)
+            new_rank = _SEVERITY_RANK.get(str(new.get("severity", "INFO")), -1)
+            if new_rank > old_rank:
+                severity_escalations.append({"title": key[0], "path": key[1], "baseline": old.get("severity"), "candidate": new.get("severity")})
+            elif new_rank >= 0 and old_rank > new_rank:
+                severity_deescalations.append({"title": key[0], "path": key[1], "baseline": old.get("severity"), "candidate": new.get("severity")})
+
+    def edges(report_graph: dict[str, Any]) -> list[dict[str, Any]]:
+        values = report_graph.get("edges", [])
+        if not isinstance(values, list) or not all(isinstance(edge, dict) for edge in values):
+            raise RuntimeError("reference_graph.edges has an invalid shape")
+        return values
+
+    old_edges = edges(baseline_graph)
+    new_edges = edges(candidate_graph)
+    old_by_key: dict[tuple[str, str, str, str, str], list[dict[str, Any]]] = {}
+    new_by_key: dict[tuple[str, str, str, str, str], list[dict[str, Any]]] = {}
+    for edge in old_edges:
+        old_by_key.setdefault(_edge_key(edge), []).append(edge)
+    for edge in new_edges:
+        new_by_key.setdefault(_edge_key(edge), []).append(edge)
+
+    new_unresolved: list[dict[str, Any]] = []
+    regressed_edges: list[dict[str, Any]] = []
+    for key, candidates in new_by_key.items():
+        prior = old_by_key.get(key, [])
+        prior_resolved = any(item.get("status") == "resolved" for item in prior)
+        for edge in candidates:
+            status = str(edge.get("status", ""))
+            if status not in _UNRESOLVED_GRAPH_STATES:
+                continue
+            item = {
+                "source_file": edge.get("source_file"),
+                "source_pointer": edge.get("source_pointer"),
+                "reference_kind": edge.get("reference_kind"),
+                "referenced_value": edge.get("referenced_value"),
+                "target_domain": edge.get("target_domain"),
+                "status": status,
+                "confidence": edge.get("confidence", "LOW"),
+            }
+            if prior_resolved:
+                item["baseline_status"] = "resolved"
+                regressed_edges.append(item)
+            elif not prior:
+                new_unresolved.append(item)
+
+    candidate_severities = [str(f.get("severity", "INFO")) for f in current_findings]
+    has_critical = any(level in ("BLOCKER", "HIGH") for level in candidate_severities)
+    has_medium = "MEDIUM" in candidate_severities
+    has_file_removals = bool(raw_diff.get("removed"))
+    has_regression_edges = bool(regressed_edges)
+    if has_critical:
+        recommendation = "HOLD"
+    elif has_medium or has_file_removals or has_regression_edges or new_findings:
+        recommendation = "REVIEW"
+    else:
+        recommendation = "STATIC CHECKS PASSED — RUNTIME NOT VERIFIED"
+
+    return {
+        "status": "completed",
+        "candidate": comparison.get("candidate"),
+        "baseline": comparison.get("baseline"),
+        "analysis_versions": {"candidate": comparison.get("tool_version"), "baseline": baseline_report.get("tool_version")},
+        "file_diff": file_diff,
+        "finding_delta": {
+            "new": _sample(new_findings),
+            "no_longer_reported": _sample(resolved_findings),
+            "severity_escalations": _sample(severity_escalations),
+            "severity_deescalations": _sample(severity_deescalations),
+        },
+        "reference_delta": {
+            "new_unresolved": _sample(new_unresolved),
+            "resolved_to_unresolved": _sample(regressed_edges),
+        },
+        "summary": {
+            "files_added": len(raw_diff.get("added", [])),
+            "files_removed": len(raw_diff.get("removed", [])),
+            "files_modified": len(raw_diff.get("modified", [])),
+            "new_findings": len(new_findings),
+            "resolved_findings": len(resolved_findings),
+            "severity_escalations": len(severity_escalations),
+            "new_unresolved_references": len(new_unresolved),
+            "reference_regressions": len(regressed_edges),
+        },
+        "recommendation": recommendation,
+        "runtime_status": "NOT RUN",
+        "mcp_server_version": SERVER_VERSION,
+        "read_only": True,
+        "sample_limit": _DIFF_SAMPLE_LIMIT,
+    }
+
+
 def call_tool(name: str, raw_args: Any) -> dict[str, Any]:
     try:
         args = _validate_arguments(name, raw_args)
@@ -295,6 +480,12 @@ def call_tool(name: str, raw_args: Any) -> dict[str, Any]:
             candidate = _resolve_archive(args["candidate_path"])
             baseline = _resolve_archive(args["baseline_path"])
             return _run_audit(candidate, baseline)
+        if name == "diff_packs":
+            candidate = _resolve_archive(args["candidate_path"])
+            baseline = _resolve_archive(args["baseline_path"])
+            comparison = _run_audit(candidate, baseline)
+            baseline_report = _run_audit(baseline)
+            return _summarize_pack_diff(comparison, baseline_report)
         if name == "audit_pack":
             candidate = _resolve_archive(args["candidate_path"])
             return _run_audit(candidate)

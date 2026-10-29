@@ -62,6 +62,8 @@ def run_case(auditor: Path, case: str):
         titles = [str(f.get("title", "" )).lower() for f in findings]
         if not all(k in report for k in ("tool_version", "candidate", "checks", "findings", "file_diff", "runtime_status", "recommendation")):
             return False, "Required top-level report keys missing"
+        if report.get("tool_version") != "0.6.4":
+            return False, f"Analyzer version mismatch: expected 0.6.4, got {report.get('tool_version')!r}"
         if report.get("runtime_status") != "NOT RUN":
             return False, f"Static CLI incorrectly reported runtime_status={report.get('runtime_status')!r}"
         if not isinstance(graph, dict) or not isinstance(graph.get("scope", {}).get("coverage"), dict):

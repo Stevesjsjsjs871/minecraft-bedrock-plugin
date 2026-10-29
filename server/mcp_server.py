@@ -34,10 +34,10 @@ AUDITOR = ROOT / "skills" / "automated-validation" / "scripts" / "bedrock_audit.
 
 # Keep the priority workflow short and front-loaded for clients that expose it.
 WORKFLOW_INSTRUCTIONS = (
-    "Project: create_addon_project; content: create_addon_item/block/recipe/entity. "
+    "Project: create_addon_project. Content writers: create_addon_item, create_addon_block, create_addon_recipe, create_addon_entity. "
     "Writes stay in scaffold; refuse collisions; no fake textures. Samples: search_mojang_samples/read_mojang_sample. "
-    "inspect_archive for ZIP safety; audit_pack/compare_baseline/diff_packs; get_resource_graph/validate_manifest/audit_geometry/audit_animation. "
-    "Cite evidence; runtime NOT RUN unless tested. Audit/reference tools are read-only; MCT CLI handoff is optional."
+    "inspect_archive; audit_pack/compare_baseline/diff_packs; get_resource_graph/validate_manifest/audit_geometry/audit_animation. "
+    "Cite evidence; runtime NOT RUN unless tested. Audit/reference tools are read-only; optional MCT CLI handoff."
 )
 
 

@@ -1,4 +1,12 @@
-# Minecraft Bedrock Engineer — 0.9.0
+# Minecraft Bedrock Engineer — 0.9.1
+
+## 0.9.1: sample-index resilience and reproducible checks
+
+- Fixes source-checkout failures when the generated compressed Mojang sample index is not present in GitHub.
+- Sample search/read fall back to a searchable, hash-verified index built from curated text examples already shipped in the repository.
+- Responses expose index_mode=curated_fallback and the actual curated entry count; the fallback is not represented as the full 22,252-entry index.
+- Adds regression coverage for fallback mode and makes the result-cap test independent of whether the full generated index is installed locally.
+- Synchronizes package, server and CI version markers to 0.9.1. Minecraft gameplay/runtime tests remain NOT RUN.
 
 ## 0.9.0: shaped and shapeless recipe authoring
 
@@ -37,12 +45,12 @@
 ## 0.8.6: Mojang samples index and example search
 
 - Uses the user-provided Mojang `bedrock-samples` archive labelled 1.26.50.4 as a version-specific reference corpus. The exact uploaded archive SHA-256 is recorded in the sample metadata.
-- Adds a compact compressed index of 22,252 file entries, with resource-category labels, paths, file sizes, SHA-256 values where available, and selected literal identifiers from strict JSON.
+- Adds an indexer that can generate a compact index of 22,252 source-archive entries, with resource-category labels, paths, sizes, hashes and selected literal identifiers. The generated compressed index is an optional local artifact and is not committed in this source checkout.
 - Adds `search_mojang_samples` for offline search and `read_mojang_sample` for curated example excerpts or a specific indexed text file from the user's source ZIP placed inside the configured workspace.
 - Adds a safe index rebuild script. It validates archive bounds and raw member paths, rejects traversal/absolute/non-canonical paths, does not extract or execute archive members, and can write deterministic gzip output.
 - Bundles a small set of representative manifests, item/block/recipe definitions, entity/geometry/animation examples, and offline documentation pages. It does not embed the full vanilla ZIP or binary vanilla assets.
 - Updates the new-project workflow to search version-labelled examples before creating the first content slice. Samples remain references: adapt namespaces and dependencies, remove undocumented vanilla-only fields, and don't assume 1.26.50.4 automatically proves compatibility with every 1.26.50 runtime.
-- Static and unit tests cover search ranking/filtering/output caps, source index and sample hashes, unsafe path rejection, bounded indexed-archive reads, and deterministic compressed index output. Minecraft runtime remains `NOT RUN`.
+- Static and unit tests cover search ranking/filtering/output caps, source index and sample hashes, unsafe path rejection, bounded indexed-archive reads, deterministic index output, and curated fallback. The full generated index still requires the original ZIP and a local indexer run. Minecraft runtime remains `NOT RUN`.
 
 ## 0.8.5: start add-on projects from scratch
 

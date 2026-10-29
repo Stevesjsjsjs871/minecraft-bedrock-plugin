@@ -193,11 +193,11 @@ TOOLS = [
             self.make_package(root)
             server_path = root / "server/mcp_server.py"
             source = server_path.read_text(encoding="utf-8")
-            tool = '    _tool("generate_texture", "Generate a procedural PNG.", {"project_directory": {"type": "string"}, "output_path": {"type": "string"}}, ["project_directory", "output_path"], read_only=False),\\n'
-            source = source.replace("TOOLS = [\\n", "TOOLS = [\\n" + tool, 1)
+            tool = '    _tool("generate_texture", "Generate a procedural PNG.", {"project_directory": {"type": "string"}, "output_path": {"type": "string"}}, ["project_directory", "output_path"], read_only=False),\n'
+            source = source.replace("TOOLS = [\n", "TOOLS = [\n" + tool, 1)
             source = source.replace(
-                "def call_tool(name, args):\\n",
-                'def call_tool(name, args):\\n    if name == "generate_texture":\\n        return {"status": "created"}\\n',
+                "def call_tool(name, args):\n",
+                'def call_tool(name, args):\n    if name == "generate_texture":\n        return {"status": "created"}\n',
                 1,
             )
             server_path.write_text(source, encoding="utf-8")

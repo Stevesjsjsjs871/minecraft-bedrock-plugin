@@ -22,7 +22,7 @@ jobs:
       - name: Compile analyzer, MCP server and evaluation tools
         run: |
           python -m py_compile archive_safety.py
-          python -m py_compile server/mcp_server.py server/tests/test_mcp_server.py
+          python -m py_compile server/mcp_server.py server/tests/test_mcp_server.py server/tests/test_generate_texture_tool.py
           python -m py_compile skills/automated-validation/scripts/bedrock_audit.py
           python -m py_compile skills/automated-validation/scripts/validate_report.py
           python -m py_compile skills/regression-evals/scripts/regression_tests.py
@@ -35,6 +35,8 @@ jobs:
           python -m py_compile skills/visual-resource-pipeline/scripts/generate_texture.py skills/visual-resource-pipeline/scripts/test_generate_texture.py
       - name: Test MCP server schemas, protocol, diff tool and safety
         run: python -m unittest discover -s server/tests -v
+      - name: Test procedural texture generator safety and PNG output
+        run: python -m unittest discover -s skills/visual-resource-pipeline/scripts -p 'test_*.py' -v
       - name: Test benchmark evaluator safety and metrics
         run: python -m unittest discover -s skills/audit-benchmark/scripts -p 'test_*.py' -v
       - name: Test Mojang sample-index safety and fallback
@@ -54,7 +56,7 @@ jobs:
           import runpy
           from pathlib import Path
 
-          expected = "1.0.9"
+          expected = "1.0.10"
           assert Path("VERSION").read_text(encoding="utf-8").strip() == expected
           root = json.loads(Path("plugin.json").read_text(encoding="utf-8"))
           compat = json.loads(Path(".codex-plugin/plugin.json").read_text(encoding="utf-8"))

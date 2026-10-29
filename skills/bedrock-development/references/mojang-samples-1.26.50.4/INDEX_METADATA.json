@@ -1,0 +1,33 @@
+{
+  "source_archive": "bedrock-samples-v1.26.50.4-full(1).zip",
+  "source_url": "https://github.com/Mojang/bedrock-samples",
+  "target_version": "1.26.50.4",
+  "zip_sha256": "c0b6151f5f9a0c31ebe3c909dfc82d97f12473ed2c6e039aa7e22d667042026c",
+  "entry_count": 22859,
+  "indexed_count": 22252,
+  "declared_uncompressed_bytes": 319437100,
+  "category_counts": {
+    "trading": 27,
+    "json": 1684,
+    "item": 79,
+    "entity_behavior": 128,
+    "block": 98,
+    "recipe": 1892,
+    "loot_table": 309,
+    "client_entity": 180,
+    "sound": 4766,
+    "ui": 207,
+    "particle": 192,
+    "texture": 11756,
+    "animation": 143,
+    "attachable": 55,
+    "geometry": 193,
+    "block_model": 4,
+    "render_controller": 173,
+    "animation_controller": 73,
+    "localization": 269,
+    "other": 24
+  },
+  "license_notice": "(c) Mojang AB. All rights reserved. By downloading the files in this repository, you agree to the Minecraft End User License Agreement and that these files are subject to its terms.",
+  "method": "Archive CRC check and a no-extraction path/hash/identifier index. Strict JSON is parsed only where applicable. Runtime correctness was not tested."
+}

@@ -1,33 +1,35 @@
 ---
 name: creator-tools-bridge
-description: Use when a Minecraft Bedrock task requires authoring or modifying content through Mojang's Minecraft Creator Tools CLI, while retaining Minecraft Bedrock Engineer for independent static audit and regression checks.
+description: Use when creating a Minecraft Bedrock add-on from scratch or extending one through Mojang's Minecraft Creator Tools MCP/CLI, with Minecraft Bedrock Engineer providing independent static audits and regressions.
 ---
 
-# Minecraft Creator Tools handoff
+# Minecraft Creator Tools integration
 
-## Role boundary
-Minecraft Bedrock Engineer supplies evidence-backed, read-only auditing, resource graphs, and baseline comparisons. It does not currently expose a packaged MCP tool that invokes the Creator Tools CLI. Do not claim that `scaffold_addon`, `scaffold_entity`, or an automatic writer exists in this release.
+## Capability boundary
+Minecraft Bedrock Engineer now has a local `create_addon_project` MCP tool that writes a new linked BP/RP starter scaffold inside the configured workspace. It does not create gameplay content, textures, models, animations, or Script API code. The eight analysis tools remain read-only. Do not claim that an automatic MCT CLI subprocess wrapper is part of this plugin.
 
-When a compatible local shell/execution environment and an already-installed, user-approved `mct` command are available, use Mojang's Creator Tools for authoring and this plugin for independent verification. If the environment exposes only this plugin's read-only MCP tools, explain the local CLI prerequisite instead of pretending to run it.
+When an actual Creator Tools MCP tool or approved local `mct` CLI is available in the host, use its supported creation and validation commands for the requested content. If only the local scaffold/audit server is available, explain which files can be generated and which authoring capability is missing; never pretend a model, entity, texture, or code file was created.
 
 ## Before invoking MCT
-1. Check the installed CLI and its own help (`mct --version`, `mct --help`) instead of assuming commands or flags from another release.
-2. Require an explicit project/output path from the user or an already-established project state. Resolve and display the intended target before any write operation; never write into an arbitrary current directory.
-3. Do not install packages, run `npx` downloads, update global tools, or invoke network-dependent commands silently. Ask for explicit authorization to install or download dependencies.
-4. Minecraft Creator Tools documents Node.js 22+ as a prerequisite for current releases. The user must review and accept the Minecraft EULA themselves where MCT requires it; never accept it on their behalf.
-5. Prefer the narrowest relevant command and inspect `--help` for supported dry-run options. Do not use force/overwrite options unless the user explicitly authorizes overwriting identified files.
+1. Inspect available tools or the installed CLI help (`mct --version`, `mct --help`, and the relevant command's `--help`). Don't assume names/options from another release.
+2. For a new project, create the clean BP/RP scaffold first with `create_addon_project`, then verify the output. Supply a new single directory name, not a path.
+3. Require an explicit project/output path or established project state before any write operation. Never write into an arbitrary current directory or overwrite an existing file without explicit authorization.
+4. Do not install packages, run `npx` downloads, update global tools, or invoke network-dependent commands silently. Ask for authorization before installing/downloading dependencies.
+5. Current Creator Tools documentation lists Node.js 22+ as a prerequisite. The user must review and accept the Minecraft EULA themselves when MCT requires it; never accept it on their behalf.
+6. Prefer the narrowest relevant command. Use only actual dry-run/safe options confirmed by the installed version.
 
 ## Recommended flow
-- For a new project, use the installed MCT creation workflow to scaffold a project, then inspect the resulting files and manifests before adding content.
-- For an entity, item, or block, use the installed version's documented `create-*` or `add` workflow. Record the exact command and target directory.
-- For edits to an existing project, preserve a baseline copy or version-control checkpoint first. Have MCT generate proposed content, then inspect the diff and run its validator where appropriate.
-- After authoring, run Minecraft Bedrock Engineer's static archive audit, resource graph and `compare_baseline` on the candidate. Keep MCT diagnostics and this auditor's findings separate; disagreement requires review rather than silently preferring one result.
-- Package only after the diff, manifest/dependency checks and resource references are reviewed. Mark Minecraft import/visual/gameplay tests `NOT RUN` unless actually performed.
+- New project: scaffold -> agree first feature -> create only the related content -> validate -> audit -> compare -> package.
+- Use MCT content tools for supported new mobs/items/blocks and model design when those specific tools are actually available.
+- Use the CLI for whole-project validation, fixes, rendering, packaging or deployment only where supported by the installed version and explicit authorization.
+- After authoring, run Minecraft Bedrock Engineer's static audit/resource graph/baseline comparison. Keep MCT diagnostics and local analyzer findings separate; disagreements require review.
+- Mark Minecraft import, visual output and gameplay/multiplayer tests `NOT RUN` unless they actually occurred.
 
-## Safety contract for any future wrapper
-A future packaged MCT wrapper must use fixed argv arrays (never shell-string concatenation), a strict command allowlist, a bounded working directory, path traversal protection, execution timeouts, bounded stdout/stderr, and structured errors. It must declare write-capable tools as destructive and separate read-only validation from write operations. It must never auto-install MCT, auto-accept the EULA, deploy to a live game, or overwrite files without explicit user authorization.
+## Requirements for any future wrapper
+Use fixed argv arrays, never shell-string concatenation; allowlist commands; constrain operations to an approved workspace; reject path traversal and symlinks; impose timeouts and bounded stdout/stderr; return structured errors; mark writing tools as write-capable; separate read-only checks from writes; and never auto-install MCT, accept the EULA, deploy to a live game, or overwrite files without user authorization.
 
 ## Official references
 - Creator Tools overview: https://learn.microsoft.com/en-us/minecraft/creator/documents/mctoolsoverview?view=minecraft-bedrock-stable
+- Manifest reference: https://learn.microsoft.com/en-us/minecraft/creator/reference/content/addonsreference/packmanifest?view=minecraft-bedrock-stable
 - Mojang repository: https://github.com/Mojang/minecraft-creator-tools
-- CLI package and setup: https://www.npmjs.com/package/@minecraft/creator-tools
+- CLI package: https://www.npmjs.com/package/@minecraft/creator-tools

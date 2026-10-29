@@ -81,3 +81,27 @@ Benchmark artifacts and reports are resolved within their configured input roots
 ## Pack-to-pack regression summary 0.8.0
 
 The MCP `diff_packs` tool summarizes baseline file changes and compares current static findings and resource-graph edges against the baseline. Finding identity uses exact `(title, path)`; severity changes are reported separately. A reference regression means an edge resolved in the baseline is unresolved/ambiguous in the candidate, and a new unresolved edge is only a candidate finding. These are change indicators rather than engine proof. Lists are bounded to 100 displayed examples with the total count retained. The tool is read-only and always reports runtime `NOT RUN`.
+
+
+## Pack-to-pack diff hardening 0.8.1
+
+`diff_packs` validates file-diff paths and rejects duplicate/overlapping buckets, malformed findings, invalid severities and malformed graph-edge fields. Repeated identical graph edges are accounted for as occurrences so a single baseline-resolved edge cannot inflate every duplicate regression. Newly unresolved references produce `REVIEW`; severity de-escalations are exposed in both detail and summary counts. These are defensive comparison semantics, not a substitute for reviewed labels or runtime validation.
+
+
+## Pack-to-pack diff provenance and path checks 0.8.2
+
+`diff_packs` rejects file-diff path entries that are empty, contain surrounding whitespace or NUL, are absolute/drive-qualified, or contain `.`/`..` path components. If SHA-256 metadata is present, malformed digests and disagreement between the baseline inside a comparison report and the separately audited baseline are errors. Provenance is `verified` only when both baseline digests exist and match; missing digests are explicitly `not_available`. This check verifies report consistency, not the origin of a report cryptographically.
+
+
+## Duplicate finding comparison 0.8.3
+
+When several findings share an exact `(title, path)` fingerprint, `diff_packs` first matches equal-severity occurrences. Remaining occurrences are paired by minimum absolute severity-rank distance; counts left over on either side remain explicit as new or no-longer-reported. This is deterministic bookkeeping for duplicate fingerprints, not semantic deduplication.
+
+
+## Canonical diff paths 0.8.4
+
+`diff_packs` accepts canonical relative paths only: `/` separators, no empty or `.`/`..` segments, no drive/absolute prefix, no backslashes, and no control characters. Invalid paths fail closed before diff buckets are compared.
+
+
+## Generated item content 0.8.7
+- The item authoring tool checks project manifests and writes a BP item JSON, RP atlas JSON and localization key. If a PNG path is supplied, it verifies the PNG signature. It does not validate against every engine schema, generate a PNG, or prove in-game rendering. Existing atlas/lang merge scenarios are refused.

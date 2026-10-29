@@ -462,7 +462,7 @@ class SchemaTests(unittest.TestCase):
                 call = server.handle_message({"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "inspect_archive", "arguments": {"archive_path": "fixture.mcaddon"}}})
                 bad = server.handle_message({"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {"name": "inspect_archive", "arguments": {"archive_path": str(root.parent / "outside.mcaddon")}}})
                 self.assertEqual(init["result"]["serverInfo"]["version"], server.SERVER_VERSION)
-                self.assertEqual(len(tools["result"]["tools"]), 19)
+                self.assertEqual(len(tools["result"]["tools"]), 20)
                 self.assertEqual(call["result"]["structuredContent"]["status"], "completed")
                 self.assertTrue(bad["result"]["isError"])
                 self.assertEqual(bad["result"]["structuredContent"]["status"], "error")

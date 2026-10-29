@@ -1,15 +1,14 @@
-# Operating system
-.DS_Store
-Thumbs.db
-
-# Editors
-.vscode/
-.idea/
-
-# Local test outputs and user archives
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+*.log
+audit-report.json
 *.mcaddon
 *.mcpack
 *.zip
-*.log
-.env
-.env.*
+.DS_Store
+Thumbs.db

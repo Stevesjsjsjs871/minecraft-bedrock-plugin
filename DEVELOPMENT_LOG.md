@@ -21,7 +21,7 @@ Harden register_texture_atlas so a PNG with valid chunk CRCs but invalid compres
 
 ### Verification
 - Pre-change baseline: GitHub Actions run #103 passed all configured checks on main (Python compile, MCP/unit suites, benchmark tests, Mojang sample-index tests, texture generator tests, package-integrity audit, analyzer regression and version/prompt consistency).
-- Final code/test commit d9ca200: GitHub Actions run #106 succeeded. The workflow compiled all listed Python modules; passed 136 unit tests across five suites (97 MCP/server, 12 benchmark, 6 sample-index, 12 procedural texture, 9 package-integrity); passed all 18 analyzer regression cases; passed package-integrity audit and version/manifest/default-prompt/MCP-configuration consistency checks. The four new PNG cases (three negative CRC-valid corruptions and one positive 5x5 Adam7 fixture) all passed. Runs #104 and #105 also passed on earlier heads.
+- Final code/test commit d9ca200: GitHub Actions run #106 succeeded. The documentation-only log commit 5ab6fd3 was also validated by run #107 (success). The workflow compiled all listed Python modules; passed 136 unit tests across five suites (97 MCP/server, 12 benchmark, 6 sample-index, 12 procedural texture, 9 package-integrity); passed all 18 analyzer regression cases; passed package-integrity audit and version/manifest/default-prompt/MCP-configuration consistency checks. The four new PNG cases (three negative CRC-valid corruptions and one positive 5x5 Adam7 fixture) all passed. Runs #104 and #105 also passed on earlier heads.
 - Minecraft import/rendering and Creator Tools CLI runtime: NOT RUN.
 
 ### Git state
@@ -30,4 +30,5 @@ Harden register_texture_atlas so a PNG with valid chunk CRCs but invalid compres
 
 ### Risks and next step
 - The new validator is static PNG-structure validation; Minecraft's exact importer behavior still requires an in-game test.
-- Next: reconcile the Plugin Creator/GitHub metadata drift without changing the three prompts, then retire or clearly supersede draft PR #1 after review.
+- Residual file-operation risk: _atomic_update_json compares the existing atlas hash and then calls os.replace. The compare and replace are separate operations, so a non-cooperating external writer can still race in the narrow interval between them; path-based parent checks also are not a complete defense against a hostile directory swap. The next safety task is to harden this update path with a cross-platform, tested concurrency strategy before claiming strict lost-update protection.
+- After that, reconcile the Plugin Creator/GitHub metadata and documentation drift without changing the three prompts, then review and clearly supersede draft PR #1.

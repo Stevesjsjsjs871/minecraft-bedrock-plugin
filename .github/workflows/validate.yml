@@ -1,0 +1,29 @@
+name: Validate Minecraft Bedrock Engineer
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile analyzer and regression harness
+        run: |
+          python -m py_compile skills/automated-validation/scripts/bedrock_audit.py
+          python -m py_compile skills/regression-evals/scripts/regression_tests.py
+      - name: Run regression cases
+        run: python skills/regression-evals/scripts/regression_tests.py --auditor skills/automated-validation/scripts/bedrock_audit.py
+      - name: Check plugin manifests
+        run: |
+          python -c "import json; p=json.load(open('plugin.json')); assert p['version']=='0.6.4' and p['name']=='minecraft-bedrock-engineer'"
+          python -c "import json; p=json.load(open('.codex-plugin/plugin.json')); assert p['version']=='0.6.4' and p['name']=='minecraft-bedrock-engineer'"

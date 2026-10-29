@@ -1,4 +1,14 @@
-# Minecraft Bedrock Engineer — 0.9.3
+# Minecraft Bedrock Engineer — 1.0.6
+
+## 1.0.6: package-integrity audit and release stabilization
+
+- Adds an offline package-integrity checker with JSON evidence for manifest/version parity, preserved prompts, MCP configuration, skill metadata, MCP registry/dispatch consistency, writer annotations and sample-index provenance.
+- Adds nine synthetic positive/negative regression tests for package structure, schema closure, tool dispatch, version drift, unsafe sample paths and conservative README heading repair.
+- Adds release-engineering, validation-runbook, readiness, MCP contract, tool-registry and resource-integrity workflows.
+- Preserves the existing GitHub MCP server implementation, including the optional Minecraft Creator Tools CLI staging workflow. Package-level checks do not replace the full MCP/analyzer suite.
+- This GitHub checkout uses curated Mojang sample fallback when the generated compressed full index is absent; the checker reports that as a warning rather than a full-index pass.
+- Minecraft runtime/import/rendering and multiplayer tests remain `NOT RUN` unless actually executed in-game.
+
 
 ## 0.9.3: optional Minecraft Creator Tools integration
 

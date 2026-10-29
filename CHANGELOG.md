@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.6
+- Adds an offline package-integrity checker and nine synthetic regression tests for manifest/version consistency, default prompts, MCP configuration, skill metadata, registry/dispatch parity, schema closure, writer annotations, sample-index path integrity and conservative README heading repair.
+- Adapts the integrity audit to the GitHub source checkout: the generated full gzip index is optional when curated sample fallback files exist, and the checker reports that state as WARN rather than claiming full-index verification.
+- Adds release-readiness, validation-runbook, MCP contract/registry, resource-integrity, dependency-closure, baseline-regression and end-to-end validation skills.
+- Preserves the existing 0.9.3 MCP implementation and optional staged Minecraft Creator Tools CLI workflow. Full runtime tests are not claimed.
+
 ## 0.9.3
 - Adds optional MCT CLI discovery and gallery-template listing tools. These never install packages or invoke npx.
 - Adds MCT validation against a bounded temporary project copy with report output outside the source project.

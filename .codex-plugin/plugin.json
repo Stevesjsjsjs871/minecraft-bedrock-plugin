@@ -17,7 +17,7 @@
     ]
   },
   "name": "minecraft-bedrock-engineer",
-  "version": "0.9.3",
+  "version": "1.0.6",
   "description": "A Minecraft Bedrock development toolkit for creating BP/RP projects, generating items, blocks, crafting recipes and entities, optionally orchestrating an installed MCT CLI for validation and safe staged entity generation, searching version-labelled Mojang samples, and auditing packs with evidence-based checks.",
   "author": {
     "name": "Plugin owner"

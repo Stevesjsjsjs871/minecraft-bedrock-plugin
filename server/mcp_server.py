@@ -35,12 +35,11 @@ AUDITOR = ROOT / "skills" / "automated-validation" / "scripts" / "bedrock_audit.
 
 # Keep the priority workflow short and front-loaded for clients that expose it.
 WORKFLOW_INSTRUCTIONS = (
-    "Project: create_addon_project. Content writers: create_addon_item, create_addon_block, create_addon_recipe, create_addon_entity. "
-    "Writes stay in scaffold; refuse collisions; no fake textures. Samples: search_mojang_samples/read_mojang_sample. "
-    "inspect_archive; audit_pack/compare_baseline/diff_packs; get_resource_graph/validate_manifest/audit_geometry/audit_animation. "
-    "Cite evidence; runtime NOT RUN unless tested. Audit/reference tools are read-only; optional MCT CLI handoff."
+    "Project: create_addon_project. Writers: create_addon_item, create_addon_block, create_addon_recipe, create_addon_entity, create_entity_with_mct. "
+    "MCT CLI: creator_tools_status/catalog/validate_with_mct. "
+    "Samples: search_mojang_samples/read_mojang_sample; inspect_archive, compare_baseline, diff_packs, audit_pack, get_resource_graph, validate_manifest, audit_geometry, audit_animation. "
+    "Audit/reference tools are read-only; preserve originals; no fake textures; cite evidence; runtime NOT RUN."
 )
-
 
 def _tool(
     name: str,
@@ -51,6 +50,7 @@ def _tool(
     read_only: bool = True,
     destructive: bool = False,
     idempotent: bool = True,
+    open_world: bool = False,
 ) -> dict[str, Any]:
     return {
         "name": name,
@@ -65,7 +65,7 @@ def _tool(
             "readOnlyHint": read_only,
             "destructiveHint": destructive,
             "idempotentHint": idempotent,
-            "openWorldHint": False,
+            "openWorldHint": open_world,
         },
     }
 
@@ -179,6 +179,40 @@ TOOLS = [
         read_only=False,
         destructive=False,
         idempotent=False,
+    ),
+    _tool(
+        "creator_tools_status",
+        "Read-only discovery of local Node.js, npm and Minecraft Creator Tools CLI. Checks installed commands only; never uses npx or installs packages.",
+        {},
+        [],
+    ),
+    _tool(
+        "creator_tools_catalog",
+        "Ask the installed MCT CLI for gallery template IDs and types. The CLI may access its own gallery/cache; no package is installed by this tool.",
+        {},
+        [],
+        read_only=True, destructive=False, idempotent=True, open_world=True,
+    ),
+    _tool(
+        "validate_with_mct",
+        "Validate a project with the installed MCT CLI on a temporary copy. Uses --offline/--isolated; MCT documents that some checks may still use the network.",
+        {
+            "project_directory": {"type": "string", "minLength": 1, "maxLength": 63, "description": "One existing child directory of the configured workspace."},
+            "suite": {"type": "string", "enum": ["main", "addon", "currentplatform", "all"], "description": "MCT validation suite; defaults to addon."},
+        },
+        ["project_directory"],
+        read_only=True, destructive=False, idempotent=True, open_world=True,
+    ),
+    _tool(
+        "create_entity_with_mct",
+        "Optional MCT handoff: generate from an explicit entity template in a bounded staging copy, audit against baseline, then merge only new pack files if no existing file changed and no new HIGH/BLOCKER finding appeared. No shell, npx, auto-install or deployment; MCT may access its gallery/cache.",
+        {
+            "project_directory": {"type": "string", "minLength": 1, "maxLength": 63, "description": "One existing child directory of the configured workspace."},
+            "template_id": {"type": "string", "minLength": 1, "maxLength": 64, "description": "An entity-template ID returned by creator_tools_catalog (gallery item type entityType)."},
+            "entity_slug": {"type": "string", "minLength": 1, "maxLength": 50, "description": "Lowercase letters, digits and underscores."},
+        },
+        ["project_directory", "template_id", "entity_slug"],
+        read_only=False, destructive=False, idempotent=False, open_world=True,
     ),
     _tool("audit_pack", "Run all supported static checks against a Bedrock ZIP-compatible archive. Returns the full structured report; runtime remains NOT RUN.", {"candidate_path": _PATH}, ["candidate_path"]),
     _tool("compare_baseline", "Compare a candidate archive against a baseline and report additions, removals, modifications and audit findings.", {"candidate_path": _PATH, "baseline_path": _PATH}, ["candidate_path", "baseline_path"]),
@@ -387,6 +421,17 @@ def _validate_arguments(name: str, args: Any) -> dict[str, Any]:
             parts = texture.split("/")
             if any(part in {"", ".", ".."} for part in parts) or not texture.lower().endswith(".png"):
                 raise ValueError("texture_path must be a canonical relative path ending in .png")
+    if name in {"validate_with_mct", "create_entity_with_mct"}:
+        dirname = normalized["project_directory"]
+        if not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", dirname) or "--" in dirname:
+            raise ValueError("project_directory must be one lowercase kebab-case directory name, not a path")
+    if name == "validate_with_mct":
+        normalized.setdefault("suite", "addon")
+    if name == "create_entity_with_mct":
+        if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]{0,63}", normalized["template_id"]):
+            raise ValueError("template_id must be a simple MCT gallery template ID, not a path or command")
+        if not re.fullmatch(r"[a-z0-9][a-z0-9_]{0,49}", normalized["entity_slug"]):
+            raise ValueError("entity_slug must contain only lowercase letters, digits and underscores")
     if name == "create_addon_recipe":
         dirname = normalized["project_directory"]
         if not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", dirname) or "--" in dirname:
@@ -2637,6 +2682,14 @@ def call_tool(name: str, raw_args: Any) -> dict[str, Any]:
             return _create_addon_recipe(args)
         if name == "create_addon_entity":
             return _create_addon_entity(args)
+        if name == "creator_tools_status":
+            return _creator_tools_status()
+        if name == "creator_tools_catalog":
+            return _creator_tools_catalog()
+        if name == "validate_with_mct":
+            return _validate_with_mct(args)
+        if name == "create_entity_with_mct":
+            return _create_entity_with_mct(args)
         if name == "search_mojang_samples":
             return _search_mojang_samples(args)
         if name == "read_mojang_sample":

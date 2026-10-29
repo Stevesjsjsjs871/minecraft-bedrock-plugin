@@ -1,0 +1,292 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Minecraft Bedrock Engineer Audit Report",
+  "type": "object",
+  "required": [
+    "tool_version",
+    "candidate",
+    "checks",
+    "findings",
+    "file_diff",
+    "runtime_status",
+    "recommendation"
+  ],
+  "properties": {
+    "tool_version": {
+      "type": "string"
+    },
+    "candidate": {
+      "type": "object",
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": "string"
+        },
+        "archive_valid": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      }
+    },
+    "baseline": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": "string"
+        }
+      }
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "status"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "PASS",
+              "FAIL",
+              "WARN",
+              "NOT RUN"
+            ]
+          },
+          "details": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "severity",
+          "confidence",
+          "title",
+          "evidence",
+          "recommendation"
+        ],
+        "properties": {
+          "severity": {
+            "enum": [
+              "BLOCKER",
+              "HIGH",
+              "MEDIUM",
+              "LOW",
+              "INFO"
+            ]
+          },
+          "confidence": {
+            "enum": [
+              "HIGH",
+              "MEDIUM",
+              "LOW"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "path": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "evidence": {
+            "type": "string"
+          },
+          "impact": {
+            "type": "string"
+          },
+          "recommendation": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "file_diff": {
+      "type": "object",
+      "required": [
+        "added",
+        "removed",
+        "modified"
+      ],
+      "properties": {
+        "added": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "removed": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "modified": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "runtime_status": {
+      "enum": [
+        "TESTED",
+        "NOT RUN",
+        "PARTIAL"
+      ]
+    },
+    "recommendation": {
+      "enum": [
+        "HOLD",
+        "STATIC CHECKS PASSED — RUNTIME NOT VERIFIED",
+        "INSUFFICIENT EVIDENCE",
+        "READY FOR RUNTIME TEST"
+      ]
+    },
+    "reference_graph": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "definitions",
+        "edges",
+        "edge_count",
+        "status_counts",
+        "scope"
+      ],
+      "properties": {
+        "schema_version": {
+          "type": "string",
+          "const": "1.1"
+        },
+        "definitions": {
+          "type": "object"
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "source_file",
+              "source_pointer",
+              "reference_kind",
+              "referenced_value",
+              "target_domain",
+              "target_files",
+              "status",
+              "confidence"
+            ],
+            "properties": {
+              "source_file": {
+                "type": "string"
+              },
+              "source_pointer": {
+                "type": "string"
+              },
+              "reference_kind": {
+                "type": "string"
+              },
+              "referenced_value": {},
+              "target_domain": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "target_files": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "status": {
+                "enum": [
+                  "resolved",
+                  "unresolved",
+                  "ambiguous",
+                  "dynamic_or_expression",
+                  "heuristic_unresolved",
+                  "alias_or_heuristic"
+                ]
+              },
+              "confidence": {
+                "enum": [
+                  "HIGH",
+                  "MEDIUM",
+                  "LOW"
+                ]
+              },
+              "note": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "edge_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "status_counts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "scope": {
+          "type": "object",
+          "properties": {
+            "indexed_files": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "parsed_json_files": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "definitions_by_domain": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "coverage": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "static_only": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    }
+  }
+}

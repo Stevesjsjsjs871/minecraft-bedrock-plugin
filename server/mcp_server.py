@@ -34,10 +34,10 @@ AUDITOR = ROOT / "skills" / "automated-validation" / "scripts" / "bedrock_audit.
 
 # Keep the priority workflow short and front-loaded for clients that expose it.
 WORKFLOW_INSTRUCTIONS = (
-    "Project: create_addon_project; content: create_addon_item, create_addon_block, create_addon_recipe. "
-    "Writes in scaffold; refuse collisions; no fake textures. Samples: search_mojang_samples/read_mojang_sample. "
-    "inspect_archive for ZIP safety; audit_pack/compare_baseline/diff_packs for audits; get_resource_graph/validate_manifest/audit_geometry/audit_animation for checks. "
-    "Cite evidence; runtime NOT RUN unless tested. Audit/reference tools are read-only; authoring needs a tool or approved MCT CLI."
+    "Project: create_addon_project; content: create_addon_item/block/recipe/entity. "
+    "Writes stay in scaffold; refuse collisions; no fake textures. Samples: search_mojang_samples/read_mojang_sample. "
+    "inspect_archive for ZIP safety; audit_pack/compare_baseline/diff_packs; get_resource_graph/validate_manifest/audit_geometry/audit_animation. "
+    "Cite evidence; runtime NOT RUN unless tested. Audit/reference tools are read-only; MCT CLI handoff is optional."
 )
 
 
@@ -141,6 +141,21 @@ TOOLS = [
             "target_game_version": {"type": "string", "minLength": 5, "maxLength": 20, "description": "Three-part numeric target version, e.g. 1.26.50."},
         },
         ["project_directory", "block_name", "block_slug", "target_game_version"],
+        read_only=False,
+        destructive=False,
+        idempotent=False,
+    ),
+    _tool(
+        "create_addon_entity",
+        "Create a minimal custom entity as one coordinated BP/RP slice: BP entity, RP client entity, geometry and render controller. Validates the linked project and all paths before writing; refuses any output collision; never invents a PNG. Static generation only; runtime remains NOT RUN.",
+        {
+            "project_directory": {"type": "string", "minLength": 1, "maxLength": 63, "description": "One existing child directory of the configured workspace."},
+            "entity_name": {"type": "string", "minLength": 2, "maxLength": 80, "description": "Human-readable entity name, e.g. Forest Golem."},
+            "entity_slug": {"type": "string", "minLength": 2, "maxLength": 48, "description": "Lowercase snake_case identifier suffix, e.g. forest_golem."},
+            "texture_path": {"type": "string", "minLength": 1, "maxLength": 200, "description": "Optional project-relative PNG already inside this project's RP. If omitted, files reference textures/entity/<entity_slug>.png without creating a fake texture."},
+            "target_game_version": {"type": "string", "minLength": 5, "maxLength": 20, "description": "Three-part numeric target version matching the BP/RP scaffold, e.g. 1.26.50."},
+        },
+        ["project_directory", "entity_name", "entity_slug", "target_game_version"],
         read_only=False,
         destructive=False,
         idempotent=False,
@@ -350,6 +365,26 @@ def _validate_arguments(name: str, args: Any) -> dict[str, Any]:
                 raise ValueError("texture_path must be a safe relative POSIX path")
             parts = texture.split("/")
             if any(part in {"", ".", ".."} for part in parts) or not texture.endswith(".png"):
+                raise ValueError("texture_path must be a canonical relative path ending in .png")
+    if name == "create_addon_entity":
+        dirname = normalized["project_directory"]
+        if not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", dirname) or "--" in dirname:
+            raise ValueError("project_directory must be one lowercase kebab-case directory name, not a path")
+        if not normalized["entity_name"].strip() or normalized["entity_name"] != normalized["entity_name"].strip():
+            raise ValueError("entity_name must be nonblank and have no leading/trailing whitespace")
+        if not re.fullmatch(r"[a-z][a-z0-9]*(?:_[a-z0-9]+)*", normalized["entity_slug"]):
+            raise ValueError("entity_slug must be lowercase snake_case and start with a letter")
+        version = normalized["target_game_version"]
+        if not re.fullmatch(r"(?:0|[1-9][0-9]{0,2})\.(?:0|[1-9][0-9]{0,2})\.(?:0|[1-9][0-9]{0,2})", version):
+            raise ValueError("target_game_version must be a three-part numeric version, for example 1.26.50")
+        texture = normalized.get("texture_path")
+        if texture is not None:
+            if not texture.strip() or texture != texture.strip():
+                raise ValueError("texture_path must be nonblank and have no surrounding whitespace")
+            if "\\" in texture or "\x00" in texture or texture.startswith("/") or re.match(r"^[A-Za-z]:", texture):
+                raise ValueError("texture_path must be a safe relative POSIX path")
+            parts = texture.split("/")
+            if any(part in {"", ".", ".."} for part in parts) or not texture.lower().endswith(".png"):
                 raise ValueError("texture_path must be a canonical relative path ending in .png")
     if name == "create_addon_recipe":
         dirname = normalized["project_directory"]
@@ -1987,6 +2022,211 @@ def _create_addon_recipe(args: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+
+def _create_addon_entity(args: dict[str, Any]) -> dict[str, Any]:
+    """Create a safe, linked BP/RP entity slice without overwriting existing files."""
+    workspace = _workspace_root()
+    project_name = args["project_directory"]
+    target = workspace / project_name
+    try:
+        project = target.resolve(strict=True)
+        project.relative_to(workspace)
+    except (OSError, ValueError) as exc:
+        raise ValueError(f"project directory does not exist inside the configured workspace: {project_name}") from exc
+    if target.is_symlink() or project != target or not project.is_dir():
+        raise ValueError("project_directory must be a real directory directly under the configured workspace")
+
+    bp_parent = project / "behavior_packs"
+    rp_parent = project / "resource_packs"
+    bp_root = bp_parent / f"{project_name}_BP"
+    rp_root = rp_parent / f"{project_name}_RP"
+    for parent, pack_root in ((bp_parent, bp_root), (rp_parent, rp_root)):
+        if parent.is_symlink() or not parent.is_dir() or pack_root.is_symlink() or not pack_root.is_dir():
+            raise ValueError("project BP/RP folder is missing or unsafe")
+        try:
+            parent.resolve(strict=True).relative_to(project)
+            pack_root.resolve(strict=True).relative_to(project)
+        except (OSError, ValueError) as exc:
+            raise ValueError("project BP/RP folder resolves outside the project") from exc
+        manifest_path = pack_root / "manifest.json"
+        if manifest_path.is_symlink() or not manifest_path.is_file():
+            raise ValueError("project BP/RP manifest is missing or unsafe")
+
+    try:
+        bp_manifest = json.loads((bp_root / "manifest.json").read_text(encoding="utf-8"))
+        rp_manifest = json.loads((rp_root / "manifest.json").read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"project manifest is invalid JSON or unreadable: {exc}") from exc
+    if not isinstance(bp_manifest, dict) or not isinstance(rp_manifest, dict):
+        raise ValueError("project BP/RP manifests must be JSON objects")
+    bp_header, rp_header = bp_manifest.get("header"), rp_manifest.get("header")
+    bp_deps = bp_manifest.get("dependencies")
+    if not isinstance(bp_header, dict) or not isinstance(rp_header, dict) or not isinstance(bp_deps, list):
+        raise ValueError("project manifests are missing expected header/dependency objects")
+    rp_uuid = rp_header.get("uuid")
+    if not isinstance(rp_uuid, str) or not any(isinstance(dep, dict) and dep.get("uuid") == rp_uuid for dep in bp_deps):
+        raise ValueError("project BP/RP manifests do not contain a valid BP-to-RP UUID dependency")
+    if bp_header.get("min_engine_version") != rp_header.get("min_engine_version"):
+        raise ValueError("project BP/RP target versions differ; refusing to add content")
+    version_parts = [int(part) for part in args["target_game_version"].split(".")]
+    if bp_header.get("min_engine_version") != version_parts:
+        raise ValueError("target_game_version does not match this project's BP/RP min_engine_version")
+
+    slug = args["entity_slug"]
+    namespace = re.sub(r"[^a-z0-9_]", "_", project_name.lower().replace("-", "_"))
+    if not namespace or not namespace[0].isalpha():
+        namespace = f"addon_{namespace}"
+    identifier = f"{namespace}:{slug}"
+    geometry_id = f"geometry.{namespace}.{slug}"
+    render_controller_id = f"controller.render.{namespace}.{slug}"
+    expected_texture_rel = Path("textures") / "entity" / f"{slug}.png"
+    texture_ref = (Path("textures") / "entity" / slug).as_posix()
+    texture_path_arg = args.get("texture_path")
+    texture_status = "texture_file_not_created"
+
+    if texture_path_arg:
+        candidate = project / Path(*texture_path_arg.split("/"))
+        try:
+            resolved_texture = candidate.resolve(strict=True)
+            resolved_texture.relative_to(rp_root.resolve(strict=True))
+        except (OSError, ValueError) as exc:
+            raise ValueError("texture_path must resolve to an existing file inside this project's Resource Pack") from exc
+        if candidate.is_symlink() or not resolved_texture.is_file() or resolved_texture.suffix.lower() != ".png":
+            raise ValueError("texture_path must be a regular PNG file, not a symlink or directory")
+        current = candidate.parent
+        while current != rp_root:
+            if current.is_symlink():
+                raise ValueError("texture_path contains a symlinked parent")
+            current = current.parent
+            if current == project or current == current.parent:
+                raise ValueError("texture_path is not inside the Resource Pack")
+        with resolved_texture.open("rb") as stream:
+            if stream.read(8) != b"\x89PNG\r\n\x1a\n":
+                raise ValueError("texture_path does not have a PNG signature")
+        texture_ref = resolved_texture.relative_to(rp_root.resolve(strict=True)).with_suffix("").as_posix()
+        texture_status = "mapped_existing_png"
+
+    bp_rel = Path("entities") / f"{slug}.json"
+    client_rel = Path("entity") / f"{slug}.entity.json"
+    geometry_rel = Path("models") / "entity" / f"{slug}.geo.json"
+    controller_rel = Path("render_controllers") / f"{slug}.render_controllers.json"
+    outputs = [(bp_root, bp_rel), (rp_root, client_rel), (rp_root, geometry_rel), (rp_root, controller_rel)]
+    for pack_root, relative in outputs:
+        destination = pack_root / relative
+        parent = destination.parent
+        if parent.is_symlink() or not parent.is_dir():
+            raise ValueError(f"required output folder is missing or unsafe: {destination.relative_to(project).as_posix()}")
+        try:
+            parent.resolve(strict=True).relative_to(pack_root.resolve(strict=True))
+            destination.resolve(strict=False).relative_to(pack_root.resolve(strict=True))
+        except (OSError, ValueError) as exc:
+            raise ValueError(f"generated entity path escapes its pack: {destination.relative_to(project).as_posix()}") from exc
+        if destination.is_symlink() or destination.exists():
+            raise ValueError(f"entity output already exists or is a symlink; refusing to overwrite: {destination.relative_to(project).as_posix()}")
+
+    bp_entity = {
+        "format_version": "1.20.50",
+        "minecraft:entity": {
+            "description": {"identifier": identifier, "is_spawnable": True, "is_summonable": True, "is_experimental": False},
+            "components": {
+                "minecraft:type_family": {"family": [namespace, "mob"]},
+                "minecraft:health": {"value": 20, "max": 20},
+                "minecraft:collision_box": {"width": 0.8, "height": 1.8},
+                "minecraft:movement": {"value": 0.25},
+                "minecraft:movement.basic": {},
+                "minecraft:navigation.walk": {"can_path_over_water": True},
+                "minecraft:jump.static": {},
+                "minecraft:physics": {},
+                "minecraft:pushable": {"is_pushable": True, "is_pushable_by_piston": True},
+                "minecraft:behavior.float": {"priority": 0},
+                "minecraft:behavior.random_stroll": {"priority": 6, "speed_multiplier": 1.0},
+                "minecraft:behavior.look_at_player": {"priority": 7, "look_distance": 8.0, "probability": 0.02},
+                "minecraft:behavior.random_look_around": {"priority": 8}
+            }
+        }
+    }
+    client_entity = {
+        "format_version": "1.10.0",
+        "minecraft:client_entity": {
+            "description": {
+                "identifier": identifier,
+                "materials": {"default": "entity_alphatest"},
+                "textures": {"default": texture_ref},
+                "geometry": {"default": geometry_id},
+                "render_controllers": [render_controller_id]
+            }
+        }
+    }
+    geometry = {
+        "format_version": "1.12.0",
+        "minecraft:geometry": [{
+            "description": {
+                "identifier": geometry_id,
+                "texture_width": 64,
+                "texture_height": 64,
+                "visible_bounds_width": 2.0,
+                "visible_bounds_height": 2.5,
+                "visible_bounds_offset": [0, 1.25, 0]
+            },
+            "bones": [
+                {"name": "body", "pivot": [0, 12, 0], "cubes": [{"origin": [-4, 6, -2], "size": [8, 12, 4], "uv": [0, 0]}]},
+                {"name": "head", "parent": "body", "pivot": [0, 24, 0], "cubes": [{"origin": [-4, 18, -4], "size": [8, 8, 8], "uv": [0, 16]}]},
+                {"name": "left_leg", "pivot": [2, 12, 0], "cubes": [{"origin": [1, 0, -2], "size": [3, 6, 3], "uv": [0, 32]}]},
+                {"name": "right_leg", "pivot": [-2, 12, 0], "cubes": [{"origin": [-4, 0, -2], "size": [3, 6, 3], "uv": [16, 32]}]}
+            ]
+        }]
+    }
+    render_controller = {
+        "format_version": "1.8.0",
+        "render_controllers": {
+            render_controller_id: {
+                "geometry": "Geometry.default",
+                "materials": [{"*": "Material.default"}],
+                "textures": ["Texture.default"]
+            }
+        }
+    }
+
+    contents = [
+        (bp_root / bp_rel, json.dumps(bp_entity, ensure_ascii=False, indent=2) + "\n"),
+        (rp_root / client_rel, json.dumps(client_entity, ensure_ascii=False, indent=2) + "\n"),
+        (rp_root / geometry_rel, json.dumps(geometry, ensure_ascii=False, indent=2) + "\n"),
+        (rp_root / controller_rel, json.dumps(render_controller, ensure_ascii=False, indent=2) + "\n"),
+    ]
+    created: list[Path] = []
+    try:
+        for destination, payload in contents:
+            with destination.open("x", encoding="utf-8", newline="\n") as stream:
+                created.append(destination)
+                stream.write(payload)
+                stream.flush()
+                os.fsync(stream.fileno())
+    except Exception:
+        for destination in reversed(created):
+            try:
+                if destination.is_file() and not destination.is_symlink():
+                    destination.unlink()
+            except OSError:
+                pass
+        raise
+
+    return {
+        "status": "created",
+        "project_directory": str(project),
+        "entity_identifier": identifier,
+        "geometry_identifier": geometry_id,
+        "render_controller_identifier": render_controller_id,
+        "files_created": [path.relative_to(project).as_posix() for path, _payload in contents],
+        "texture_status": texture_status,
+        "texture_expected_path": f"resource_packs/{project_name}_RP/{expected_texture_rel.as_posix()}",
+        "texture_reference": texture_ref,
+        "target_game_version": args["target_game_version"],
+        "mcp_server_version": SERVER_VERSION,
+        "runtime_status": "NOT RUN",
+        "note": "Generated a coordinated BP entity, RP client-entity, geometry and render controller. A real PNG texture is still required if one was not supplied; animation, spawn-rule and in-game behavior were not tested."
+    }
+
+
 def call_tool(name: str, raw_args: Any) -> dict[str, Any]:
     try:
         args = _validate_arguments(name, raw_args)
@@ -1998,6 +2238,8 @@ def call_tool(name: str, raw_args: Any) -> dict[str, Any]:
             return _create_addon_block(args)
         if name == "create_addon_recipe":
             return _create_addon_recipe(args)
+        if name == "create_addon_entity":
+            return _create_addon_entity(args)
         if name == "search_mojang_samples":
             return _search_mojang_samples(args)
         if name == "read_mojang_sample":

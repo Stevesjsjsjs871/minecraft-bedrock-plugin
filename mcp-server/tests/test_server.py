@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import importlib.util
 import tempfile
 import unittest
@@ -21,9 +20,7 @@ class MCPServerTests(unittest.TestCase):
         self.assertLessEqual(len(MODULE.INSTRUCTIONS), 512)
 
     def test_tool_names_registered(self):
-        async def get_names():
-            return {tool.name for tool in await MODULE.mcp._tool_manager.list_tools()}
-        names = asyncio.run(get_names())
+        names = {tool.name for tool in MODULE.mcp._tool_manager.list_tools()}
         self.assertEqual(names, {
             "audit_archive", "compare_baseline", "get_resource_graph",
             "validate_manifest", "inspect_archive"
@@ -52,9 +49,7 @@ class MCPServerTests(unittest.TestCase):
             self.assertEqual(result["file_types"][".png"], 1)
 
     def test_all_tools_are_read_only(self):
-        async def get_tools():
-            return await MODULE.mcp._tool_manager.list_tools()
-        tools = asyncio.run(get_tools())
+        tools = MODULE.mcp._tool_manager.list_tools()
         self.assertEqual(len(tools), 5)
         for tool in tools:
             annotations = tool.annotations

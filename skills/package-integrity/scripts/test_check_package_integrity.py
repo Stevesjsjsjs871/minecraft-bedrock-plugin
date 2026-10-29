@@ -186,5 +186,24 @@ TOOLS = [
             self.assertEqual((root / "README.md").read_text(encoding="utf-8"), original)
 
 
+
+    def test_generate_texture_is_allowed_as_explicit_write_tool(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "package"
+            self.make_package(root)
+            server_path = root / "server/mcp_server.py"
+            source = server_path.read_text(encoding="utf-8")
+            tool = '    _tool("generate_texture", "Generate a procedural PNG.", {"project_directory": {"type": "string"}, "output_path": {"type": "string"}}, ["project_directory", "output_path"], read_only=False),\\n'
+            source = source.replace("TOOLS = [\\n", "TOOLS = [\\n" + tool, 1)
+            source = source.replace(
+                "def call_tool(name, args):\\n",
+                'def call_tool(name, args):\\n    if name == "generate_texture":\\n        return {"status": "created"}\\n',
+                1,
+            )
+            server_path.write_text(source, encoding="utf-8")
+            report = checker.audit_package(root)
+            self.assertEqual(self.check_by_id(report, "mcp-tool-registry")["status"], "PASS")
+            self.assertEqual(self.check_by_id(report, "mcp-write-annotations")["status"], "PASS")
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -1,4 +1,11 @@
-# Minecraft Bedrock Engineer — 1.0.6
+# Minecraft Bedrock Engineer — 1.0.9
+
+## 1.0.9: procedural texture pattern expansion and hardening
+
+- Expands the local standard-library PNG generator to ten deterministic styles: pixel noise, checker, stripes, solid, vertical/horizontal gradients, brick, stone noise, ore veins, and wood grain.
+- Tightens RGB hex/dimension validation, rejects boolean dimensions and symlink destinations, preserves atomic no-overwrite behavior, and reports machine-readable JSON from the CLI.
+- Adds generator regression tests for all styles, repeatability, gradient endpoints, alpha, symlink rejection, CLI error handling, and PNG chunk/CRC integrity.
+- This is a procedural starter component, not an AI image model, a UV-aware texture painter, an MCP `generate_texture` tool, or in-game verification.
 
 ## 1.0.6: package-integrity audit and release stabilization
 

@@ -21,8 +21,12 @@ Harden register_texture_atlas so a PNG with valid chunk CRCs but invalid compres
 
 ### Verification
 - Pre-change baseline: GitHub Actions run #103 passed all configured checks on main (Python compile, MCP/unit suites, benchmark tests, Mojang sample-index tests, texture generator tests, package-integrity audit, analyzer regression and version/prompt consistency).
-- New branch/PR CI: pending at time of commit creation.
+- Final code/test commit d9ca200: GitHub Actions run #106 succeeded. The workflow compiled all listed Python modules; passed 136 unit tests across five suites (97 MCP/server, 12 benchmark, 6 sample-index, 12 procedural texture, 9 package-integrity); passed all 18 analyzer regression cases; passed package-integrity audit and version/manifest/default-prompt/MCP-configuration consistency checks. The four new PNG cases (three negative CRC-valid corruptions and one positive 5x5 Adam7 fixture) all passed. Runs #104 and #105 also passed on earlier heads.
 - Minecraft import/rendering and Creator Tools CLI runtime: NOT RUN.
+
+### Git state
+- PR #2 remains Draft and unmerged. Final code/test head: d9ca200fcb3eec6809fa71a91e0e5c063d2d4aaa; documentation-only result logging is being added separately. Main remains unchanged.
+- PR #1 remains open and unmerged; do not merge its divergent 1.0.10 implementation without a fresh review.
 
 ### Risks and next step
 - The new validator is static PNG-structure validation; Minecraft's exact importer behavior still requires an in-game test.

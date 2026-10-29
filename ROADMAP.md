@@ -10,21 +10,17 @@ The project should keep its safety and evidence-based audit as the core, add com
 
 Acceptance: full-index and curated-fallback modes are clearly distinguished. No runtime support is claimed without Minecraft tests.
 
-## 0.9.2 — complete entity authoring slice
+## 0.9.2 — implemented: coordinated entity authoring
 
-1. Plan the entity resource graph before writing: validate identifiers, BP/RP linkage, geometry IDs, animation/controller references, render-controller links and expected texture paths.
-2. Add a safe entity authoring tool to generate a minimal custom BP entity plus matching RP client-entity and geometry files from version-labelled Mojang patterns. Do not ship fake PNGs or copy vanilla-only internal fields.
-3. Validate the generated slice as one unit: positive/negative tests for cross-references, path confinement, collisions, malformed templates, missing textures and rollback/no-partial-write behavior.
+Implemented in `server/mcp_server.py` as `create_addon_entity`: one operation produces the BP entity definition, RP client-entity, geometry JSON and render controller. It checks scaffold linkage/version, keeps the generated identifiers consistent, refuses collisions and unsafe paths, validates a supplied PNG, rolls back partial writes, and reports missing texture files rather than fabricating assets. Dedicated integration/security tests are included. CI status should be checked on the exact release commit; runtime behavior is still NOT RUN.
 
-Acceptance: generated cross-references resolve statically, existing files remain untouched, and missing textures are explicit. Geometry/animation runtime behavior remains unverified until tested in Minecraft.
+## 0.9.3 — next: optional MCT handoff and evidence
 
-## 0.9.3 — hybrid MCT handoff and evidence
+1. Add an MCT `doctor` capability that discovers local Node/npm/Creator Tools versions without installing packages or making network calls automatically.
+2. Add an explicit opt-in, allowlisted MCT CLI handoff only after verifying its documented syntax. Run without a shell, inside a user-approved workspace, with a timeout, bounded output, and collision/path controls.
+3. Automatically audit generated output, compare it with a baseline using `diff_packs`, and evaluate user-supplied real add-ons with provenance. Publish precision/recall only from reviewed labelled cases.
 
-1. Add optional MCT discovery/doctor support: detect local Node/npm/Creator Tools without installing packages or making network calls automatically; report discovered versions and capability gaps.
-2. Build an explicit opt-in generation handoff only after the installed MCT CLI and its documented syntax are verified. Invoke without a shell, inside a user-approved workspace/project, with a timeout, bounded output and collision checks.
-3. Close the loop with audits and benchmarks: audit generated output, compare against a baseline with diff_packs, and evaluate user-supplied real packs with provenance. Publish precision/recall only from reviewed labelled cases.
-
-Acceptance: MCT remains optional; generation is followed by static validation and baseline comparison; real-pack metrics are never invented.
+Acceptance: MCT remains optional; generation is always followed by our static validation and baseline comparison; real-pack metrics are never invented.
 
 ## Safeguards
 

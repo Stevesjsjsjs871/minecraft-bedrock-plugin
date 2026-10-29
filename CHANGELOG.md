@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.9 — Procedural texture reliability and pattern expansion
+- Expands the standalone PNG generator to ten deterministic patterns, including gradients, brick/mortar, stone variation, connected ore-like veins and wood grain.
+- Rejects malformed RGB hex, boolean dimensions/seeds/alpha, symlink destinations, and unsafe forced destinations; preserves atomic default no-overwrite behavior.
+- Adds tests for all patterns, repeatability, gradients, transparency, symlink safety, CLI structured output and PNG CRC integrity.
+- Does not claim MCP registration, UV-aware texture painting, AI image synthesis or Minecraft runtime verification.
+
 ## 1.0.6
 - Adds an offline package-integrity checker and nine synthetic regression tests for manifest/version consistency, default prompts, MCP configuration, skill metadata, registry/dispatch parity, schema closure, writer annotations, sample-index path integrity and conservative README heading repair.
 - Adapts the integrity audit to the GitHub source checkout: the generated full gzip index is optional when curated sample fallback files exist, and the checker reports that state as WARN rather than claiming full-index verification.

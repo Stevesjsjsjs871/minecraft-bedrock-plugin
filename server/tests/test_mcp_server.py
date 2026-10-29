@@ -22,14 +22,14 @@ analyzer_spec.loader.exec_module(analyzer)
 
 
 class SchemaTests(unittest.TestCase):
-    def test_nineteen_tools_and_closed_schemas(self):
-        self.assertEqual(len(server.TOOLS), 19)
+    def test_twenty_tools_and_closed_schemas(self):
+        self.assertEqual(len(server.TOOLS), 20)
         for tool in server.TOOLS:
             schema = tool["inputSchema"]
             self.assertFalse(schema["additionalProperties"])
             self.assertEqual(schema["type"], "object")
             self.assertTrue(set(schema["required"]).issubset(schema["properties"]))
-            self.assertEqual(tool["annotations"]["readOnlyHint"], tool["name"] not in {"create_addon_project", "create_addon_item", "create_addon_block", "create_addon_recipe", "create_addon_entity", "create_entity_with_mct"})
+            self.assertEqual(tool["annotations"]["readOnlyHint"], tool["name"] not in {"create_addon_project", "create_addon_item", "create_addon_block", "create_addon_recipe", "create_addon_entity", "create_entity_with_mct", "generate_texture"})
             self.assertFalse(tool["annotations"]["destructiveHint"])
         creator = server.TOOL_BY_NAME["create_addon_project"]
         self.assertFalse(creator["annotations"]["readOnlyHint"])

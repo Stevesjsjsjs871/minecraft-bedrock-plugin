@@ -40,7 +40,7 @@ WORKFLOW_INSTRUCTIONS = (
     "Project: create_addon_project. Writers: create_addon_item, create_addon_block, create_addon_recipe, create_addon_entity, create_entity_with_mct. "
     "MCT CLI: creator_tools_status/catalog/validate_with_mct. "
     "Texture: generate_texture. Samples: search_mojang_samples/read_mojang_sample; inspect_archive, compare_baseline, diff_packs, audit_pack, get_resource_graph, validate_manifest, audit_geometry, audit_animation. "
-    "Read-only audits; preserve originals; cite evidence; runtime NOT RUN."
+    "Audit/reference tools are read-only; preserve originals; cite evidence; runtime NOT RUN."
 )
 
 def _tool(

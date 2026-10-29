@@ -9,6 +9,7 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 import sys
 import uuid
 import zipfile
@@ -2225,6 +2226,402 @@ def _create_addon_entity(args: dict[str, Any]) -> dict[str, Any]:
         "runtime_status": "NOT RUN",
         "note": "Generated a coordinated BP entity, RP client-entity, geometry and render controller. A real PNG texture is still required if one was not supplied; animation, spawn-rule and in-game behavior were not tested."
     }
+
+
+
+def _resolve_mct_scaffold(project_name: str) -> tuple[Path, Path, Path]:
+    """Resolve a direct workspace project with valid linked BP/RP manifests."""
+    workspace = _workspace_root()
+    target = workspace / project_name
+    try:
+        project = target.resolve(strict=True)
+        project.relative_to(workspace)
+    except (OSError, ValueError) as exc:
+        raise ValueError(f"project directory does not exist inside the configured workspace: {project_name}") from exc
+    if target.is_symlink() or project != target or not project.is_dir():
+        raise ValueError("project_directory must be a real directory directly under the configured workspace")
+    bp_root = project / "behavior_packs" / f"{project_name}_BP"
+    rp_root = project / "resource_packs" / f"{project_name}_RP"
+    for parent, pack_root in ((project / "behavior_packs", bp_root), (project / "resource_packs", rp_root)):
+        if parent.is_symlink() or not parent.is_dir() or pack_root.is_symlink() or not pack_root.is_dir():
+            raise ValueError("project BP/RP folder is missing or unsafe")
+        try:
+            parent.resolve(strict=True).relative_to(project)
+            pack_root.resolve(strict=True).relative_to(project)
+        except (OSError, ValueError) as exc:
+            raise ValueError("project BP/RP folder resolves outside the project") from exc
+        manifest_path = pack_root / "manifest.json"
+        if manifest_path.is_symlink() or not manifest_path.is_file():
+            raise ValueError("project BP/RP manifest is missing or unsafe")
+    try:
+        bp = json.loads((bp_root / "manifest.json").read_text(encoding="utf-8"))
+        rp = json.loads((rp_root / "manifest.json").read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"project manifest is invalid JSON or unreadable: {exc}") from exc
+    if not isinstance(bp, dict) or not isinstance(rp, dict):
+        raise ValueError("project BP/RP manifests must be JSON objects")
+    bh, rh, deps = bp.get("header"), rp.get("header"), bp.get("dependencies")
+    if not isinstance(bh, dict) or not isinstance(rh, dict) or not isinstance(deps, list):
+        raise ValueError("project manifests are missing expected header/dependency objects")
+    if not isinstance(rh.get("uuid"), str) or not any(isinstance(d, dict) and d.get("uuid") == rh["uuid"] for d in deps):
+        raise ValueError("project BP/RP manifests do not contain a valid BP-to-RP UUID dependency")
+    if bh.get("min_engine_version") != rh.get("min_engine_version"):
+        raise ValueError("project BP/RP target versions differ")
+    return project, bp_root, rp_root
+
+
+def _validate_mct_project_tree(project: Path) -> dict[str, int]:
+    """Reject symlinks/special files, unsafe names and unbounded staging input."""
+    root = project.resolve(strict=True)
+    count = total = 0
+    for current, directories, filenames in os.walk(root, topdown=True, followlinks=False):
+        folder = Path(current)
+        if folder.is_symlink():
+            raise ValueError("MCT staging refuses symlinked directories")
+        for dirname in list(directories):
+            candidate = folder / dirname
+            if candidate.is_symlink():
+                raise ValueError("MCT staging refuses symlinked directories")
+            try:
+                candidate.resolve(strict=True).relative_to(root)
+            except (OSError, ValueError) as exc:
+                raise ValueError("project directory resolves outside the project") from exc
+        for filename in filenames:
+            path = folder / filename
+            if path.is_symlink() or not path.is_file():
+                raise ValueError("MCT staging refuses symlinks and non-regular files")
+            relative = path.relative_to(root).as_posix()
+            if not _safe_indexed_sample_path(relative) or any(ord(ch) < 32 or ord(ch) == 127 for ch in relative):
+                raise ValueError("MCT staging refuses non-canonical paths")
+            size = path.stat().st_size
+            if size > MAX_MEMBER_BYTES:
+                raise ValueError(f"project file exceeds the {MAX_MEMBER_BYTES}-byte staging limit")
+            total += size
+            count += 1
+            if total > MAX_UNCOMPRESSED_BYTES or count > MAX_ARCHIVE_MEMBERS:
+                raise ValueError("project exceeds the bounded MCT staging size or file-count limit")
+    return {"file_count": count, "total_bytes": total}
+
+
+def _mct_pack_snapshot(project: Path, project_name: str) -> dict[str, dict[str, Any]]:
+    """Hash regular files under the two expected pack roots."""
+    output: dict[str, dict[str, Any]] = {}
+    for root in (project / "behavior_packs" / f"{project_name}_BP", project / "resource_packs" / f"{project_name}_RP"):
+        resolved_root = root.resolve(strict=True)
+        for current, directories, filenames in os.walk(root, topdown=True, followlinks=False):
+            folder = Path(current)
+            if folder.is_symlink():
+                raise ValueError("MCT snapshot refuses symlinked pack directories")
+            for dirname in list(directories):
+                if (folder / dirname).is_symlink():
+                    raise ValueError("MCT snapshot refuses symlinked pack directories")
+            for filename in filenames:
+                path = folder / filename
+                if path.is_symlink() or not path.is_file():
+                    raise ValueError("MCT snapshot refuses symlinks and non-regular files")
+                try:
+                    path.resolve(strict=True).relative_to(resolved_root)
+                except (OSError, ValueError) as exc:
+                    raise ValueError("MCT snapshot file resolves outside its pack root") from exc
+                digest = hashlib.sha256()
+                with path.open("rb") as stream:
+                    for block in iter(lambda: stream.read(1024 * 1024), b""):
+                        digest.update(block)
+                output[path.relative_to(project).as_posix()] = {"sha256": digest.hexdigest(), "size_bytes": path.stat().st_size}
+    return output
+
+
+def _create_mct_pack_archive(project: Path, project_name: str, destination: Path) -> None:
+    """Package expected BP/RP roots for static baseline/candidate comparison."""
+    _validate_mct_project_tree(project)
+    _mct_pack_snapshot(project, project_name)
+    with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for label, root in (
+            ("BP", project / "behavior_packs" / f"{project_name}_BP"),
+            ("RP", project / "resource_packs" / f"{project_name}_RP"),
+        ):
+            for current, directories, filenames in os.walk(root, topdown=True, followlinks=False):
+                folder = Path(current)
+                if folder.is_symlink() or any((folder / name).is_symlink() for name in directories):
+                    raise ValueError("MCT audit archive refuses symlinked directories")
+                for filename in filenames:
+                    path = folder / filename
+                    if path.is_symlink() or not path.is_file():
+                        raise ValueError("MCT audit archive refuses symlinks and non-regular files")
+                    archive.write(path, f"{label}/{path.relative_to(root).as_posix()}")
+
+
+def _mct_command(command: list[str], cwd: Path, timeout: int = 60) -> dict[str, Any]:
+    """Run an explicit local executable without shell dispatch or package installation."""
+    try:
+        process = subprocess.run(
+            command, cwd=str(cwd), capture_output=True, text=True, timeout=timeout,
+            check=False, shell=False, env={**os.environ, "NO_COLOR": "1", "CI": "1"},
+        )
+    except subprocess.TimeoutExpired:
+        return {"exit_code": None, "timed_out": True, "stdout": "", "stderr": f"command exceeded the {timeout}-second limit"}
+    except OSError as exc:
+        return {"exit_code": None, "launch_error": str(exc)[:1000], "stdout": "", "stderr": ""}
+    stdout = process.stdout if isinstance(process.stdout, str) else ""
+    stderr = process.stderr if isinstance(process.stderr, str) else ""
+    return {
+        "exit_code": process.returncode, "timed_out": False,
+        "stdout": stdout[:12000], "stderr": stderr[:12000],
+        "stdout_truncated": len(stdout) > 12000, "stderr_truncated": len(stderr) > 12000,
+    }
+
+
+def _extract_cli_json(text_value: str) -> Any:
+    try:
+        return json.loads(text_value)
+    except json.JSONDecodeError:
+        decoder = json.JSONDecoder()
+        for index, char in enumerate(text_value):
+            if char != "{":
+                continue
+            try:
+                value, _end = decoder.raw_decode(text_value[index:])
+            except json.JSONDecodeError:
+                continue
+            if isinstance(value, dict):
+                return value
+    return None
+
+
+def _creator_tools_status() -> dict[str, Any]:
+    workspace = _workspace_root()
+    tools: dict[str, Any] = {}
+    for name in ("node", "npm", "mct"):
+        executable = shutil.which(name)
+        if not executable:
+            tools[name] = {"status": "not_found", "path": None}
+            continue
+        command = [executable, "version", "--json"] if name == "mct" else [executable, "--version"]
+        result = _mct_command(command, workspace, timeout=8)
+        parsed = _extract_cli_json(result.get("stdout", "")) if name == "mct" else None
+        tools[name] = {
+            "status": "available" if result.get("exit_code") == 0 else "check_failed",
+            "path": executable,
+            "version": parsed.get("version") if isinstance(parsed, dict) else result.get("stdout", "").strip(),
+            "version_payload": parsed if isinstance(parsed, dict) else None,
+            "result": result,
+        }
+    return {
+        "status": "available" if tools["mct"]["status"] == "available" else "mct_not_installed",
+        "tools": tools, "automatic_install_performed": False, "npx_used": False,
+        "mcp_server_version": SERVER_VERSION, "runtime_status": "NOT RUN",
+    }
+
+
+def _creator_tools_catalog() -> dict[str, Any]:
+    executable = shutil.which("mct")
+    if not executable:
+        return {
+            "status": "not_available",
+            "message": "MCT CLI is not installed. Install it explicitly; this tool never uses npx or installs packages.",
+            "automatic_install_performed": False, "runtime_status": "NOT RUN",
+        }
+    command = [executable, "add", "--list-types", "--json", "--offline", "--isolated"]
+    result = _mct_command(command, _workspace_root(), timeout=60)
+    payload = _extract_cli_json(result.get("stdout", ""))
+    return {
+        "status": "completed" if result.get("exit_code") == 0 and isinstance(payload, dict) else "catalog_failed",
+        "catalog": payload, "command": command, "command_result": result,
+        "note": "The MCT CLI may load its gallery from a local cache or remote source; --offline/--isolated do not guarantee every operation is network-free.",
+        "automatic_install_performed": False, "runtime_status": "NOT RUN", "mcp_server_version": SERVER_VERSION,
+    }
+
+
+def _validate_with_mct(args: dict[str, Any]) -> dict[str, Any]:
+    project_name = args["project_directory"]
+    project, _bp_root, _rp_root = _resolve_mct_scaffold(project_name)
+    tree_info = _validate_mct_project_tree(project)
+    executable = shutil.which("mct")
+    if not executable:
+        return {
+            "status": "not_available", "project_directory": str(project),
+            "message": "MCT CLI is not installed. Install it explicitly and ensure mct is on PATH; this tool never uses npx.",
+            "source_project_modified": False, "automatic_install_performed": False, "runtime_status": "NOT RUN",
+        }
+    with tempfile.TemporaryDirectory(prefix="mbe-mct-validate-") as temporary:
+        temporary_root = Path(temporary)
+        staged_project = temporary_root / project_name
+        report_directory = temporary_root / "reports"
+        shutil.copytree(project, staged_project)
+        report_directory.mkdir()
+        command = [
+            executable, "validate", args["suite"],
+            "--input-folder", str(staged_project), "--output-folder", str(report_directory),
+            "--single", "--isolated", "--offline", "--json",
+        ]
+        result = _mct_command(command, staged_project, timeout=180)
+    return {
+        "status": "completed" if result.get("exit_code") == 0 else ("launch_failed" if result.get("launch_error") else "completed_with_findings"),
+        "project_directory": str(project), "suite": args["suite"], "source_tree": tree_info,
+        "source_project_modified": False, "command_result": result,
+        "network_note": "MCT runs on a temporary copy with --offline and --isolated. Its CLI documentation notes some checks may still use the network.",
+        "automatic_install_performed": False, "runtime_status": "NOT RUN", "mcp_server_version": SERVER_VERSION,
+    }
+
+
+def _create_entity_with_mct(args: dict[str, Any]) -> dict[str, Any]:
+    project_name, template_id, slug = args["project_directory"], args["template_id"], args["entity_slug"]
+    project, bp_root, rp_root = _resolve_mct_scaffold(project_name)
+    source_tree = _validate_mct_project_tree(project)
+    executable = shutil.which("mct")
+    if not executable:
+        return {
+            "status": "not_available", "project_directory": str(project),
+            "message": "MCT CLI is not installed. Install it explicitly and ensure mct is on PATH; this tool never uses npx.",
+            "automatic_install_performed": False, "writes_applied": False, "runtime_status": "NOT RUN",
+        }
+
+    catalog = _creator_tools_catalog()
+    payload = catalog.get("catalog") if isinstance(catalog, dict) else None
+    gallery_items = payload.get("galleryTemplates") if isinstance(payload, dict) else None
+    template = next((item for item in gallery_items if isinstance(item, dict) and item.get("id") == template_id), None) if isinstance(gallery_items, list) else None
+    template_type = str(template.get("type", "")).lower() if isinstance(template, dict) else ""
+    if catalog.get("status") != "completed":
+        return {"status": "catalog_unavailable", "catalog_status": catalog.get("status"), "writes_applied": False, "runtime_status": "NOT RUN"}
+    if template is None or template_type not in {"4", "entitytype", "entity_type", "entity"}:
+        return {
+            "status": "invalid_entity_template", "template_id": template_id,
+            "message": "Choose an entityType gallery template (MCT enum value 4) from creator_tools_catalog.",
+            "writes_applied": False, "runtime_status": "NOT RUN",
+        }
+
+    before = _mct_pack_snapshot(project, project_name)
+    with tempfile.TemporaryDirectory(prefix="mbe-mct-stage-") as temporary:
+        temp_root = Path(temporary)
+        staged_project = temp_root / project_name
+        baseline_archive, candidate_archive = temp_root / "before.mcaddon", temp_root / "after.mcaddon"
+        shutil.copytree(project, staged_project)
+        _validate_mct_project_tree(staged_project)
+        _create_mct_pack_archive(project, project_name, baseline_archive)
+        command = [
+            executable, "add", template_id, slug,
+            "--input-folder", str(staged_project), "--isolated", "--offline", "--yes", "--single", "--json",
+        ]
+        generation = _mct_command(command, staged_project, timeout=180)
+        if generation.get("exit_code") != 0:
+            return {
+                "status": "generation_failed", "command_result": generation, "writes_applied": False,
+                "automatic_install_performed": False, "runtime_status": "NOT RUN",
+                "note": "MCT did not exit successfully; the original project was not modified.",
+            }
+
+        _validate_mct_project_tree(staged_project)
+        after = _mct_pack_snapshot(staged_project, project_name)
+        added = sorted(set(after) - set(before))
+        modified = sorted(path for path in set(after) & set(before) if after[path] != before[path])
+        removed = sorted(set(before) - set(after))
+        if modified or removed:
+            return {
+                "status": "refused_existing_file_changes", "files_added_in_staging": added[:100],
+                "files_modified_in_staging": modified[:100], "files_removed_in_staging": removed[:100],
+                "writes_applied": False, "runtime_status": "NOT RUN",
+                "note": "MCT changed or deleted existing pack files in staging. Nothing was merged.",
+            }
+        if not added:
+            return {
+                "status": "no_new_pack_files", "command_result": generation, "writes_applied": False,
+                "runtime_status": "NOT RUN", "note": "MCT added no files inside the expected BP/RP roots.",
+            }
+
+        _create_mct_pack_archive(staged_project, project_name, candidate_archive)
+        try:
+            baseline_report = _run_audit(baseline_archive)
+            candidate_report = _run_audit(candidate_archive, baseline_archive)
+            diff = _summarize_pack_diff(candidate_report, baseline_report)
+        except (OSError, RuntimeError, TimeoutError, ValueError) as exc:
+            return {"status": "static_audit_failed", "message": str(exc), "files_added_in_staging": added[:100], "writes_applied": False, "runtime_status": "NOT RUN"}
+
+        new_findings = diff.get("finding_delta", {}).get("new", {}).get("items", [])
+        escalations = diff.get("finding_delta", {}).get("severity_escalations", {}).get("items", [])
+        critical_new = [item for item in new_findings if isinstance(item, dict) and str(item.get("severity", "")).upper() in {"HIGH", "BLOCKER"}]
+        critical_escalations = [item for item in escalations if isinstance(item, dict) and str(item.get("candidate", "")).upper() in {"HIGH", "BLOCKER"}]
+        audit_summary = {
+            "recommendation": diff.get("recommendation"),
+            "summary": diff.get("summary"),
+            "new_findings": new_findings[:30],
+            "new_unresolved_references": diff.get("reference_delta", {}).get("new_unresolved", {}).get("items", [])[:30],
+            "reference_regressions": diff.get("reference_delta", {}).get("resolved_to_unresolved", {}).get("items", [])[:30],
+        }
+        if critical_new or critical_escalations:
+            return {
+                "status": "refused_static_audit_hold", "files_added_in_staging": added[:100],
+                "audit": audit_summary, "writes_applied": False, "runtime_status": "NOT RUN",
+                "note": "The staged entity introduces new HIGH/BLOCKER findings or escalates a finding to that severity. Review before merging.",
+            }
+
+        additions: list[tuple[Path, bytes]] = []
+        planned_directories: set[Path] = set()
+        pack_roots = {
+            ("behavior_packs", f"{project_name}_BP"): bp_root,
+            ("resource_packs", f"{project_name}_RP"): rp_root,
+        }
+        for relative_text in added:
+            relative = Path(relative_text)
+            if len(relative.parts) < 3 or tuple(relative.parts[:2]) not in pack_roots:
+                return {"status": "refused_outside_pack", "path": relative_text, "writes_applied": False, "runtime_status": "NOT RUN"}
+            pack_root = pack_roots[tuple(relative.parts[:2])]
+            source_path, target_path = staged_project / relative, project / relative
+            if source_path.is_symlink() or not source_path.is_file() or source_path.stat().st_size > MAX_MEMBER_BYTES:
+                return {"status": "refused_unsafe_output", "path": relative_text, "writes_applied": False, "runtime_status": "NOT RUN"}
+            try:
+                source_path.resolve(strict=True).relative_to(staged_project.resolve(strict=True))
+                target_path.resolve(strict=False).relative_to(pack_root.resolve(strict=True))
+            except (OSError, ValueError) as exc:
+                return {"status": "refused_unsafe_output", "path": relative_text, "message": str(exc), "writes_applied": False, "runtime_status": "NOT RUN"}
+            if target_path.exists() or target_path.is_symlink():
+                return {"status": "refused_collision", "path": relative_text, "writes_applied": False, "runtime_status": "NOT RUN"}
+            parent = target_path.parent
+            while parent != pack_root:
+                if parent.exists():
+                    if parent.is_symlink() or not parent.is_dir():
+                        return {"status": "refused_unsafe_parent", "path": relative_text, "writes_applied": False, "runtime_status": "NOT RUN"}
+                else:
+                    planned_directories.add(parent)
+                parent = parent.parent
+            additions.append((target_path, source_path.read_bytes()))
+
+        created_directories: list[Path] = []
+        created_files: list[Path] = []
+        try:
+            for directory in sorted(planned_directories, key=lambda path: len(path.parts)):
+                if not directory.exists():
+                    directory.mkdir()
+                    created_directories.append(directory)
+                elif directory.is_symlink() or not directory.is_dir():
+                    raise ValueError("merge destination directory changed during preflight")
+            for destination, contents in additions:
+                with destination.open("xb") as stream:
+                    created_files.append(destination)
+                    stream.write(contents)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+        except Exception:
+            for path in reversed(created_files):
+                try:
+                    if path.is_file() and not path.is_symlink():
+                        path.unlink()
+                except OSError:
+                    pass
+            for path in reversed(created_directories):
+                try:
+                    path.rmdir()
+                except OSError:
+                    pass
+            raise
+
+        return {
+            "status": "created", "project_directory": str(project), "template_id": template_id,
+            "entity_slug": slug, "files_created": [path.relative_to(project).as_posix() for path, _ in additions],
+            "audit": audit_summary, "mct_command_result": generation, "source_tree": source_tree,
+            "automatic_install_performed": False, "npx_used": False, "runtime_status": "NOT RUN",
+            "note": "Only new files from the bounded staging copy were merged. Review audit warnings and import into Minecraft for runtime verification.",
+        }
+
 
 
 def call_tool(name: str, raw_args: Any) -> dict[str, Any]:

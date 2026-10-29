@@ -40,6 +40,10 @@ python -m unittest discover -s skills/visual-resource-pipeline/scripts -p 'test_
 
 This produces a procedural starter pattern, not AI image synthesis, a UV-aware entity texture painter, or proof of Minecraft rendering. The generator is a standalone script and is **not currently registered or dispatched as an MCP `generate_texture` tool**. Do not claim that capability until server registration, workspace-confined path validation, dispatch and MCP integration tests are implemented and run.
 
+## Procedural texture generation
+
+The MCP `generate_texture` tool creates deterministic RGBA PNGs inside an existing linked Resource Pack at a relative path under `textures/`. Destination parent folders must already exist; traversal, symlink escapes and overwrites are rejected. It supports `pixel_noise`, `checker`, `stripes`, `solid`, `vertical_gradient`, `horizontal_gradient`, `brick`, `stone_noise`, `ore_veins` and `wood_grain`, with bounded dimensions, RGB hex colors, seed and alpha. This is procedural starter art, not AI image synthesis or UV-aware entity texture painting. Every result reports Minecraft runtime status as `NOT RUN`.
+
 ## Asset discipline
 
 - Do not invent a model or texture when the user gave an exact reference; follow the described proportions, palette, silhouette and constraints.

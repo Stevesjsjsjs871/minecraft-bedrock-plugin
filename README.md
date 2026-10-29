@@ -1,4 +1,11 @@
-# Minecraft Bedrock Engineer — 1.0.9
+# Minecraft Bedrock Engineer — 1.0.10
+
+## 1.0.10: MCP procedural texture authoring
+
+- Adds the `generate_texture` MCP tool to the existing local stdio server, backed by the deterministic ten-style PNG generator.
+- Writes only to an existing linked Resource Pack under `textures/`; rejects path traversal, symlink escapes, missing parent folders and overwrites.
+- This produces procedural starter art, not AI image synthesis or UV-aware entity textures. Minecraft runtime remains `NOT RUN`.
+
 
 ## 1.0.9: procedural texture pattern expansion and hardening
 

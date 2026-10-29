@@ -22,14 +22,14 @@ analyzer_spec.loader.exec_module(analyzer)
 
 
 class SchemaTests(unittest.TestCase):
-    def test_nineteen_tools_and_closed_schemas(self):
-        self.assertEqual(len(server.TOOLS), 19)
+    def test_twenty_tools_and_closed_schemas(self):
+        self.assertEqual(len(server.TOOLS), 20)
         for tool in server.TOOLS:
             schema = tool["inputSchema"]
             self.assertFalse(schema["additionalProperties"])
             self.assertEqual(schema["type"], "object")
             self.assertTrue(set(schema["required"]).issubset(schema["properties"]))
-            self.assertEqual(tool["annotations"]["readOnlyHint"], tool["name"] not in {"create_addon_project", "create_addon_item", "create_addon_block", "create_addon_recipe", "create_addon_entity", "create_entity_with_mct"})
+            self.assertEqual(tool["annotations"]["readOnlyHint"], tool["name"] not in {"create_addon_project", "create_addon_item", "create_addon_block", "create_addon_recipe", "create_addon_entity", "create_entity_with_mct", "generate_texture"})
             self.assertFalse(tool["annotations"]["destructiveHint"])
         creator = server.TOOL_BY_NAME["create_addon_project"]
         self.assertFalse(creator["annotations"]["readOnlyHint"])
@@ -462,7 +462,7 @@ class SchemaTests(unittest.TestCase):
                 call = server.handle_message({"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "inspect_archive", "arguments": {"archive_path": "fixture.mcaddon"}}})
                 bad = server.handle_message({"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {"name": "inspect_archive", "arguments": {"archive_path": str(root.parent / "outside.mcaddon")}}})
                 self.assertEqual(init["result"]["serverInfo"]["version"], server.SERVER_VERSION)
-                self.assertEqual(len(tools["result"]["tools"]), 19)
+                self.assertEqual(len(tools["result"]["tools"]), 20)
                 self.assertEqual(call["result"]["structuredContent"]["status"], "completed")
                 self.assertTrue(bad["result"]["isError"])
                 self.assertEqual(bad["result"]["structuredContent"]["status"], "error")

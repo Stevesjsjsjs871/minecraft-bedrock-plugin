@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.10 — MCP procedural texture authoring
+- Registers `generate_texture` in the existing stdio MCP server as the twentieth tool, backed by the deterministic ten-style PNG generator.
+- Restricts writes to an existing linked Resource Pack under `textures/`; rejects traversal, symlink escapes, missing parent directories and overwrites.
+- Adds MCP integration tests, package-integrity writer metadata coverage, and CI execution for the generator suite.
+- Procedural output only; AI image synthesis, UV-aware entity painting and Minecraft runtime are not claimed.
+
 ## 1.0.9 — Procedural texture reliability and pattern expansion
 - Expands the standalone PNG generator to ten deterministic patterns, including gradients, brick/mortar, stone variation, connected ore-like veins and wood grain.
 - Rejects malformed RGB hex, boolean dimensions/seeds/alpha, symlink destinations, and unsafe forced destinations; preserves atomic default no-overwrite behavior.

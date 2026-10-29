@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import gzip
+import importlib.util
 import hashlib
 import json
 import os
@@ -32,13 +33,14 @@ SERVER_VERSION = VERSION_FILE.read_text(encoding="utf-8").strip()
 MAX_MEMBERS_RETURNED = 2000
 SUPPORTED_SUFFIXES = {".mcaddon", ".mcpack", ".mcworld", ".zip"}
 AUDITOR = ROOT / "skills" / "automated-validation" / "scripts" / "bedrock_audit.py"
+TEXTURE_GENERATOR_PATH = ROOT / "skills" / "visual-resource-pipeline" / "scripts" / "generate_texture.py"
 
 # Keep the priority workflow short and front-loaded for clients that expose it.
 WORKFLOW_INSTRUCTIONS = (
     "Project: create_addon_project. Writers: create_addon_item, create_addon_block, create_addon_recipe, create_addon_entity, create_entity_with_mct. "
     "MCT CLI: creator_tools_status/catalog/validate_with_mct. "
-    "Samples: search_mojang_samples/read_mojang_sample; inspect_archive, compare_baseline, diff_packs, audit_pack, get_resource_graph, validate_manifest, audit_geometry, audit_animation. "
-    "Audit/reference tools are read-only; preserve originals; no fake textures; cite evidence; runtime NOT RUN."
+    "Texture: generate_texture. Samples: search_mojang_samples/read_mojang_sample; inspect_archive, compare_baseline, diff_packs, audit_pack, get_resource_graph, validate_manifest, audit_geometry, audit_animation. "
+    "Audit/reference tools are read-only; preserve originals; cite evidence; runtime NOT RUN."
 )
 
 def _tool(
@@ -233,6 +235,25 @@ TOOLS = [
         ["query"],
     ),
     _tool(
+        "generate_texture",
+        "Generate a deterministic procedural RGBA PNG texture inside an existing linked Resource Pack. Output is restricted to an RP-relative path under textures/; rejects traversal, symlink escapes, missing parent folders and overwrites. This is procedural starter art, not AI synthesis; runtime remains NOT RUN.",
+        {
+            "project_directory": {"type": "string", "minLength": 1, "maxLength": 63, "description": "One existing project directory directly under the configured workspace, created by create_addon_project."},
+            "output_path": {"type": "string", "minLength": 1, "maxLength": 200, "description": "Relative PNG path under the project's Resource Pack textures/ directory, e.g. textures/blocks/ruby_ore.png. Parent folders must already exist."},
+            "width": {"type": "integer", "minimum": 1, "maximum": 1024, "description": "Texture width; defaults to 16."},
+            "height": {"type": "integer", "minimum": 1, "maximum": 1024, "description": "Texture height; defaults to 16."},
+            "style": {"type": "string", "enum": ["pixel_noise", "checker", "stripes", "solid", "vertical_gradient", "horizontal_gradient", "brick", "stone_noise", "ore_veins", "wood_grain"], "description": "Deterministic pixel-art pattern; defaults to pixel_noise."},
+            "base_color": {"type": "string", "minLength": 6, "maxLength": 7, "description": "Six-digit RGB hex, optionally prefixed with #; defaults to #777777."},
+            "accent_color": {"type": "string", "minLength": 6, "maxLength": 7, "description": "Six-digit RGB hex, optionally prefixed with #; defaults to #A0A0A0."},
+            "seed": {"type": "integer", "minimum": -2147483648, "maximum": 2147483647, "description": "Deterministic random seed; defaults to 1."},
+            "alpha": {"type": "integer", "minimum": 0, "maximum": 255, "description": "Output alpha channel; defaults to 255."},
+        },
+        ["project_directory", "output_path"],
+        read_only=False,
+        destructive=False,
+        idempotent=False,
+    ),
+    _tool(
         "read_mojang_sample",
         "Read a curated bundled Mojang sample/documentation file, or an indexed text file from a user-supplied sample ZIP located inside the configured workspace. Output is capped and read-only; no files are extracted.",
         {
@@ -347,6 +368,14 @@ def _validate_arguments(name: str, args: Any) -> dict[str, Any]:
             raise ValueError("query must contain a searchable character")
     if name == "read_mojang_sample" and "archive_path" in normalized and not normalized["archive_path"].strip():
         raise ValueError("archive_path must not be blank when supplied")
+    if name == "generate_texture":
+        normalized.setdefault("width", 16)
+        normalized.setdefault("height", 16)
+        normalized.setdefault("style", "pixel_noise")
+        normalized.setdefault("base_color", "#777777")
+        normalized.setdefault("accent_color", "#A0A0A0")
+        normalized.setdefault("seed", 1)
+        normalized.setdefault("alpha", 255)
     if name == "create_addon_project":
         dirname = normalized["project_directory"]
         if not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", dirname) or "--" in dirname:
@@ -2669,6 +2698,77 @@ def _create_entity_with_mct(args: dict[str, Any]) -> dict[str, Any]:
 
 
 
+
+def _load_texture_generator():
+    spec = importlib.util.spec_from_file_location("mbe_generate_texture", TEXTURE_GENERATOR_PATH)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("procedural texture generator could not be loaded")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _generate_texture(args: dict[str, Any]) -> dict[str, Any]:
+    project_name = args["project_directory"]
+    if not re.fullmatch(r"[a-z][a-z0-9-]{0,62}", project_name):
+        raise ValueError("project_directory must be one lowercase project directory name")
+    output_raw = args["output_path"]
+    if not output_raw or len(output_raw) > 200 or "\\" in output_raw or "\x00" in output_raw:
+        raise ValueError("output_path must be a safe RP-relative path under textures/")
+    parts = output_raw.split("/")
+    if len(parts) < 2 or parts[0] != "textures" or any(part in {"", ".", ".."} for part in parts):
+        raise ValueError("output_path must stay under textures/, e.g. textures/blocks/ruby_ore.png")
+    if Path(parts[-1]).suffix.lower() != ".png":
+        raise ValueError("output_path must end with .png")
+
+    project, _bp_root, rp_root = _resolve_mct_scaffold(project_name)
+    rp_root = rp_root.resolve(strict=True)
+    parent = rp_root
+    for part in parts[:-1]:
+        candidate = parent / part
+        if candidate.is_symlink():
+            raise ValueError("output_path may not traverse symlink directories")
+        try:
+            resolved = candidate.resolve(strict=True)
+        except OSError as exc:
+            raise ValueError("output parent directories must already exist inside the Resource Pack") from exc
+        try:
+            resolved.relative_to(rp_root)
+        except ValueError as exc:
+            raise ValueError("output path resolves outside the Resource Pack") from exc
+        if not resolved.is_dir():
+            raise ValueError("output parent must be a directory")
+        parent = resolved
+
+    destination = parent / parts[-1]
+    if destination.is_symlink():
+        raise ValueError("refusing to write through a symlink")
+    if destination.exists():
+        raise ValueError("refusing to overwrite an existing texture")
+    generator = _load_texture_generator()
+    try:
+        result = generator.write_texture(
+            destination,
+            width=args["width"],
+            height=args["height"],
+            style=args["style"],
+            base_color=args["base_color"],
+            accent_color=args["accent_color"],
+            seed=args["seed"],
+            alpha=args["alpha"],
+        )
+    except FileExistsError as exc:
+        return _error("DESTINATION_EXISTS", str(exc))
+    result["project_directory"] = str(project)
+    result["resource_pack"] = str(rp_root)
+    result["output_path"] = "/".join(parts)
+    result["runtime_status"] = "NOT RUN"
+    result["generator_status"] = "PROCEDURAL_STARTER"
+    result["note"] = "Deterministic procedural PNG generated inside the linked Resource Pack; this is not AI image synthesis and has not been tested in Minecraft."
+    return result
+
+
 def call_tool(name: str, raw_args: Any) -> dict[str, Any]:
     try:
         args = _validate_arguments(name, raw_args)
@@ -2680,6 +2780,8 @@ def call_tool(name: str, raw_args: Any) -> dict[str, Any]:
             return _create_addon_block(args)
         if name == "create_addon_recipe":
             return _create_addon_recipe(args)
+        if name == "generate_texture":
+            return _generate_texture(args)
         if name == "create_addon_entity":
             return _create_addon_entity(args)
         if name == "creator_tools_status":

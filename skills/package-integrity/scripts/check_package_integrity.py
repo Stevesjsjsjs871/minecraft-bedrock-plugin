@@ -138,7 +138,7 @@ def _registry_audit(server_path: Path, checks: list[dict[str, str]]) -> dict[str
     schema_errors: list[str] = []
     writer_readonly_errors: list[str] = []
     writer_names = {"create_addon_project", "create_addon_item", "create_addon_block", "create_addon_recipe"}
-    additional_writer_names = {"create_addon_entity", "create_entity_with_mct"}
+    additional_writer_names = {"create_addon_entity", "create_entity_with_mct", "generate_texture"}
     all_writer_names = writer_names | additional_writer_names
     if len(assignments) != 1 or not isinstance(assignments[0], (ast.List, ast.Tuple)):
         schema_errors.append("Expected one statically declared TOOLS list")
@@ -230,7 +230,7 @@ def _registry_audit(server_path: Path, checks: list[dict[str, str]]) -> dict[str
     if writer_readonly_errors:
         checks.append({"id": "mcp-write-annotations", "status": "FAIL", "message": "; ".join(writer_readonly_errors)})
     elif set(names) >= writer_names:
-        checks.append({"id": "mcp-write-annotations", "status": "PASS", "message": "Four write-capable tools are explicitly marked; other registered tools are not incorrectly marked write-capable"})
+        checks.append({"id": "mcp-write-annotations", "status": "PASS", "message": "Core authoring tools are explicitly marked; other registered tools are not incorrectly marked write-capable"})
     else:
         checks.append({"id": "mcp-write-annotations", "status": "WARN", "message": "One or more expected authoring tools are absent; check API compatibility before release"})
     return {

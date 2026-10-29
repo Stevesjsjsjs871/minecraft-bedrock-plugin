@@ -14,13 +14,13 @@ Acceptance: full-index and curated-fallback modes are clearly distinguished. No 
 
 Implemented in `server/mcp_server.py` as `create_addon_entity`: one operation produces the BP entity definition, RP client-entity, geometry JSON and render controller. It checks scaffold linkage/version, keeps the generated identifiers consistent, refuses collisions and unsafe paths, validates a supplied PNG, rolls back partial writes, and reports missing texture files rather than fabricating assets. Dedicated integration/security tests are included. CI status should be checked on the exact release commit; runtime behavior is still NOT RUN.
 
-## 0.9.3 — next: optional MCT handoff and evidence
+## 0.9.3 — implemented: hybrid MCT orchestration
 
-1. Add an MCT `doctor` capability that discovers local Node/npm/Creator Tools versions without installing packages or making network calls automatically.
-2. Add an explicit opt-in, allowlisted MCT CLI handoff only after verifying its documented syntax. Run without a shell, inside a user-approved workspace, with a timeout, bounded output, and collision/path controls.
-3. Automatically audit generated output, compare it with a baseline using `diff_packs`, and evaluate user-supplied real add-ons with provenance. Publish precision/recall only from reviewed labelled cases.
+1. `creator_tools_status` discovers locally installed tools; `creator_tools_catalog` lists the actual MCT gallery identifiers and types. Neither installs dependencies or runs `npx`.
+2. `validate_with_mct` invokes the installed CLI on a temporary copy. `create_entity_with_mct` requires a specific `entityType` gallery ID, runs in staging, rejects modifications/removals to existing BP/RP files, audits a before/after bundle with `diff_packs` logic, and merges only new files when no new HIGH/BLOCKER issue or severity escalation is present.
+3. MCT remains optional. The CLI may access its gallery/cache even with `--offline`; the integration does not claim network isolation, and it does not automatically install MCT or deploy to Minecraft.
 
-Acceptance: MCT remains optional; generation is always followed by our static validation and baseline comparison; real-pack metrics are never invented.
+Acceptance status: implementation and mocked unit coverage are committed. Actual local MCT CLI execution, gallery availability and Minecraft runtime remain `NOT RUN`.
 
 ## Safeguards
 
@@ -28,4 +28,4 @@ Acceptance: MCT remains optional; generation is always followed by our static va
 - Do not execute arbitrary pack scripts or invoke a shell for generator integration.
 - Never download, install or execute external tools automatically without an explicit request and a verified command contract.
 - Treat Mojang samples as reference material; respect the relevant Minecraft EULA and do not redistribute vanilla assets automatically.
-- Report compile checks, unit tests, static checks and in-game tests separately. Use NOT RUN for runtime tests not actually performed.
+- Report compile checks, unit tests, static checks and in-game tests separately. Use `NOT RUN` for runtime tests not actually performed.

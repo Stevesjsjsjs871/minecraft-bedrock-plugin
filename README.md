@@ -1,4 +1,13 @@
-# Minecraft Bedrock Engineer — 0.9.2
+# Minecraft Bedrock Engineer — 0.9.3
+
+## 0.9.3: optional Minecraft Creator Tools integration
+
+- Adds read-only `creator_tools_status` to detect the installed Node.js, npm and MCT CLI without installing packages or calling `npx`.
+- Adds `creator_tools_catalog` to return actual gallery template IDs/types from the installed MCT CLI. Gallery loading is delegated to MCT and may use its own cache or remote source.
+- Adds `validate_with_mct`, which validates a bounded temporary copy of the selected project and directs reports to temporary storage; the source project is not used as the CLI working copy.
+- Adds `create_entity_with_mct`, requiring an explicit gallery template whose type is MCT `entityType`. It stages generation, hashes the original BP/RP files, refuses changed/deleted existing files, runs our static baseline diff, and merges only new pack files when no new HIGH/BLOCKER findings or severity escalations are present.
+- Never uses a shell, `npx`, automatic installation or deployment. MCT is optional. The official CLI notes that some operations may still access the network even when `--offline` is supplied.
+- Tests cover tool schemas, unavailable-CLI behavior, template/path validation and staged merge safety. MCT is mocked in unit tests; runtime CLI behavior and Minecraft import/rendering remain `NOT RUN`.
 
 ## 0.9.2: coordinated custom entity authoring
 

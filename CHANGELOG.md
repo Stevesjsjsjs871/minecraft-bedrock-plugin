@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.3
+- Adds optional MCT CLI discovery and gallery-template listing tools. These never install packages or invoke npx.
+- Adds MCT validation against a bounded temporary project copy with report output outside the source project.
+- Adds entity-template handoff using an explicit MCT gallery template ID. Generation runs in staging; existing-file modifications/deletions are rejected; the baseline/candidate packs are statically diffed before merge.
+- Only newly added pack files can be merged, and only when the diff introduces no HIGH/BLOCKER finding or escalation. Collisions, unsafe paths, symlinks, oversized project trees and partial-write failures are guarded.
+- The integration may cause the installed MCT CLI to access its own gallery/cache. Official documentation says --offline does not guarantee every CLI action is network-free.
+- Unit tests mock MCT; real CLI availability, MCT gallery operation, and Minecraft runtime tests remain NOT RUN.
+
 ## 0.9.2
 - Adds `create_addon_entity` to generate a coordinated four-file custom entity slice: BP entity, RP client entity, geometry and render controller.
 - Confirms linked BP/RP manifests, exact target version, canonical resource paths and matching identifiers before writing.

@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "minecraft-bedrock-engineer",
-  "version": "0.9.2",
-  "description": "A Minecraft Bedrock development toolkit for creating BP/RP projects, generating items, blocks, crafting recipes and coordinated entities, searching version-labelled Mojang samples, and auditing packs with evidence-based checks.",
+  "version": "0.9.3",
+  "description": "A Minecraft Bedrock development toolkit for creating BP/RP projects, generating items, blocks, crafting recipes and entities, optionally orchestrating an installed MCT CLI for validation and safe staged entity generation, searching version-labelled Mojang samples, and auditing packs with evidence-based checks.",
   "author": {
     "name": "Plugin owner"
   },
@@ -44,14 +44,17 @@
     "localization-generation",
     "shaped-recipe",
     "shapeless-recipe",
-    "crafting-table"
+    "crafting-table",
+    "mct-cli",
+    "hybrid-generation",
+    "entity-authoring"
   ],
   "extensions": {
     "com.openai": {
       "interface": {
         "displayName": "Minecraft Bedrock Engineer",
         "shortDescription": "Create & audit Bedrock add-ons",
-        "longDescription": "Create new Minecraft Bedrock BP/RP projects, generate starter items, blocks, shaped/shapeless crafting recipes and coordinated entity resources, reuse version-labelled Mojang samples, and audit packs with evidence-based static checks.",
+        "longDescription": "Create and audit Minecraft Bedrock add-ons, generate linked BP/RP content, use version-labelled Mojang samples, and optionally hand entity generation or validation to an already-installed Minecraft Creator Tools CLI through a guarded staging workflow.",
         "developerName": "Private project",
         "category": "Developer tools",
         "capabilities": [

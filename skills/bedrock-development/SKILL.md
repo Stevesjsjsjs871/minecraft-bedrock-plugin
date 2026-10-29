@@ -49,6 +49,16 @@ For complex tasks use: A) concise analysis, B) implementation/files changed, C) 
 - The uploaded source archive is labelled 1.26.50.4; the default target remains 1.26.50, so compatibility must not be inferred from the patch label alone.
 
 
+## 0.9.3 — optional MCT CLI orchestration
+
+- Use `creator_tools_status` to discover only already-installed Node.js/npm/MCT commands. Do not auto-install packages or invoke `npx`.
+- Use `creator_tools_catalog` to inspect the actual MCT gallery IDs and types. Select an item explicitly marked as `entityType` for `create_entity_with_mct`; shorthand `add entity` is interactive and must not be used for unattended generation.
+- `validate_with_mct` runs against a temporary copy and writes reports to a temporary output folder.
+- `create_entity_with_mct` runs the MCT add operation in a size-bounded staging copy. It hashes pack files before/after, refuses any modification or removal of existing pack files, creates baseline/candidate archives for our own static diff, and refuses merge for new HIGH/BLOCKER findings or critical severity escalations.
+- Only new files inside the expected BP/RP roots can be merged. Output paths are checked, collisions are refused, writes are exclusive, and newly created files/directories are rolled back on failure. The source project is never used as MCT's scratch directory.
+- MCT may load its gallery or use networked resources; `--offline`/ `--isolated` are passed, but the official CLI notes that some operations may still access the network. The tool never installs MCT or deploys into Minecraft.
+- Local MCT execution is not exercised by CI; tests mock the external executable. Runtime status remains `NOT RUN` until validated with the installed CLI and Minecraft.
+
 ## 0.9.2 — coordinated custom entity slice
 
 `create_addon_entity` writes four linked resources into an existing generated BP/RP scaffold: BP `entities/<slug>.json`, RP `entity/<slug>.entity.json`, RP `models/entity/<slug>.geo.json`, and RP `render_controllers/<slug>.render_controllers.json`. It checks BP-to-RP UUID dependency and target version before any write, uses one consistent custom identifier/geometry/controller set, rejects output collisions and unsafe/symlinked paths, validates a supplied PNG signature, and rolls back new outputs on write failure. It deliberately does not create placeholder textures. The basic model/AI template is a starting point only; validate version-specific schemas and test import, rendering and behavior in Minecraft before claiming runtime compatibility.

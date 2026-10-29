@@ -29,15 +29,18 @@ For items and blocks, verify:
 
 ## Procedural texture generator
 
-A command-line example (run from the plugin root):
+Command-line example (from the plugin root):
 
 ```bash
-python skills/visual-resource-pipeline/scripts/generate_texture.py resource_packs/my-addon_RP/textures/blocks/ruby_ore.png --width 16 --height 16 --style ore_veins --base '#55545A' --accent '#9A5CDA' --seed 14
+python skills/visual-resource-pipeline/scripts/generate_texture.py resource_packs/ruby-addon_RP/textures/blocks/ruby_ore.png --width 16 --height 16 --style ore_veins --base '#55545A' --accent '#9A5CDA' --seed 14
 ```
 
 `scripts/generate_texture.py` is the deterministic standard-library RGBA PNG writer. It supports `pixel_noise`, `checker`, `stripes`, `solid`, `vertical_gradient`, `horizontal_gradient`, `brick`, `stone_noise`, `ore_veins`, and `wood_grain`; width/height are capped at 1024 each and 1,048,576 total pixels.
 
-The separate `minecraft-bedrock-texture-generator` stdio MCP server exposes `generate_texture`. It writes only inside an existing project's `resource_packs/<project>_RP/textures/` directory, requires existing parent folders, refuses symlinked paths and existing destinations, validates style/color/dimensions, and returns structured output with a file hash. It does not modify manifests or texture atlases automatically.
+The separate `minecraft-bedrock-texture-generator` stdio MCP server exposes two tools:
+
+- `generate_texture` creates a deterministic RGBA PNG inside an existing project's `resource_packs/<project>_RP/textures/` directory. It requires existing parent folders, refuses symlinked paths and existing destinations, validates style/color/dimensions, and returns structured output with a file hash.
+- `register_texture_atlas` registers an existing PNG in `textures/terrain_texture.json` (`texture_type: "blocks"`) or `textures/item_texture.json` (`texture_type: "items"`). It validates the PNG signature, chunk CRCs and dimensions, preserves unrelated atlas entries, refuses conflicting identifiers, and writes the JSON atomically. It does not modify BP/RP block or item definitions; those definitions must reference the selected texture identifier.
 
 Example MCP call arguments:
 
@@ -54,7 +57,18 @@ Example MCP call arguments:
 }
 ```
 
-This remains procedural starter art, not AI image synthesis, UV-aware entity texture painting, automatic atlas integration, or proof of Minecraft rendering. Runtime/import/rendering checks remain `NOT RUN` unless executed in-game.
+Example atlas-registration arguments:
+
+```json
+{
+  "project_directory": "ruby-addon",
+  "texture_type": "blocks",
+  "texture_identifier": "ruby_ore",
+  "texture_path": "resource_packs/ruby-addon_RP/textures/blocks/ruby_ore.png"
+}
+```
+
+Texture generation remains procedural starter art, not AI image synthesis or UV-aware entity texture painting. Atlas registration does not create or edit the behavior/resource definitions that consume the key. Runtime/import/rendering checks remain `NOT RUN` unless executed in-game.
 
 ## Asset discipline
 

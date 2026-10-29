@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import struct
 import tempfile
@@ -46,6 +47,13 @@ class TextureGeneratorMcpTests(unittest.TestCase):
         generator_patch.start()
         self.addCleanup(generator_patch.stop)
 
+    def _call_tool(self, name, arguments):
+        return texture_mcp.handle_message({
+            "jsonrpc": "2.0", "id": 1,
+            "method": "tools/call",
+            "params": {"name": name, "arguments": arguments},
+        })
+
     def _call(self, args=None, *, output_path=None, project_directory=None):
         call_args = {
             "project_directory": project_directory or self.project_name,
@@ -53,22 +61,44 @@ class TextureGeneratorMcpTests(unittest.TestCase):
         }
         if args:
             call_args.update(args)
-        return texture_mcp.handle_message({
-            "jsonrpc": "2.0", "id": 1,
-            "method": "tools/call",
-            "params": {"name": "generate_texture", "arguments": call_args},
-        })
+        return self._call_tool("generate_texture", call_args)
+
+    def _register(self, *, texture_type="blocks", identifier="ruby_ore", texture_path=None, project_directory=None, extra=None):
+        arguments = {
+            "project_directory": project_directory or self.project_name,
+            "texture_type": texture_type,
+            "texture_identifier": identifier,
+            "texture_path": texture_path or self.output_rel,
+        }
+        if extra:
+            arguments.update(extra)
+        return self._call_tool("register_texture_atlas", arguments)
+
+    def _generate_real_png(self, relative_path=None, *, width=8, height=8):
+        relative_path = relative_path or self.output_rel
+        output = self.project / relative_path
+        output.parent.mkdir(parents=True, exist_ok=True)
+        bundled = texture_mcp.ROOT / "skills" / "visual-resource-pipeline" / "scripts" / "generate_texture.py"
+        with patch.object(texture_mcp, "GENERATOR_PATH", bundled):
+            result = self._call({"width": width, "height": height, "style": "solid", "base_color": "#123456"}, output_path=relative_path)
+        self.assertFalse(result["result"]["isError"], result["result"]["structuredContent"])
+        return output
 
     def test_tool_is_registered_with_closed_write_schema(self):
         listing = texture_mcp.handle_message({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
         tools = listing["result"]["tools"]
-        self.assertEqual([tool["name"] for tool in tools], ["generate_texture"])
-        tool = tools[0]
-        self.assertFalse(tool["inputSchema"]["additionalProperties"])
-        self.assertEqual(tool["inputSchema"]["required"], ["project_directory", "output_path"])
-        self.assertFalse(tool["annotations"]["readOnlyHint"])
-        self.assertFalse(tool["annotations"]["destructiveHint"])
-        self.assertFalse(tool["annotations"]["idempotentHint"])
+        self.assertEqual([tool["name"] for tool in tools], ["generate_texture", "register_texture_atlas"])
+        generate_tool, atlas_tool = tools
+        self.assertFalse(generate_tool["inputSchema"]["additionalProperties"])
+        self.assertEqual(generate_tool["inputSchema"]["required"], ["project_directory", "output_path"])
+        self.assertFalse(atlas_tool["inputSchema"]["additionalProperties"])
+        self.assertEqual(set(atlas_tool["inputSchema"]["required"]), {"project_directory", "texture_type", "texture_identifier", "texture_path"})
+        self.assertFalse(generate_tool["annotations"]["readOnlyHint"])
+        self.assertFalse(generate_tool["annotations"]["destructiveHint"])
+        self.assertFalse(generate_tool["annotations"]["idempotentHint"])
+        self.assertFalse(atlas_tool["annotations"]["readOnlyHint"])
+        self.assertFalse(atlas_tool["annotations"]["destructiveHint"])
+        self.assertTrue(atlas_tool["annotations"]["idempotentHint"])
 
     def test_initialize_and_ping_follow_jsonrpc_shape(self):
         initialized = texture_mcp.handle_message({
@@ -194,6 +224,98 @@ class TextureGeneratorMcpTests(unittest.TestCase):
         response = self._call(output_path=output_path)
         self.assertEqual(response["result"]["structuredContent"]["error"]["code"], "INVALID_ARGUMENT")
         self.assertFalse((outside / "escape.png").exists())
+
+    def test_register_block_texture_creates_atlas_and_preserves_existing_entries(self):
+        self._generate_real_png()
+        atlas_path = self.project / "resource_packs" / f"{self.project_name}_RP" / "textures" / "terrain_texture.json"
+        original = {
+            "resource_pack_name": "Keep Existing Name",
+            "texture_name": "atlas.terrain",
+            "padding": 8,
+            "num_mip_levels": 4,
+            "texture_data": {"existing_block": {"textures": "textures/blocks/existing_block"}},
+        }
+        atlas_path.write_text(json.dumps(original), encoding="utf-8")
+        response = self._register()
+        result = response["result"]["structuredContent"]
+        self.assertFalse(response["result"]["isError"], result)
+        self.assertEqual(result["status"], "registered")
+        self.assertEqual(result["atlas_path"], f"resource_packs/{self.project_name}_RP/textures/terrain_texture.json")
+        self.assertEqual(result["texture_reference"], "textures/blocks/ruby_ore")
+        self.assertEqual((result["width"], result["height"]), (8, 8))
+        saved = json.loads(atlas_path.read_text(encoding="utf-8"))
+        self.assertEqual(saved["resource_pack_name"], "Keep Existing Name")
+        self.assertEqual(saved["texture_data"]["existing_block"], original["texture_data"]["existing_block"])
+        self.assertEqual(saved["texture_data"]["ruby_ore"], {"textures": "textures/blocks/ruby_ore"})
+        before = atlas_path.read_bytes()
+        repeat = self._register()
+        self.assertEqual(repeat["result"]["structuredContent"]["status"], "already_registered")
+        self.assertEqual(atlas_path.read_bytes(), before)
+
+    def test_register_item_texture_creates_item_atlas(self):
+        item_path = f"resource_packs/{self.project_name}_RP/textures/items/ruby_gem.png"
+        self._generate_real_png(item_path)
+        response = self._register(texture_type="items", identifier="ruby_gem", texture_path=item_path)
+        result = response["result"]["structuredContent"]
+        self.assertFalse(response["result"]["isError"], result)
+        self.assertEqual(result["status"], "registered")
+        atlas = self.project / "resource_packs" / f"{self.project_name}_RP" / "textures" / "item_texture.json"
+        data = json.loads(atlas.read_text(encoding="utf-8"))
+        self.assertEqual(data["texture_name"], "atlas.items")
+        self.assertEqual(data["texture_data"]["ruby_gem"], {"textures": "textures/items/ruby_gem"})
+
+    def test_registration_refuses_identifier_conflicts_without_overwriting_atlas(self):
+        first = self._generate_real_png()
+        second_rel = f"resource_packs/{self.project_name}_RP/textures/blocks/ruby_ore_alt.png"
+        self._generate_real_png(second_rel)
+        self.assertEqual(self._register()["result"]["structuredContent"]["status"], "registered")
+        atlas = self.project / "resource_packs" / f"{self.project_name}_RP" / "textures" / "terrain_texture.json"
+        before = atlas.read_bytes()
+        response = self._register(texture_path=second_rel)
+        result = response["result"]["structuredContent"]
+        self.assertTrue(response["result"]["isError"])
+        self.assertEqual(result["error"]["code"], "IDENTIFIER_CONFLICT")
+        self.assertEqual(atlas.read_bytes(), before)
+        self.assertTrue(first.is_file())
+
+    def test_registration_rejects_wrong_paths_missing_files_and_bad_atlas(self):
+        invalid_paths = [
+            f"resource_packs/{self.project_name}_RP/textures/items/wrong_folder.png",
+            f"resource_packs/{self.project_name}_RP/textures/blocks/../escape.png",
+            "/tmp/ruby_ore.png",
+        ]
+        for path in invalid_paths:
+            with self.subTest(path=path):
+                result = self._register(texture_path=path)["result"]["structuredContent"]
+                self.assertEqual(result["error"]["code"], "INVALID_ARGUMENT")
+        missing = self._register(texture_path=f"resource_packs/{self.project_name}_RP/textures/blocks/missing.png")["result"]["structuredContent"]
+        self.assertEqual(missing["error"]["code"], "TEXTURE_UNAVAILABLE")
+        self._generate_real_png()
+        atlas = self.project / "resource_packs" / f"{self.project_name}_RP" / "textures" / "terrain_texture.json"
+        atlas.write_text("not-json", encoding="utf-8")
+        malformed = self._register()["result"]["structuredContent"]
+        self.assertEqual(malformed["error"]["code"], "INVALID_ATLAS")
+        self.assertEqual(atlas.read_text(encoding="utf-8"), "not-json")
+
+    def test_registration_rejects_corrupt_png_and_symlinked_texture_parent(self):
+        bad = self.project / self.output_rel
+        bad.write_bytes(b"not a png" * 10)
+        corrupt = self._register()["result"]["structuredContent"]
+        self.assertEqual(corrupt["error"]["code"], "INVALID_PNG")
+        bad.unlink()
+        outside = self.workspace / "outside-textures"
+        outside.mkdir()
+        linked = self.project / "resource_packs" / f"{self.project_name}_RP" / "textures" / "blocks" / "linked"
+        try:
+            linked.symlink_to(outside, target_is_directory=True)
+        except (OSError, NotImplementedError) as exc:
+            self.skipTest(f"symlinks are unavailable in this environment: {exc}")
+        linked_file = linked / "escape.png"
+        linked_file.write_bytes(b"not a png")
+        path = f"resource_packs/{self.project_name}_RP/textures/blocks/linked/escape.png"
+        result = self._register(texture_path=path)["result"]["structuredContent"]
+        self.assertEqual(result["error"]["code"], "UNSAFE_TEXTURE_PATH")
+        self.assertFalse((self.project / "resource_packs" / f"{self.project_name}_RP" / "textures" / "terrain_texture.json").exists())
 
     def test_unknown_tool_and_unknown_method_return_protocol_errors(self):
         unknown_tool = texture_mcp.handle_message({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"something_else","arguments":{}}})

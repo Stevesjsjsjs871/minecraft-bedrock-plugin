@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.11 — Safe texture-atlas registration
+- Adds the `register_texture_atlas` MCP tool for block and item Resource Pack textures.
+- Preserves existing atlas metadata and unrelated entries; creates a minimal atlas only when absent and refuses conflicting identifiers.
+- Validates existing PNG signature, chunk boundaries and CRCs, IHDR dimensions, workspace containment, symlinks, malformed atlas JSON, oversized inputs and concurrent atlas changes.
+- Adds regression tests for block/item atlas writes, idempotent repeats, conflict safety, corruption, traversal and symlink rejection.
+- Does not edit BP/RP item or block definitions and does not claim in-game rendering verification.
+
+
 ## 1.0.10 — Dedicated procedural texture MCP tool
 - Adds an independent stdio MCP server, `server/texture_generator_mcp.py`, exposing `generate_texture` while leaving the original server and dispatch untouched.
 - Generates bounded RGBA PNGs inside an existing project's RP `textures/` directory; validates canonical paths and dimensions, rejects symlinks and existing destinations, and returns structured metadata plus SHA-256.

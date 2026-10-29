@@ -1,4 +1,12 @@
-# Minecraft Bedrock Engineer — 1.0.10
+# Minecraft Bedrock Engineer — 1.0.11
+
+## 1.0.11: safe texture-atlas registration
+
+- Adds `register_texture_atlas` alongside procedural `generate_texture`.
+- Registers existing PNGs in the Bedrock block (`textures/terrain_texture.json`) or item (`textures/item_texture.json`) atlas while preserving unrelated entries.
+- Validates PNG chunk bounds and CRCs, dimensions, project/Resource Pack containment, atlas shape, and symlink safety; refuses conflicting texture identifiers and concurrent atlas changes.
+- Does not alter BP/RP item or block definitions. Those definitions must use the registered texture identifier; Minecraft runtime remains `NOT RUN`.
+
 
 ## 1.0.10: dedicated procedural texture MCP tool
 

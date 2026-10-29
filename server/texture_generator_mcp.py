@@ -12,7 +12,10 @@ import importlib.util
 import json
 import os
 import re
+import struct
 import sys
+import tempfile
+import zlib
 from pathlib import Path
 from typing import Any
 
@@ -30,6 +33,9 @@ TEXTURE_STYLES = [
 ]
 MAX_DIMENSION = 1024
 MAX_PIXELS = 1_048_576
+MAX_PNG_BYTES = 16 * 1024 * 1024
+MAX_ATLAS_BYTES = 8 * 1024 * 1024
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 PROJECT_NAME_RE = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?")
 
 
@@ -75,7 +81,49 @@ def _tool() -> dict[str, Any]:
     }
 
 
-TOOLS = [_tool()]
+def _atlas_tool() -> dict[str, Any]:
+    return {
+        "name": "register_texture_atlas",
+        "description": (
+            "Register an existing PNG in an existing Minecraft Bedrock Resource Pack texture atlas. "
+            "Use texture_type=blocks for textures/terrain_texture.json or items for textures/item_texture.json. "
+            "Preserves unrelated JSON entries, refuses duplicate identifiers that point elsewhere, and never "
+            "follows symlinked paths. It does not create or modify BP/RP item/block definitions; those must "
+            "reference the chosen texture identifier. Static checks only; Minecraft runtime remains NOT RUN."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "project_directory": {
+                    "type": "string", "minLength": 1, "maxLength": 63,
+                    "description": "One existing project directory directly inside the configured workspace, e.g. ruby-addon.",
+                },
+                "texture_type": {
+                    "type": "string", "enum": ["blocks", "items"],
+                    "description": "Which vanilla texture atlas to update: blocks or items.",
+                },
+                "texture_identifier": {
+                    "type": "string", "minLength": 1, "maxLength": 63,
+                    "description": "New lowercase atlas key, e.g. ruby_ore. Existing conflicting keys are never overwritten.",
+                },
+                "texture_path": {
+                    "type": "string", "minLength": 1, "maxLength": 512,
+                    "description": "Project-relative POSIX path to an existing PNG under resource_packs/<project>_RP/textures/blocks/ or textures/items/.",
+                },
+            },
+            "required": ["project_directory", "texture_type", "texture_identifier", "texture_path"],
+            "additionalProperties": False,
+        },
+        "annotations": {
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": False,
+        },
+    }
+
+
+TOOLS = [_tool(), _atlas_tool()]
 TOOL_BY_NAME = {tool["name"]: tool for tool in TOOLS}
 
 
@@ -240,6 +288,264 @@ def generate_texture(raw_args: Any) -> dict[str, Any]:
     return result
 
 
+
+class AtlasToolError(ValueError):
+    """An expected atlas-registry failure with a stable MCP error code."""
+    def __init__(self, code: str, message: str):
+        super().__init__(message)
+        self.code = code
+
+
+def _valid_project_name(value: Any) -> bool:
+    return isinstance(value, str) and PROJECT_NAME_RE.fullmatch(value) is not None and "--" not in value
+
+
+def _validate_atlas_arguments(raw_args: Any) -> dict[str, str]:
+    if not isinstance(raw_args, dict):
+        raise ValueError("arguments must be a JSON object")
+    required = {"project_directory", "texture_type", "texture_identifier", "texture_path"}
+    extras = set(raw_args) - required
+    missing = required - set(raw_args)
+    if extras:
+        raise ValueError(f"unexpected argument(s): {', '.join(sorted(extras))}")
+    if missing:
+        raise ValueError(f"missing required argument(s): {', '.join(sorted(missing))}")
+    for key, max_length in (("project_directory", 63), ("texture_type", 16), ("texture_identifier", 63), ("texture_path", 512)):
+        value = raw_args[key]
+        if not isinstance(value, str) or not value or len(value) > max_length:
+            raise ValueError(f"{key} must be a non-empty string of at most {max_length} characters")
+    if not _valid_project_name(raw_args["project_directory"]):
+        raise ValueError("project_directory must be one lowercase kebab-case directory name, not a path")
+    if raw_args["texture_type"] not in {"blocks", "items"}:
+        raise ValueError("texture_type must be either 'blocks' or 'items'")
+    identifier = raw_args["texture_identifier"]
+    if not re.fullmatch(r"[a-z0-9](?:[a-z0-9._-]{0,61}[a-z0-9])?", identifier) or ".." in identifier:
+        raise ValueError("texture_identifier must be a lowercase atlas key using letters, digits, dot, underscore or hyphen")
+    path = raw_args["texture_path"]
+    if "\\" in path or "\x00" in path or path.startswith("/") or re.match(r"^[A-Za-z]:", path):
+        raise ValueError("texture_path must be a safe relative POSIX path")
+    parts = path.split("/")
+    if any(part in {"", ".", ".."} for part in parts):
+        raise ValueError("texture_path must not contain empty, dot or parent-traversal path segments")
+    expected_type = raw_args["texture_type"]
+    expected_rp = f"{raw_args['project_directory']}_RP"
+    if len(parts) < 5 or parts[0] != "resource_packs" or parts[1] != expected_rp or parts[2] != "textures" or parts[3] != expected_type:
+        raise ValueError(f"texture_path must be inside resource_packs/{expected_rp}/textures/{expected_type}/")
+    if not path.endswith(".png"):
+        raise ValueError("texture_path must end with lowercase .png")
+    return {key: raw_args[key] for key in required}
+
+
+def _resolve_project_directory(project_name: str) -> tuple[Path, Path]:
+    workspace = _workspace_root()
+    candidate = workspace / project_name
+    if candidate.is_symlink():
+        raise ValueError("project_directory must not be a symlink")
+    try:
+        project = candidate.resolve(strict=True)
+    except OSError as exc:
+        raise ValueError(f"project_directory is unavailable: {project_name}") from exc
+    if project.parent != workspace or not project.is_dir():
+        raise ValueError("project_directory must be an existing real directory directly under the configured workspace")
+    return workspace, project
+
+
+def _read_valid_png(path: Path) -> tuple[int, int]:
+    """Validate PNG signature, chunk bounds/CRCs, IHDR, IDAT and IEND."""
+    try:
+        size = path.stat().st_size
+    except OSError as exc:
+        raise AtlasToolError("TEXTURE_UNAVAILABLE", f"texture file is unavailable: {exc}") from exc
+    if size < 45 or size > MAX_PNG_BYTES:
+        raise AtlasToolError("INVALID_PNG", f"texture PNG must be between 45 bytes and {MAX_PNG_BYTES} bytes")
+    payload = path.read_bytes()
+    if not payload.startswith(PNG_SIGNATURE):
+        raise AtlasToolError("INVALID_PNG", "texture file does not have a PNG signature")
+    offset = len(PNG_SIGNATURE)
+    width = height = 0
+    seen_ihdr = seen_idat = seen_iend = False
+    chunks = 0
+    while offset < len(payload):
+        if len(payload) - offset < 12:
+            raise AtlasToolError("INVALID_PNG", "PNG contains a truncated chunk header")
+        length = struct.unpack(">I", payload[offset:offset + 4])[0]
+        kind = payload[offset + 4:offset + 8]
+        end = offset + 12 + length
+        if end > len(payload):
+            raise AtlasToolError("INVALID_PNG", "PNG contains a truncated chunk body")
+        data = payload[offset + 8:offset + 8 + length]
+        expected_crc = struct.unpack(">I", payload[offset + 8 + length:end])[0]
+        if zlib.crc32(kind + data) & 0xFFFFFFFF != expected_crc:
+            raise AtlasToolError("INVALID_PNG", "PNG chunk checksum failed")
+        if chunks == 0:
+            if kind != b"IHDR" or length != 13:
+                raise AtlasToolError("INVALID_PNG", "PNG must begin with a 13-byte IHDR chunk")
+            width, height = struct.unpack(">II", data[:8])
+            if width < 1 or height < 1 or width > MAX_DIMENSION or height > MAX_DIMENSION or width * height > MAX_PIXELS:
+                raise AtlasToolError("INVALID_PNG", "PNG dimensions are outside the supported texture limits")
+            seen_ihdr = True
+        elif kind == b"IHDR":
+            raise AtlasToolError("INVALID_PNG", "PNG contains a duplicate IHDR chunk")
+        if kind == b"IDAT":
+            seen_idat = True
+        if kind == b"IEND":
+            if length != 0 or end != len(payload):
+                raise AtlasToolError("INVALID_PNG", "PNG IEND must be empty and terminate the file")
+            seen_iend = True
+            offset = end
+            break
+        offset = end
+        chunks += 1
+    if not (seen_ihdr and seen_idat and seen_iend):
+        raise AtlasToolError("INVALID_PNG", "PNG must contain IHDR, IDAT and IEND chunks")
+    return width, height
+
+
+def _atomic_update_json(path: Path, encoded: bytes, original_sha256: str | None) -> None:
+    parent = path.parent
+    if parent.is_symlink() or not parent.is_dir():
+        raise AtlasToolError("UNSAFE_ATLAS_PATH", "atlas parent directory is missing or symlinked")
+    if path.is_symlink():
+        raise AtlasToolError("UNSAFE_ATLAS_PATH", "refusing to update a symlinked atlas file")
+    temp_path: Path | None = None
+    try:
+        fd, name = tempfile.mkstemp(prefix=f".{path.name}.tmp-", dir=str(parent))
+        temp_path = Path(name)
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(encoded)
+            stream.flush()
+            os.fsync(stream.fileno())
+        if original_sha256 is None:
+            # Atomic no-overwrite creation if another process creates the atlas concurrently.
+            os.link(temp_path, path)
+            temp_path.unlink()
+        else:
+            if not path.is_file():
+                raise AtlasToolError("ATLAS_CHANGED", "atlas file changed while preparing the update")
+            current = path.read_bytes()
+            if hashlib.sha256(current).hexdigest() != original_sha256:
+                raise AtlasToolError("ATLAS_CHANGED", "atlas file changed during registration; retry after inspecting its current contents")
+            if path.is_symlink():
+                raise AtlasToolError("UNSAFE_ATLAS_PATH", "refusing to update a symlinked atlas file")
+            os.replace(temp_path, path)
+        temp_path = None
+    except FileExistsError as exc:
+        raise AtlasToolError("ATLAS_CHANGED", "atlas file appeared during registration; no file was overwritten") from exc
+    finally:
+        if temp_path is not None:
+            try:
+                temp_path.unlink()
+            except OSError:
+                pass
+
+
+def register_texture_atlas(raw_args: Any) -> dict[str, Any]:
+    """Safely add an existing PNG to a Bedrock terrain or item texture atlas."""
+    args = _validate_atlas_arguments(raw_args)
+    _, project = _resolve_project_directory(args["project_directory"])
+    project_name = args["project_directory"]
+    pack_root = project / "resource_packs" / f"{project_name}_RP"
+    for ancestor in (project / "resource_packs", pack_root, pack_root / "textures"):
+        if ancestor.is_symlink():
+            raise AtlasToolError("UNSAFE_TEXTURE_PATH", "Resource Pack texture path contains a symlink; refusing to register")
+    try:
+        resolved_pack = pack_root.resolve(strict=True)
+        resolved_pack.relative_to(project)
+        resolved_textures = (pack_root / "textures").resolve(strict=True)
+        resolved_textures.relative_to(resolved_pack)
+    except (OSError, ValueError) as exc:
+        raise AtlasToolError("RESOURCE_PACK_UNAVAILABLE", "expected Resource Pack and textures directory must exist inside the selected project") from exc
+    if not resolved_pack.is_dir() or not resolved_textures.is_dir():
+        raise AtlasToolError("RESOURCE_PACK_UNAVAILABLE", "expected Resource Pack and textures directory must be directories")
+
+    parts = args["texture_path"].split("/")
+    texture = project.joinpath(*parts)
+    current = project
+    for part in parts[:-1]:
+        current = current / part
+        if current.is_symlink():
+            raise AtlasToolError("UNSAFE_TEXTURE_PATH", "texture_path contains a symlinked parent; refusing to register")
+        if not current.is_dir():
+            raise AtlasToolError("TEXTURE_UNAVAILABLE", "texture_path parent directories must already exist")
+    if texture.is_symlink() or not texture.is_file():
+        raise AtlasToolError("TEXTURE_UNAVAILABLE", "texture_path must be an existing regular PNG file, not a symlink")
+    try:
+        resolved_texture = texture.resolve(strict=True)
+        resolved_texture.relative_to(resolved_pack)
+    except (OSError, ValueError) as exc:
+        raise AtlasToolError("UNSAFE_TEXTURE_PATH", "texture_path resolves outside the expected Resource Pack") from exc
+    width, height = _read_valid_png(resolved_texture)
+
+    texture_ref = "textures/" + "/".join(parts[3:])[:-4]
+    atlas_filename = "terrain_texture.json" if args["texture_type"] == "blocks" else "item_texture.json"
+    atlas_path = resolved_textures / atlas_filename
+    atlas_relpath = f"resource_packs/{project_name}_RP/textures/{atlas_filename}"
+    expected_atlas_name = "atlas.terrain" if args["texture_type"] == "blocks" else "atlas.items"
+    original_sha: str | None = None
+    if atlas_path.is_symlink():
+        raise AtlasToolError("UNSAFE_ATLAS_PATH", "refusing to update a symlinked atlas file")
+    if atlas_path.exists():
+        if not atlas_path.is_file():
+            raise AtlasToolError("INVALID_ATLAS", "atlas path exists but is not a regular file")
+        try:
+            if atlas_path.stat().st_size > MAX_ATLAS_BYTES:
+                raise AtlasToolError("INVALID_ATLAS", f"existing atlas exceeds the {MAX_ATLAS_BYTES}-byte safety limit")
+            original_bytes = atlas_path.read_bytes()
+            original_sha = hashlib.sha256(original_bytes).hexdigest()
+            atlas_data = json.loads(original_bytes.decode("utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise AtlasToolError("INVALID_ATLAS", f"existing atlas is not valid UTF-8 JSON: {exc}") from exc
+        if not isinstance(atlas_data, dict):
+            raise AtlasToolError("INVALID_ATLAS", "existing atlas root must be a JSON object")
+        if atlas_data.get("texture_name") != expected_atlas_name:
+            raise AtlasToolError("INVALID_ATLAS", f"existing atlas texture_name must be {expected_atlas_name!r}")
+        if not isinstance(atlas_data.get("texture_data"), dict):
+            raise AtlasToolError("INVALID_ATLAS", "existing atlas must contain an object-valued texture_data map")
+        texture_data = atlas_data["texture_data"]
+    else:
+        atlas_data = {
+            "resource_pack_name": project_name,
+            "texture_name": expected_atlas_name,
+            "texture_data": {},
+        }
+        if args["texture_type"] == "blocks":
+            atlas_data["padding"] = 8
+            atlas_data["num_mip_levels"] = 4
+        texture_data = atlas_data["texture_data"]
+
+    identifier = args["texture_identifier"]
+    if identifier in texture_data:
+        existing = texture_data[identifier]
+        if isinstance(existing, dict) and existing.get("textures") == texture_ref:
+            return {
+                "status": "already_registered",
+                "atlas_path": atlas_relpath,
+                "texture_type": args["texture_type"],
+                "texture_identifier": identifier,
+                "texture_reference": texture_ref,
+                "sha256": hashlib.sha256(atlas_path.read_bytes()).hexdigest() if atlas_path.is_file() else None,
+                "mcp_server_version": SERVER_VERSION,
+                "runtime_status": "NOT RUN",
+            }
+        raise AtlasToolError("IDENTIFIER_CONFLICT", f"texture identifier {identifier!r} already points to a different atlas entry; nothing was overwritten")
+
+    texture_data[identifier] = {"textures": texture_ref}
+    encoded = (json.dumps(atlas_data, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    _atomic_update_json(atlas_path, encoded, original_sha)
+    return {
+        "status": "registered",
+        "atlas_path": atlas_relpath,
+        "texture_type": args["texture_type"],
+        "texture_identifier": identifier,
+        "texture_reference": texture_ref,
+        "width": width,
+        "height": height,
+        "sha256": hashlib.sha256(encoded).hexdigest(),
+        "mcp_server_version": SERVER_VERSION,
+        "runtime_status": "NOT RUN",
+        "note": "Atlas registration preserves unrelated entries but does not edit BP/RP item or block definitions. Minecraft import/rendering remains NOT RUN.",
+    }
+
 def _tool_result(request_id: Any, payload: dict[str, Any]) -> dict[str, Any]:
     return {
         "jsonrpc": "2.0",
@@ -273,7 +579,7 @@ def handle_message(message: Any) -> dict[str, Any] | None:
             "protocolVersion": requested,
             "capabilities": {"tools": {"listChanged": False}},
             "serverInfo": {"name": "minecraft-bedrock-texture-generator", "version": SERVER_VERSION},
-            "instructions": "Use generate_texture to create procedural PNGs only inside an existing project's RP textures folder. Outputs are never overwritten; runtime is NOT RUN.",
+            "instructions": "Use generate_texture for procedural PNG creation, then register_texture_atlas to add an existing block/item PNG to the matching RP atlas. Both tools operate only in an existing project workspace; Minecraft runtime is NOT RUN.",
         }}
     if method == "ping":
         return {"jsonrpc": "2.0", "id": request_id, "result": {}}
@@ -287,13 +593,20 @@ def handle_message(message: Any) -> dict[str, Any] | None:
         if name not in TOOL_BY_NAME:
             return _jsonrpc_error(request_id, -32602, f"Unknown tool: {name}")
         try:
-            payload = generate_texture(arguments)
+            if name == "generate_texture":
+                payload = generate_texture(arguments)
+            elif name == "register_texture_atlas":
+                payload = register_texture_atlas(arguments)
+            else:  # TOOL_BY_NAME and dispatch must stay in sync.
+                return _jsonrpc_error(request_id, -32602, f"Unsupported tool: {name}")
+        except AtlasToolError as exc:
+            payload = _error(exc.code, str(exc))
         except FileExistsError as exc:
             payload = _error("OUTPUT_EXISTS", str(exc))
         except ValueError as exc:
             payload = _error("INVALID_ARGUMENT", str(exc))
         except OSError as exc:
-            payload = _error("FILE_WRITE_FAILED", f"could not write texture safely: {exc}")
+            payload = _error("FILE_WRITE_FAILED", f"could not write texture resource safely: {exc}")
         except RuntimeError as exc:
             payload = _error("GENERATOR_UNAVAILABLE", str(exc))
         except Exception as exc:  # Structured failure; do not expose a traceback.

@@ -1,12 +1,11 @@
 # Changelog
 
 ## 0.9.0
-- Synchronized GitHub source to the Minecraft Bedrock Engineer 0.9.0 source release.
+- Synced the GitHub `main` source tree to Minecraft Bedrock Engineer 0.9.0: package manifests, compatibility manifest, MCP server, skills, tests, CI and version marker are aligned at `0.9.0`.
 - Added the write-capable `create_addon_recipe` tool for shaped and shapeless crafting-table recipes, including pattern/key-map validation, ingredient/result identifier checks, output counts, collision protection, and BP/RP scaffold checks.
-- Added recipe-authoring skill guidance and regression coverage; targeted authoring tests (22 tests) and Mojang Samples index tests (6 tests) were reported as passing in the development notes.
-- **Verification limitation:** the complete MCP regression suite has not been confirmed against the full repository source in this session. The analyzer files were preserved; do not interpret a partial/stubbed staging test as a full pass.
-- **Minecraft runtime:** recipe unlocking, crafting, and rendering were not tested in-game.
-- The repository source version is `0.9.0`; publishing a GitHub Release/tag is a separate step and is not confirmed by this changelog entry.
+- Added recipe-authoring skill guidance and regression coverage. Development notes report 22 targeted recipe-authoring tests and 6 Mojang Samples index tests passing; those counts have not been independently rerun in this update.
+- Full MCP regression suite and GitHub Actions status were not independently verified during this update. Minecraft runtime crafting was not tested in-game.
+- This changelog records source version 0.9.0; it does not by itself confirm a GitHub Release or `v0.9.0` tag.
 
 ## 0.8.0
 - Synchronized the repository to the Minecraft Bedrock Engineer 0.8.0 Plugin Creator source.
@@ -41,4 +40,13 @@
 
 ## 0.6.4
 - Added regression-evals skill and a standard-library regression harness.
-- Added synthetic positive and negative regression scenarios for the analyzer.
+- Added synthetic positive and negative analyzer scenarios.
+
+## 0.6.3
+- Expanded resource-reference indexing and graph coverage metadata.
+
+## 0.6.2
+- Added initial cross-resource reference graph support.
+
+## 0.5.0
+- Added geometry, UV, texture and animation static checks.

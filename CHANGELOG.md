@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.1
+- Adds a curated, hash-verified Mojang sample search fallback when the generated compressed full index is absent from a source checkout.
+- Makes fallback coverage explicit with index_mode=curated_fallback and full_index_available=false; it does not imply the full 22,252-entry index is present.
+- Searches terms extracted from the packaged curated text examples; user-provided archive reads remain path-confined and bounded.
+- Adds regression coverage for fallback behavior and result caps.
+- Synchronizes VERSION, root and compatibility manifests, README and CI version assertion to 0.9.1.
+- Minecraft runtime tests remain NOT RUN.
+
 ## 0.9.0
 - Synced the GitHub `main` source tree to Minecraft Bedrock Engineer 0.9.0: package manifests, compatibility manifest, MCP server, skills, tests, CI and version marker are aligned at `0.9.0`.
 - Added the write-capable `create_addon_recipe` tool for shaped and shapeless crafting-table recipes, including pattern/key-map validation, ingredient/result identifier checks, output counts, collision protection, and BP/RP scaffold checks.

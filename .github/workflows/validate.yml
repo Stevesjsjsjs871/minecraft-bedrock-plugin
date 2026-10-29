@@ -32,12 +32,15 @@ jobs:
           python -m py_compile skills/bedrock-development/scripts/test_index_mojang_samples.py
           python -m py_compile skills/package-integrity/scripts/check_package_integrity.py
           python -m py_compile skills/package-integrity/scripts/test_check_package_integrity.py
+          python -m py_compile skills/visual-resource-pipeline/scripts/generate_texture.py skills/visual-resource-pipeline/scripts/test_generate_texture.py
       - name: Test MCP server schemas, protocol, diff tool and safety
         run: python -m unittest discover -s server/tests -v
       - name: Test benchmark evaluator safety and metrics
         run: python -m unittest discover -s skills/audit-benchmark/scripts -p 'test_*.py' -v
       - name: Test Mojang sample-index safety and fallback
         run: python -m unittest discover -s skills/bedrock-development/scripts -p 'test_*.py' -v
+      - name: Test procedural texture generator
+        run: python -m unittest discover -s skills/visual-resource-pipeline/scripts -p 'test_*.py' -v
       - name: Test package-integrity checker
         run: python -m unittest discover -s skills/package-integrity/scripts -p 'test_*.py' -v
       - name: Run package-integrity audit
@@ -51,7 +54,7 @@ jobs:
           import runpy
           from pathlib import Path
 
-          expected = "1.0.6"
+          expected = "1.0.9"
           assert Path("VERSION").read_text(encoding="utf-8").strip() == expected
           root = json.loads(Path("plugin.json").read_text(encoding="utf-8"))
           compat = json.loads(Path(".codex-plugin/plugin.json").read_text(encoding="utf-8"))

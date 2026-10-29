@@ -84,6 +84,32 @@ class TextureGeneratorMcpTests(unittest.TestCase):
         self.assertFalse(result["result"]["isError"], result["result"]["structuredContent"])
         return output
 
+    def _replace_png_idat(self, path, replacement):
+        payload = path.read_bytes()
+        self.assertTrue(payload.startswith(PNG_SIGNATURE))
+        chunks = []
+        offset = len(PNG_SIGNATURE)
+        inserted = False
+        while offset < len(payload):
+            length = struct.unpack(">I", payload[offset:offset + 4])[0]
+            kind = payload[offset + 4:offset + 8]
+            data = payload[offset + 8:offset + 8 + length]
+            offset += 12 + length
+            if kind == b"IDAT":
+                if not inserted:
+                    chunks.append((kind, replacement))
+                    inserted = True
+                continue
+            chunks.append((kind, data))
+        self.assertTrue(inserted, "test PNG must contain an IDAT chunk")
+        rebuilt = bytearray(PNG_SIGNATURE)
+        for kind, data in chunks:
+            rebuilt.extend(struct.pack(">I", len(data)))
+            rebuilt.extend(kind)
+            rebuilt.extend(data)
+            rebuilt.extend(struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF))
+        path.write_bytes(rebuilt)
+
     def test_tool_is_registered_with_closed_write_schema(self):
         listing = texture_mcp.handle_message({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
         tools = listing["result"]["tools"]
@@ -224,6 +250,38 @@ class TextureGeneratorMcpTests(unittest.TestCase):
         response = self._call(output_path=output_path)
         self.assertEqual(response["result"]["structuredContent"]["error"]["code"], "INVALID_ARGUMENT")
         self.assertFalse((outside / "escape.png").exists())
+
+    def test_registration_rejects_crc_valid_invalid_idat_stream(self):
+        png = self._generate_real_png()
+        self._replace_png_idat(png, b"not-a-zlib-stream")
+        response = self._register()
+        result = response["result"]["structuredContent"]
+        self.assertTrue(response["result"]["isError"], result)
+        self.assertEqual(result["error"]["code"], "INVALID_PNG")
+        self.assertFalse((self.project / "resource_packs" / f"{self.project_name}_RP" / "textures" / "terrain_texture.json").exists())
+
+    def test_registration_rejects_crc_valid_wrong_scanline_length(self):
+        png = self._generate_real_png()
+        self._replace_png_idat(png, zlib.compress(b"\x00"))
+        response = self._register()
+        result = response["result"]["structuredContent"]
+        self.assertTrue(response["result"]["isError"], result)
+        self.assertEqual(result["error"]["code"], "INVALID_PNG")
+
+    def test_registration_rejects_invalid_png_scanline_filter(self):
+        png = self._generate_real_png()
+        payload = png.read_bytes()
+        width, height = struct.unpack(">II", payload[16:24])
+        bit_depth, color_type, _compression, _filter, interlace = payload[24:29]
+        channels = {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}[color_type]
+        self.assertEqual(interlace, 0, "bundled test generator should emit non-interlaced PNGs")
+        row_size = (width * channels * bit_depth + 7) // 8
+        invalid_scanlines = b"".join(b"\x05" + (b"\x00" * row_size) for _ in range(height))
+        self._replace_png_idat(png, zlib.compress(invalid_scanlines))
+        response = self._register()
+        result = response["result"]["structuredContent"]
+        self.assertTrue(response["result"]["isError"], result)
+        self.assertEqual(result["error"]["code"], "INVALID_PNG")
 
     def test_register_block_texture_creates_atlas_and_preserves_existing_entries(self):
         self._generate_real_png()

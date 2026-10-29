@@ -351,20 +351,31 @@ def _resolve_project_directory(project_name: str) -> tuple[Path, Path]:
 
 
 def _read_valid_png(path: Path) -> tuple[int, int]:
-    """Validate PNG signature, chunk bounds/CRCs, IHDR, IDAT and IEND."""
+    """Validate PNG chunks, compressed image data, scanline sizes and filters."""
     try:
-        size = path.stat().st_size
+        payload = path.read_bytes()
     except OSError as exc:
         raise AtlasToolError("TEXTURE_UNAVAILABLE", f"texture file is unavailable: {exc}") from exc
-    if size < 45 or size > MAX_PNG_BYTES:
+    if len(payload) < 45 or len(payload) > MAX_PNG_BYTES:
         raise AtlasToolError("INVALID_PNG", f"texture PNG must be between 45 bytes and {MAX_PNG_BYTES} bytes")
-    payload = path.read_bytes()
     if not payload.startswith(PNG_SIGNATURE):
         raise AtlasToolError("INVALID_PNG", "texture file does not have a PNG signature")
+
+    allowed_depths = {
+        0: {1, 2, 4, 8, 16},
+        2: {8, 16},
+        3: {1, 2, 4, 8},
+        4: {8, 16},
+        6: {8, 16},
+    }
+    channel_counts = {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}
+    width = height = bit_depth = color_type = interlace_method = 0
+    seen_ihdr = seen_plte = seen_idat = seen_iend = False
+    idat_ended = False
+    idat_chunks: list[bytes] = []
     offset = len(PNG_SIGNATURE)
-    width = height = 0
-    seen_ihdr = seen_idat = seen_iend = False
-    chunks = 0
+    chunk_count = 0
+
     while offset < len(payload):
         if len(payload) - offset < 12:
             raise AtlasToolError("INVALID_PNG", "PNG contains a truncated chunk header")
@@ -373,33 +384,109 @@ def _read_valid_png(path: Path) -> tuple[int, int]:
         end = offset + 12 + length
         if end > len(payload):
             raise AtlasToolError("INVALID_PNG", "PNG contains a truncated chunk body")
+        if not all(65 <= byte <= 90 or 97 <= byte <= 122 for byte in kind):
+            raise AtlasToolError("INVALID_PNG", "PNG contains an invalid chunk type")
         data = payload[offset + 8:offset + 8 + length]
         expected_crc = struct.unpack(">I", payload[offset + 8 + length:end])[0]
         if zlib.crc32(kind + data) & 0xFFFFFFFF != expected_crc:
             raise AtlasToolError("INVALID_PNG", "PNG chunk checksum failed")
-        if chunks == 0:
+
+        if chunk_count == 0:
             if kind != b"IHDR" or length != 13:
                 raise AtlasToolError("INVALID_PNG", "PNG must begin with a 13-byte IHDR chunk")
             width, height = struct.unpack(">II", data[:8])
+            bit_depth, color_type, compression_method, filter_method, interlace_method = data[8:13]
             if width < 1 or height < 1 or width > MAX_DIMENSION or height > MAX_DIMENSION or width * height > MAX_PIXELS:
                 raise AtlasToolError("INVALID_PNG", "PNG dimensions are outside the supported texture limits")
+            if color_type not in allowed_depths or bit_depth not in allowed_depths[color_type]:
+                raise AtlasToolError("INVALID_PNG", "PNG uses an invalid color type and bit-depth combination")
+            if compression_method != 0 or filter_method != 0 or interlace_method not in {0, 1}:
+                raise AtlasToolError("INVALID_PNG", "PNG uses an unsupported compression, filter or interlace method")
             seen_ihdr = True
         elif kind == b"IHDR":
             raise AtlasToolError("INVALID_PNG", "PNG contains a duplicate IHDR chunk")
-        if kind == b"IDAT":
+
+        if kind == b"PLTE":
+            if seen_plte or seen_idat or color_type in {0, 4}:
+                raise AtlasToolError("INVALID_PNG", "PNG palette is duplicated, misplaced or forbidden for its color type")
+            if length < 3 or length > 768 or length % 3:
+                raise AtlasToolError("INVALID_PNG", "PNG palette length must contain between 1 and 256 RGB entries")
+            if color_type == 3 and length // 3 > (1 << bit_depth):
+                raise AtlasToolError("INVALID_PNG", "PNG palette contains more entries than its bit depth permits")
+            seen_plte = True
+        elif kind == b"IDAT":
+            if idat_ended:
+                raise AtlasToolError("INVALID_PNG", "PNG IDAT chunks must be consecutive")
             seen_idat = True
-        if kind == b"IEND":
+            idat_chunks.append(data)
+        elif kind == b"IEND":
             if length != 0 or end != len(payload):
                 raise AtlasToolError("INVALID_PNG", "PNG IEND must be empty and terminate the file")
+            if not seen_idat:
+                raise AtlasToolError("INVALID_PNG", "PNG must contain image data before IEND")
             seen_iend = True
             offset = end
+            chunk_count += 1
             break
+        else:
+            if seen_idat:
+                idat_ended = True
+            if kind not in {b"IHDR", b"PLTE"} and not (kind[0] & 0x20):
+                raise AtlasToolError("INVALID_PNG", f"PNG contains an unknown critical chunk {kind.decode('ascii')}")
+
         offset = end
-        chunks += 1
+        chunk_count += 1
+        if chunk_count > 4096:
+            raise AtlasToolError("INVALID_PNG", "PNG contains too many chunks")
+
     if not (seen_ihdr and seen_idat and seen_iend):
         raise AtlasToolError("INVALID_PNG", "PNG must contain IHDR, IDAT and IEND chunks")
-    return width, height
+    if color_type == 3 and not seen_plte:
+        raise AtlasToolError("INVALID_PNG", "indexed-color PNG must contain a PLTE palette")
 
+    channels = channel_counts[color_type]
+    if interlace_method == 0:
+        passes = [(width, height)]
+    else:
+        pass_specs = (
+            (0, 0, 8, 8), (4, 0, 8, 8), (0, 4, 4, 8),
+            (2, 0, 4, 4), (0, 2, 2, 4), (1, 0, 2, 2), (0, 1, 1, 2),
+        )
+        passes = []
+        for x_start, y_start, x_step, y_step in pass_specs:
+            pass_width = 0 if width <= x_start else (width - x_start + x_step - 1) // x_step
+            pass_height = 0 if height <= y_start else (height - y_start + y_step - 1) // y_step
+            if pass_width and pass_height:
+                passes.append((pass_width, pass_height))
+
+    row_sizes = [
+        (pass_width * channels * bit_depth + 7) // 8
+        for pass_width, _pass_height in passes
+    ]
+    expected_size = sum((row_size + 1) * pass_height for row_size, (_pass_width, pass_height) in zip(row_sizes, passes))
+    compressed = b"".join(idat_chunks)
+    try:
+        decoder = zlib.decompressobj()
+        decoded = decoder.decompress(compressed, expected_size + 1)
+        if len(decoded) > expected_size or decoder.unconsumed_tail:
+            raise AtlasToolError("INVALID_PNG", "PNG image data expands beyond the dimensions declared in IHDR")
+        decoded += decoder.flush()
+    except zlib.error as exc:
+        raise AtlasToolError("INVALID_PNG", "PNG IDAT data is not a valid zlib stream") from exc
+
+    if not decoder.eof or decoder.unused_data or len(decoded) != expected_size:
+        raise AtlasToolError("INVALID_PNG", "PNG decompressed image data does not match the dimensions declared in IHDR")
+
+    decoded_offset = 0
+    for row_size, (_pass_width, pass_height) in zip(row_sizes, passes):
+        for _ in range(pass_height):
+            if decoded_offset >= len(decoded) or decoded[decoded_offset] > 4:
+                raise AtlasToolError("INVALID_PNG", "PNG scanline contains an invalid filter byte")
+            decoded_offset += row_size + 1
+    if decoded_offset != len(decoded):
+        raise AtlasToolError("INVALID_PNG", "PNG scanline data has an inconsistent length")
+
+    return width, height
 
 def _atomic_update_json(path: Path, encoded: bytes, original_sha256: str | None) -> None:
     parent = path.parent

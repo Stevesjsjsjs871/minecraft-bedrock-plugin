@@ -49,6 +49,10 @@ For complex tasks use: A) concise analysis, B) implementation/files changed, C) 
 - The uploaded source archive is labelled 1.26.50.4; the default target remains 1.26.50, so compatibility must not be inferred from the patch label alone.
 
 
+## 0.9.2 — coordinated custom entity slice
+
+`create_addon_entity` writes four linked resources into an existing generated BP/RP scaffold: BP `entities/<slug>.json`, RP `entity/<slug>.entity.json`, RP `models/entity/<slug>.geo.json`, and RP `render_controllers/<slug>.render_controllers.json`. It checks BP-to-RP UUID dependency and target version before any write, uses one consistent custom identifier/geometry/controller set, rejects output collisions and unsafe/symlinked paths, validates a supplied PNG signature, and rolls back new outputs on write failure. It deliberately does not create placeholder textures. The basic model/AI template is a starting point only; validate version-specific schemas and test import, rendering and behavior in Minecraft before claiming runtime compatibility.
+
 ## 0.8.7 — first content-writing slice
 
 For a new scaffold, `create_addon_item` creates one custom item: BP item JSON, RP item texture atlas mapping, and `en_US.lang` display-name key. It follows the version-labelled Mojang item example without copying vanilla identifiers. The tool stops if the target atlas or language file already exists; it does not merge them yet. No PNG is generated, so rendering is not complete until a real texture with a valid PNG signature is supplied at `resource_packs/<project>_RP/textures/items/<slug>.png`. Runtime status remains `NOT RUN`.

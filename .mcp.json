@@ -7,6 +7,14 @@
         "${PLUGIN_ROOT}/server/mcp_server.py"
       ],
       "env": {}
+    },
+    "minecraft-bedrock-texture-generator": {
+      "type": "stdio",
+      "command": "python3",
+      "args": [
+        "${PLUGIN_ROOT}/server/texture_generator_mcp.py"
+      ],
+      "env": {}
     }
   }
 }

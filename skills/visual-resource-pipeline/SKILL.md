@@ -27,18 +27,34 @@ For items and blocks, verify:
 6. Compare against the baseline and report newly unresolved links, changed definitions, resource removals and severity changes. Inspect visual and JSON changes together; never treat a JSON-only green result as proof that the model looks correct.
 7. Import into the target game when possible. Check missing textures, geometry/rendering, animation state transitions and the actual entity/item/block behavior. Record the game build and scenario.
 
-## Procedural texture starter
+## Procedural texture generator
 
-The bundled `scripts/generate_texture.py` uses only the Python standard library to create valid RGBA PNGs. It supports ten deterministic styles: `pixel_noise`, `checker`, `stripes`, `solid`, `vertical_gradient`, `horizontal_gradient`, `brick`, `stone_noise`, `ore_veins`, and `wood_grain`. Dimensions are capped at 1024 per side and 1,048,576 total pixels. RGB colors use six-digit hex; seed and alpha are explicit; output metadata is JSON; existing files are refused by default.
-
-Example:
+A command-line example (run from the plugin root):
 
 ```bash
 python skills/visual-resource-pipeline/scripts/generate_texture.py resource_packs/my-addon_RP/textures/blocks/ruby_ore.png --width 16 --height 16 --style ore_veins --base '#55545A' --accent '#9A5CDA' --seed 14
-python -m unittest discover -s skills/visual-resource-pipeline/scripts -p 'test_*.py' -v
 ```
 
-This produces a procedural starter pattern, not AI image synthesis, a UV-aware entity texture painter, or proof of Minecraft rendering. The generator is a standalone script and is **not currently registered or dispatched as an MCP `generate_texture` tool**. Do not claim that capability until server registration, workspace-confined path validation, dispatch and MCP integration tests are implemented and run.
+`scripts/generate_texture.py` is the deterministic standard-library RGBA PNG writer. It supports `pixel_noise`, `checker`, `stripes`, `solid`, `vertical_gradient`, `horizontal_gradient`, `brick`, `stone_noise`, `ore_veins`, and `wood_grain`; width/height are capped at 1024 each and 1,048,576 total pixels.
+
+The separate `minecraft-bedrock-texture-generator` stdio MCP server exposes `generate_texture`. It writes only inside an existing project's `resource_packs/<project>_RP/textures/` directory, requires existing parent folders, refuses symlinked paths and existing destinations, validates style/color/dimensions, and returns structured output with a file hash. It does not modify manifests or texture atlases automatically.
+
+Example MCP call arguments:
+
+```json
+{
+  "project_directory": "ruby-addon",
+  "output_path": "resource_packs/ruby-addon_RP/textures/blocks/ruby_ore.png",
+  "width": 16,
+  "height": 16,
+  "style": "ore_veins",
+  "base_color": "#55545A",
+  "accent_color": "#9A5CDA",
+  "seed": 14
+}
+```
+
+This remains procedural starter art, not AI image synthesis, UV-aware entity texture painting, automatic atlas integration, or proof of Minecraft rendering. Runtime/import/rendering checks remain `NOT RUN` unless executed in-game.
 
 ## Asset discipline
 

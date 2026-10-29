@@ -1,4 +1,12 @@
-# Minecraft Bedrock Engineer — 1.0.9
+# Minecraft Bedrock Engineer — 1.0.10
+
+## 1.0.10: dedicated procedural texture MCP tool
+
+- Registers a separate `minecraft-bedrock-texture-generator` stdio MCP server with the `generate_texture` tool, preserving the existing MCP server and its tools.
+- Generates real RGBA PNGs inside an existing project's Resource Pack `textures/` folder, using the existing ten-style procedural generator.
+- Enforces workspace/project containment, canonical relative POSIX paths, existing parent directories, no symlinked parents, size bounds and no-overwrite behavior.
+- Adds an independent JSON-RPC/MCP contract test suite. Generated assets are procedural starter textures, not AI image synthesis, UV-aware painting, or proof of Minecraft rendering.
+
 
 ## 1.0.9: procedural texture pattern expansion and hardening
 

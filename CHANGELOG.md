@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.10 — Dedicated procedural texture MCP tool
+- Adds an independent stdio MCP server, `server/texture_generator_mcp.py`, exposing `generate_texture` while leaving the original server and dispatch untouched.
+- Generates bounded RGBA PNGs inside an existing project's RP `textures/` directory; validates canonical paths and dimensions, rejects symlinks and existing destinations, and returns structured metadata plus SHA-256.
+- Adds an integration/JSON-RPC regression suite for schema closure, project/path safety, no-overwrite, defaults, output metadata and error handling.
+- The tool uses deterministic procedural styles, not AI image synthesis or UV-aware painting. Minecraft import/render tests remain `NOT RUN`.
+
+
 ## 1.0.9 — Procedural texture reliability and pattern expansion
 - Expands the standalone PNG generator to ten deterministic patterns, including gradients, brick/mortar, stone variation, connected ore-like veins and wood grain.
 - Rejects malformed RGB hex, boolean dimensions/seeds/alpha, symlink destinations, and unsafe forced destinations; preserves atomic default no-overwrite behavior.

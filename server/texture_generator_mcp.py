@@ -353,7 +353,8 @@ def _resolve_project_directory(project_name: str) -> tuple[Path, Path]:
 def _read_valid_png(path: Path) -> tuple[int, int]:
     """Validate PNG chunks, compressed image data, scanline sizes and filters."""
     try:
-        payload = path.read_bytes()
+        with path.open("rb") as stream:
+            payload = stream.read(MAX_PNG_BYTES + 1)
     except OSError as exc:
         raise AtlasToolError("TEXTURE_UNAVAILABLE", f"texture file is unavailable: {exc}") from exc
     if len(payload) < 45 or len(payload) > MAX_PNG_BYTES:

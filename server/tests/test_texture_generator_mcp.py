@@ -283,6 +283,42 @@ class TextureGeneratorMcpTests(unittest.TestCase):
         self.assertTrue(response["result"]["isError"], result)
         self.assertEqual(result["error"]["code"], "INVALID_PNG")
 
+    def test_registration_accepts_adam7_interlaced_png(self):
+        width = height = 5
+        pass_specs = (
+            (0, 0, 8, 8), (4, 0, 8, 8), (0, 4, 4, 8),
+            (2, 0, 4, 4), (0, 2, 2, 4), (1, 0, 2, 2), (0, 1, 1, 2),
+        )
+        filtered = bytearray()
+        for x_start, y_start, x_step, y_step in pass_specs:
+            pass_width = 0 if width <= x_start else (width - x_start + x_step - 1) // x_step
+            pass_height = 0 if height <= y_start else (height - y_start + y_step - 1) // y_step
+            if not pass_width or not pass_height:
+                continue
+            row_size = pass_width * 4
+            for _ in range(pass_height):
+                filtered.extend(b"\x00" + (b"\x00" * row_size))
+
+        png = bytearray(PNG_SIGNATURE)
+
+        def append_chunk(kind, data):
+            png.extend(struct.pack(">I", len(data)))
+            png.extend(kind)
+            png.extend(data)
+            png.extend(struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF))
+
+        append_chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 1))
+        append_chunk(b"IDAT", zlib.compress(bytes(filtered)))
+        append_chunk(b"IEND", b"")
+
+        relative_path = f"resource_packs/{self.project_name}_RP/textures/blocks/adam7.png"
+        (self.project / relative_path).write_bytes(png)
+        response = self._register(identifier="adam7", texture_path=relative_path)
+        result = response["result"]["structuredContent"]
+        self.assertFalse(response["result"]["isError"], result)
+        self.assertEqual(result["status"], "registered")
+        self.assertEqual((result["width"], result["height"]), (width, height))
+
     def test_register_block_texture_creates_atlas_and_preserves_existing_entries(self):
         self._generate_real_png()
         atlas_path = self.project / "resource_packs" / f"{self.project_name}_RP" / "textures" / "terrain_texture.json"

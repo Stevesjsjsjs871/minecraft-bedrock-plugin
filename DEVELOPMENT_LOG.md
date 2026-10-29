@@ -15,7 +15,7 @@ Harden register_texture_atlas so a PNG with valid chunk CRCs but invalid compres
 
 ### Changes
 - Extend server/texture_generator_mcp.py::_read_valid_png to validate legal IHDR color-type/bit-depth combinations, compression/filter/interlace methods, palette placement and bounds, consecutive IDAT chunks, zlib stream integrity, exact decompressed scanline length, and filter bytes 0–4. Adam7 pass dimensions are accounted for.
-- Add three regression tests that rewrite IDAT data while recomputing the chunk CRC: invalid zlib stream, incorrect decompressed scanline length, and invalid scanline filter byte.
+- Add three negative regression tests that rewrite IDAT data while recomputing the chunk CRC (invalid zlib stream, incorrect decompressed scanline length, invalid scanline filter byte), plus a positive 5x5 RGBA Adam7 fixture covering all seven passes.
 - Preserve both stdio MCP servers, tool names, plugin identity and all default prompts.
 - No Plugin Creator update or public release was made.
 

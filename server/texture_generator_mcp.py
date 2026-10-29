@@ -387,6 +387,8 @@ def _read_valid_png(path: Path) -> tuple[int, int]:
             raise AtlasToolError("INVALID_PNG", "PNG contains a truncated chunk body")
         if not all(65 <= byte <= 90 or 97 <= byte <= 122 for byte in kind):
             raise AtlasToolError("INVALID_PNG", "PNG contains an invalid chunk type")
+        if not 65 <= kind[2] <= 90:
+            raise AtlasToolError("INVALID_PNG", "PNG chunk type uses the reserved lowercase third-letter bit")
         data = payload[offset + 8:offset + 8 + length]
         expected_crc = struct.unpack(">I", payload[offset + 8 + length:end])[0]
         if zlib.crc32(kind + data) & 0xFFFFFFFF != expected_crc:
@@ -475,7 +477,8 @@ def _read_valid_png(path: Path) -> tuple[int, int]:
     except zlib.error as exc:
         raise AtlasToolError("INVALID_PNG", "PNG IDAT data is not a valid zlib stream") from exc
 
-    if not decoder.eof or decoder.unused_data or len(decoded) != expected_size:
+    # PNG permits unused trailing bytes in the final IDAT chunk; decoders must ignore them.
+    if not decoder.eof or len(decoded) != expected_size:
         raise AtlasToolError("INVALID_PNG", "PNG decompressed image data does not match the dimensions declared in IHDR")
 
     decoded_offset = 0

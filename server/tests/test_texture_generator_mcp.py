@@ -251,6 +251,24 @@ class TextureGeneratorMcpTests(unittest.TestCase):
         self.assertEqual(response["result"]["structuredContent"]["error"]["code"], "INVALID_ARGUMENT")
         self.assertFalse((outside / "escape.png").exists())
 
+    def test_registration_accepts_unused_trailing_idat_bytes(self):
+        png = self._generate_real_png()
+        payload = png.read_bytes()
+        offset = len(PNG_SIGNATURE)
+        idat_data = bytearray()
+        while offset < len(payload):
+            length = struct.unpack(">I", payload[offset:offset + 4])[0]
+            kind = payload[offset + 4:offset + 8]
+            data = payload[offset + 8:offset + 8 + length]
+            offset += 12 + length
+            if kind == b"IDAT":
+                idat_data.extend(data)
+        self._replace_png_idat(png, bytes(idat_data) + b"\x00\x00\x00")
+        response = self._register(identifier="trailing_bytes")
+        result = response["result"]["structuredContent"]
+        self.assertFalse(response["result"]["isError"], result)
+        self.assertEqual(result["status"], "registered")
+
     def test_registration_rejects_crc_valid_invalid_idat_stream(self):
         png = self._generate_real_png()
         self._replace_png_idat(png, b"not-a-zlib-stream")

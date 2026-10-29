@@ -14,14 +14,14 @@
 Harden register_texture_atlas so a PNG with valid chunk CRCs but invalid compressed image data cannot be registered. Accept only structurally valid PNG image streams whose decompressed byte count and scanline filter bytes match IHDR.
 
 ### Changes
-- Extend server/texture_generator_mcp.py::_read_valid_png to validate legal IHDR color-type/bit-depth combinations, compression/filter/interlace methods, palette placement and bounds, consecutive IDAT chunks, zlib stream integrity, exact decompressed scanline length, and filter bytes 0–4. Adam7 pass dimensions are accounted for.
-- Add three negative regression tests that rewrite IDAT data while recomputing the chunk CRC (invalid zlib stream, incorrect decompressed scanline length, invalid scanline filter byte), plus a positive 5x5 RGBA Adam7 fixture covering all seven passes.
+- Extend server/texture_generator_mcp.py::_read_valid_png to validate legal IHDR color-type/bit-depth combinations, compression/filter/interlace methods, palette placement and bounds, consecutive IDAT chunks, zlib stream integrity, exact decompressed scanline length, and filter bytes 0–4. Adam7 pass dimensions are accounted for. It also accepts unused trailing bytes in the final IDAT chunk, as required by the W3C PNG specification, and rejects a lowercase reserved third chunk-name bit.
+- Add three negative regression tests that rewrite IDAT data while recomputing the chunk CRC (invalid zlib stream, incorrect decompressed scanline length, invalid scanline filter byte), plus positive 5x5 RGBA Adam7 and unused-trailing-IDAT fixtures.
 - Preserve both stdio MCP servers, tool names, plugin identity and all default prompts.
 - No Plugin Creator update or public release was made.
 
 ### Verification
 - Pre-change baseline: GitHub Actions run #103 passed all configured checks on main (Python compile, MCP/unit suites, benchmark tests, Mojang sample-index tests, texture generator tests, package-integrity audit, analyzer regression and version/prompt consistency).
-- Final code/test commit d9ca200: GitHub Actions run #106 succeeded. The documentation-only log commit 5ab6fd3 was also validated by run #107 (success). The workflow compiled all listed Python modules; passed 136 unit tests across five suites (97 MCP/server, 12 benchmark, 6 sample-index, 12 procedural texture, 9 package-integrity); passed all 18 analyzer regression cases; passed package-integrity audit and version/manifest/default-prompt/MCP-configuration consistency checks. The four new PNG cases (three negative CRC-valid corruptions and one positive 5x5 Adam7 fixture) all passed. Runs #104 and #105 also passed on earlier heads.
+- Final code/test commit d9ca200: GitHub Actions run #106 succeeded for the initial code/test commit; documentation-only log commit 5ab6fd3 was validated by run #107 (success), and the second documentation-only update f5b801d by run #108 (success). The subsequent PNG-spec compatibility fix and its regression test are in the current head; CI is pending. The workflow compiled all listed Python modules; passed 136 unit tests across five suites (97 MCP/server, 12 benchmark, 6 sample-index, 12 procedural texture, 9 package-integrity); passed all 18 analyzer regression cases; passed package-integrity audit and version/manifest/default-prompt/MCP-configuration consistency checks. The four new PNG cases (three negative CRC-valid corruptions and one positive 5x5 Adam7 fixture) all passed. Runs #104 and #105 also passed on earlier heads.
 - Minecraft import/rendering and Creator Tools CLI runtime: NOT RUN.
 
 ### Git state

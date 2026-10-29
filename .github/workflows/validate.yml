@@ -17,18 +17,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install MCP server test dependencies
-        run: python -m pip install -r mcp-server/requirements.txt
       - name: Compile analyzer, MCP server and regression harness
         run: |
           python -m py_compile skills/automated-validation/scripts/bedrock_audit.py
           python -m py_compile skills/regression-evals/scripts/regression_tests.py
           python -m py_compile mcp-server/server.py mcp-server/tests/test_server.py
-      - name: Test MCP server schemas and safety
+      - name: Test MCP server schemas, protocol and safety
         run: python -m unittest discover -s mcp-server/tests -v
       - name: Run regression cases
         run: python skills/regression-evals/scripts/regression_tests.py --auditor skills/automated-validation/scripts/bedrock_audit.py
-      - name: Check plugin manifests
+      - name: Check package and MCP server versions
         run: |
-          python -c "import json; p=json.load(open('plugin.json')); assert p['version']=='0.6.4' and p['name']=='minecraft-bedrock-engineer'"
-          python -c "import json; p=json.load(open('.codex-plugin/plugin.json')); assert p['version']=='0.6.4' and p['name']=='minecraft-bedrock-engineer'"
+          python -c "import json; p=json.load(open('plugin.json')); assert p['version']=='0.6.7' and p['name']=='minecraft-bedrock-engineer'"
+          python -c "import json; p=json.load(open('.codex-plugin/plugin.json')); assert p['version']=='0.6.7' and p['name']=='minecraft-bedrock-engineer'"
+          python -c "import runpy; m=runpy.run_path('mcp-server/server.py'); assert m['SERVER_VERSION']=='0.6.7'"

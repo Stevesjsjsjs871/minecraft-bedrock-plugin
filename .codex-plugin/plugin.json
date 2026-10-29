@@ -1,8 +1,8 @@
 {
   "interface": {
     "displayName": "Minecraft Bedrock Engineer",
-    "shortDescription": "Validate Bedrock models and packs",
-    "longDescription": "A version-aware Minecraft Bedrock engineering toolkit: inspect BP/RP projects, audit manifests and resource definitions, produce evidence-backed resource graph reports, run executable static checks, compare baselines and validate reports. Coverage is explicit; static analysis is not proof of in-game behavior.",
+    "shortDescription": "Audit Bedrock packs and models",
+    "longDescription": "A version-aware Minecraft Bedrock engineering toolkit: inspect BP/RP projects, validate manifests, audit geometry and animations, produce evidence-backed resource graphs, compare baselines, and run strict read-only local MCP tools. Coverage is explicit; static analysis is not proof of in-game behavior.",
     "developerName": "Private project",
     "category": "Developer tools",
     "capabilities": [
@@ -17,8 +17,8 @@
     ]
   },
   "name": "minecraft-bedrock-engineer",
-  "version": "0.6.4",
-  "description": "A version-aware Minecraft Bedrock engineering toolkit with executable geometry, UV, texture, animation and cross-resource audits, baseline comparisons, and release gates.",
+  "version": "0.6.7",
+  "description": "A version-aware Minecraft Bedrock engineering toolkit with read-only local MCP tools for pack audits, manifests, geometry, animations, resource graphs and baseline comparisons.",
   "author": {
     "name": "Plugin owner"
   },
@@ -37,7 +37,10 @@
     "geometry-audit",
     "texture-validation",
     "resource-graph",
-    "controller-validation"
+    "controller-validation",
+    "mcp",
+    "read-only-tools"
   ],
-  "skills": "./skills"
+  "skills": "./skills",
+  "mcpServers": "./.mcp.json"
 }

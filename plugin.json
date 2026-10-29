@@ -1,19 +1,43 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "minecraft-bedrock-engineer",
-  "version": "0.6.4",
-  "description": "A version-aware Minecraft Bedrock engineering toolkit with executable geometry, UV, texture, animation and cross-resource audits, baseline comparisons, and release gates.",
-  "author": {"name": "Plugin owner"},
-  "keywords": ["minecraft", "bedrock", "addons", "behavior-pack", "resource-pack", "script-api", "blockbench", "animations", "audit", "regression", "validation", "geometry-audit", "texture-validation", "resource-graph", "controller-validation"],
+  "version": "0.6.7",
+  "description": "A version-aware Minecraft Bedrock engineering toolkit with read-only local MCP tools for pack audits, manifests, geometry, animations, resource graphs and baseline comparisons.",
+  "author": {
+    "name": "Plugin owner"
+  },
+  "keywords": [
+    "minecraft",
+    "bedrock",
+    "addons",
+    "behavior-pack",
+    "resource-pack",
+    "script-api",
+    "blockbench",
+    "animations",
+    "audit",
+    "regression",
+    "validation",
+    "geometry-audit",
+    "texture-validation",
+    "resource-graph",
+    "controller-validation",
+    "mcp",
+    "read-only-tools"
+  ],
   "extensions": {
     "com.openai": {
       "interface": {
         "displayName": "Minecraft Bedrock Engineer",
-        "shortDescription": "Validate Bedrock models and packs",
-        "longDescription": "A version-aware Minecraft Bedrock engineering toolkit: inspect BP/RP projects, audit manifests and resource definitions, produce evidence-backed resource graph reports, run executable static checks, compare baselines and validate reports. Coverage is explicit; static analysis is not proof of in-game behavior.",
+        "shortDescription": "Audit Bedrock packs and models",
+        "longDescription": "A version-aware Minecraft Bedrock engineering toolkit: inspect BP/RP projects, validate manifests, audit geometry and animations, produce evidence-backed resource graphs, compare baselines, and run strict read-only local MCP tools. Coverage is explicit; static analysis is not proof of in-game behavior.",
         "developerName": "Private project",
         "category": "Developer tools",
-        "capabilities": ["Code", "Research", "Interactive"],
+        "capabilities": [
+          "Code",
+          "Research",
+          "Interactive"
+        ],
         "defaultPrompt": [
           "Continue my existing Minecraft Bedrock 1.26.50 project. Inspect actual files and verified project state, make the smallest safe implementation, preserve existing functionality, run available checks, compare against baseline, and report what was and was not verified.",
           "Audit this Bedrock add-on or candidate release. Check archive integrity, BP/RP manifests and dependency links, JSON/JavaScript, resource references, identifiers, and regressions against a baseline. Provide evidence and severity; do not delete resources.",

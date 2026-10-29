@@ -20,7 +20,8 @@ The toolkit helps creators inspect and develop Behavior Packs (BP), Resource Pac
 - `.codex-plugin/plugin.json` — plugin package metadata.
 - `plugin.json` — plugin manifest and ChatGPT interface.
 - `skills/` — engineering skills, references, analyzer and regression harness.
-- `.github/workflows/validate.yml` — automated static and regression checks.
+- `mcp-server/` — read-only MCP adapter, tool schemas, safety checks and tests. It is not yet connected to a deployed ChatGPT endpoint.
+- `.github/workflows/validate.yml` — automated static, MCP and regression checks.
 - `CHANGELOG.md` — notable source versions.
 
 ## Local checks
@@ -33,7 +34,11 @@ python -m py_compile skills/regression-evals/scripts/regression_tests.py
 python skills/regression-evals/scripts/regression_tests.py --auditor skills/automated-validation/scripts/bedrock_audit.py
 ```
 
-These checks do not launch Minecraft and cannot prove runtime behavior.
+These checks do not launch Minecraft and cannot prove runtime behavior. The static analyzer itself uses only the Python standard library; the optional MCP adapter has separate dependencies in `mcp-server/requirements.txt`.
+
+## MCP adapter status
+
+The source repository now includes five read-only MCP tools. Run it locally with the instructions in [mcp-server/README.md](mcp-server/README.md). The MCP server is not yet deployed or registered with ChatGPT. Do not add a placeholder `mcp.json` URL: public integration requires a secured, stable HTTPS Streamable HTTP endpoint and a review of how user archives are supplied to the server.
 
 ## Official references
 

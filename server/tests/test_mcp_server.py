@@ -22,14 +22,14 @@ analyzer_spec.loader.exec_module(analyzer)
 
 
 class SchemaTests(unittest.TestCase):
-    def test_fourteen_tools_and_closed_schemas(self):
-        self.assertEqual(len(server.TOOLS), 14)
+    def test_fifteen_tools_and_closed_schemas(self):
+        self.assertEqual(len(server.TOOLS), 15)
         for tool in server.TOOLS:
             schema = tool["inputSchema"]
             self.assertFalse(schema["additionalProperties"])
             self.assertEqual(schema["type"], "object")
             self.assertTrue(set(schema["required"]).issubset(schema["properties"]))
-            self.assertEqual(tool["annotations"]["readOnlyHint"], tool["name"] not in {"create_addon_project", "create_addon_item", "create_addon_block", "create_addon_recipe"})
+            self.assertEqual(tool["annotations"]["readOnlyHint"], tool["name"] not in {"create_addon_project", "create_addon_item", "create_addon_block", "create_addon_recipe", "create_addon_entity"})
             self.assertFalse(tool["annotations"]["destructiveHint"])
         creator = server.TOOL_BY_NAME["create_addon_project"]
         self.assertFalse(creator["annotations"]["readOnlyHint"])
@@ -144,6 +144,7 @@ class SchemaTests(unittest.TestCase):
         self.assertIn("create_addon_project", server.WORKFLOW_INSTRUCTIONS)
         self.assertIn("create_addon_item", server.WORKFLOW_INSTRUCTIONS)
         self.assertIn("create_addon_recipe", server.WORKFLOW_INSTRUCTIONS)
+        self.assertIn("create_addon_entity", server.WORKFLOW_INSTRUCTIONS)
         self.assertIn("MCT CLI", server.WORKFLOW_INSTRUCTIONS)
         self.assertIn("Audit/reference tools are read-only", server.WORKFLOW_INSTRUCTIONS)
         self.assertIn("create_addon_recipe", server.WORKFLOW_INSTRUCTIONS)
@@ -461,7 +462,7 @@ class SchemaTests(unittest.TestCase):
                 call = server.handle_message({"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "inspect_archive", "arguments": {"archive_path": "fixture.mcaddon"}}})
                 bad = server.handle_message({"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {"name": "inspect_archive", "arguments": {"archive_path": str(root.parent / "outside.mcaddon")}}})
                 self.assertEqual(init["result"]["serverInfo"]["version"], server.SERVER_VERSION)
-                self.assertEqual(len(tools["result"]["tools"]), 14)
+                self.assertEqual(len(tools["result"]["tools"]), 15)
                 self.assertEqual(call["result"]["structuredContent"]["status"], "completed")
                 self.assertTrue(bad["result"]["isError"])
                 self.assertEqual(bad["result"]["structuredContent"]["status"], "error")
@@ -670,6 +671,105 @@ class SchemaTests(unittest.TestCase):
             self.assertTrue(result["content_hash_matches_index"])
             self.assertIn("demo:thing", result["content_excerpt"])
 
+
+
+class CreateAddonEntityTests(unittest.TestCase):
+    def _scaffold(self, workspace: Path):
+        from unittest.mock import patch
+        with patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": str(workspace)}):
+            result = server.call_tool("create_addon_project", {
+                "project_directory": "test-addon", "display_name": "Test Add-on",
+                "description": "Test scaffold for entity creation.", "target_game_version": "1.26.50"
+            })
+        self.assertEqual(result["status"], "created")
+        return workspace / "test-addon"
+
+    def test_creates_linked_entity_client_geometry_and_controller_without_fake_texture(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as td:
+            project = self._scaffold(Path(td))
+            with patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": td}):
+                result = server.call_tool("create_addon_entity", {
+                    "project_directory": "test-addon", "entity_name": "Forest Golem",
+                    "entity_slug": "forest_golem", "target_game_version": "1.26.50"
+                })
+            self.assertEqual(result["status"], "created")
+            self.assertEqual(result["entity_identifier"], "test_addon:forest_golem")
+            self.assertEqual(result["geometry_identifier"], "geometry.test_addon.forest_golem")
+            self.assertEqual(len(result["files_created"]), 4)
+            bp = json.loads((project / "behavior_packs/test-addon_BP/entities/forest_golem.json").read_text(encoding="utf-8"))
+            client = json.loads((project / "resource_packs/test-addon_RP/entity/forest_golem.entity.json").read_text(encoding="utf-8"))
+            geo = json.loads((project / "resource_packs/test-addon_RP/models/entity/forest_golem.geo.json").read_text(encoding="utf-8"))
+            controller = json.loads((project / "resource_packs/test-addon_RP/render_controllers/forest_golem.render_controllers.json").read_text(encoding="utf-8"))
+            self.assertEqual(bp["minecraft:entity"]["description"]["identifier"], client["minecraft:client_entity"]["description"]["identifier"])
+            self.assertEqual(client["minecraft:client_entity"]["description"]["geometry"]["default"], geo["minecraft:geometry"][0]["description"]["identifier"])
+            self.assertIn(result["render_controller_identifier"], controller["render_controllers"])
+            self.assertEqual(client["minecraft:client_entity"]["description"]["textures"]["default"], "textures/entity/forest_golem")
+            self.assertEqual(result["texture_status"], "texture_file_not_created")
+            self.assertFalse((project / "resource_packs/test-addon_RP/textures/entity/forest_golem.png").exists())
+            self.assertEqual(result["runtime_status"], "NOT RUN")
+
+    def test_accepts_existing_png_texture_and_maps_its_resource_path(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as td:
+            project = self._scaffold(Path(td))
+            texture = project / "resource_packs/test-addon_RP/textures/entity/bosses/forest_golem.png"
+            texture.parent.mkdir(parents=True)
+            texture.write_bytes(b"\x89PNG\r\n\x1a\n" + b"fixture")
+            with patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": td}):
+                result = server.call_tool("create_addon_entity", {
+                    "project_directory": "test-addon", "entity_name": "Forest Golem",
+                    "entity_slug": "forest_golem", "texture_path": "resource_packs/test-addon_RP/textures/entity/bosses/forest_golem.png",
+                    "target_game_version": "1.26.50"
+                })
+            self.assertEqual(result["texture_status"], "mapped_existing_png")
+            self.assertEqual(result["texture_reference"], "textures/entity/bosses/forest_golem")
+            self.assertEqual(result["runtime_status"], "NOT RUN")
+
+    def test_collision_refuses_entity_set_without_creating_partial_outputs(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as td:
+            project = self._scaffold(Path(td))
+            existing = project / "resource_packs/test-addon_RP/models/entity/forest_golem.geo.json"
+            existing.write_text('{"keep":true}\n', encoding="utf-8")
+            with patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": td}):
+                result = server.call_tool("create_addon_entity", {
+                    "project_directory": "test-addon", "entity_name": "Forest Golem",
+                    "entity_slug": "forest_golem", "target_game_version": "1.26.50"
+                })
+            self.assertEqual(result["status"], "error")
+            self.assertIn("refusing to overwrite", result["error"]["message"])
+            self.assertEqual(json.loads(existing.read_text(encoding="utf-8")), {"keep": True})
+            self.assertFalse((project / "behavior_packs/test-addon_BP/entities/forest_golem.json").exists())
+            self.assertFalse((project / "resource_packs/test-addon_RP/entity/forest_golem.entity.json").exists())
+
+    def test_invalid_png_or_unsafe_path_is_rejected_before_writing(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as td:
+            project = self._scaffold(Path(td))
+            texture = project / "resource_packs/test-addon_RP/textures/entity/forest_golem.png"
+            texture.write_bytes(b"not a png")
+            with patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": td}):
+                result = server.call_tool("create_addon_entity", {
+                    "project_directory": "test-addon", "entity_name": "Forest Golem",
+                    "entity_slug": "forest_golem", "texture_path": "resource_packs/test-addon_RP/textures/entity/forest_golem.png",
+                    "target_game_version": "1.26.50"
+                })
+            self.assertEqual(result["status"], "error")
+            self.assertIn("PNG signature", result["error"]["message"])
+            self.assertFalse((project / "behavior_packs/test-addon_BP/entities/forest_golem.json").exists())
+        base = {"project_directory":"test-addon","entity_name":"Forest Golem","entity_slug":"forest_golem","target_game_version":"1.26.50"}
+        for bad in ("../outside.png", "/tmp/a.png", "C:/outside.png", "resource_packs\\test-addon_RP/textures/entity/x.png", "resource_packs/test-addon_RP/textures/entity/../x.png"):
+            with self.subTest(texture_path=bad):
+                with self.assertRaisesRegex(ValueError, "texture_path"):
+                    server._validate_arguments("create_addon_entity", dict(base, texture_path=bad))
+
+    def test_entity_tool_is_write_capable_and_schema_closed(self):
+        tool=server.TOOL_BY_NAME["create_addon_entity"]
+        self.assertFalse(tool["annotations"]["readOnlyHint"])
+        self.assertFalse(tool["annotations"]["destructiveHint"])
+        self.assertFalse(tool["annotations"]["idempotentHint"])
+        self.assertFalse(tool["inputSchema"]["additionalProperties"])
 
 
 class CreateAddonItemTests(unittest.TestCase):

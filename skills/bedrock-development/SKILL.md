@@ -44,7 +44,7 @@ For complex tasks use: A) concise analysis, B) implementation/files changed, C) 
 
 ## Mojang sample corpus (1.26.50.4)
 - Prefer `search_mojang_samples` to find version-labelled examples by path, resource domain and selected literal identifiers; use `read_mojang_sample` for curated file excerpts or an indexed text path from the original ZIP when it is inside the configured workspace.
-- `skills/bedrock-development/references/mojang-samples-1.26.50.4/INDEX_METADATA.json` records the exact uploaded ZIP SHA-256 and archive stats. The bundled compressed index is metadata-only; it does not contain the full vanilla ZIP or binary assets.
+- `skills/bedrock-development/references/mojang-samples-1.26.50.4/INDEX_METADATA.json` records the source ZIP SHA-256 and archive stats. The generated `mojang-samples-index.json.gz` is an optional local artifact, not included in the GitHub source tree. When absent, the MCP server builds a small hash-verified index from curated text examples and reports `index_mode: curated_fallback`; this is not equivalent to the full 22,252-entry index.
 - Samples are references, not mod-ready files. Create custom namespaces/UUIDs, remove vanilla-only internal fields unless documented for custom packs, and verify formats against exact target-version documentation. Do not automatically redistribute vanilla textures, sounds or models.
 - The uploaded source archive is labelled 1.26.50.4; the default target remains 1.26.50, so compatibility must not be inferred from the patch label alone.
 

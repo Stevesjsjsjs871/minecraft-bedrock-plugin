@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.2
+- Adds `create_addon_entity` to generate a coordinated four-file custom entity slice: BP entity, RP client entity, geometry and render controller.
+- Confirms linked BP/RP manifests, exact target version, canonical resource paths and matching identifiers before writing.
+- Refuses collisions, symlink escapes and invalid supplied PNGs; rolls back newly created entity files if a write fails.
+- Does not fabricate texture assets; missing textures are reported as such. Animations, spawn rules and in-game behavior are outside this starter slice.
+- Adds cross-reference, texture, collision, rollback-safety and tool-schema regression tests.
+- Minecraft runtime tests remain `NOT RUN`.
+
 ## 0.9.1
 - Adds a curated, hash-verified Mojang sample search fallback when the generated compressed full index is absent from a source checkout.
 - Makes fallback coverage explicit with index_mode=curated_fallback and full_index_available=false; it does not imply the full 22,252-entry index is present.

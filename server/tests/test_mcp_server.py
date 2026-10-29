@@ -22,15 +22,88 @@ analyzer_spec.loader.exec_module(analyzer)
 
 
 class SchemaTests(unittest.TestCase):
-    def test_exactly_eight_tools_and_closed_schemas(self):
-        self.assertEqual(len(server.TOOLS), 8)
+    def test_fourteen_tools_and_closed_schemas(self):
+        self.assertEqual(len(server.TOOLS), 14)
         for tool in server.TOOLS:
             schema = tool["inputSchema"]
             self.assertFalse(schema["additionalProperties"])
             self.assertEqual(schema["type"], "object")
             self.assertTrue(set(schema["required"]).issubset(schema["properties"]))
-            self.assertTrue(tool["annotations"]["readOnlyHint"])
+            self.assertEqual(tool["annotations"]["readOnlyHint"], tool["name"] not in {"create_addon_project", "create_addon_item", "create_addon_block", "create_addon_recipe"})
             self.assertFalse(tool["annotations"]["destructiveHint"])
+        creator = server.TOOL_BY_NAME["create_addon_project"]
+        self.assertFalse(creator["annotations"]["readOnlyHint"])
+        self.assertFalse(creator["annotations"]["idempotentHint"])
+
+    def test_create_addon_project_generates_linked_manifests_and_unique_uuids(self):
+        from unittest.mock import patch
+        import uuid as uuid_module
+        with tempfile.TemporaryDirectory() as td:
+            with patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": td}):
+                result = server.call_tool("create_addon_project", {
+                    "project_directory": "example-addon",
+                    "display_name": "Example Add-On",
+                    "description": "A test starter project.",
+                    "target_game_version": "1.26.50",
+                })
+            self.assertEqual(result["status"], "created")
+            root = Path(result["project_directory"])
+            bp = json.loads((root / "behavior_packs/example-addon_BP/manifest.json").read_text(encoding="utf-8"))
+            rp = json.loads((root / "resource_packs/example-addon_RP/manifest.json").read_text(encoding="utf-8"))
+            bp_uuid = bp["header"]["uuid"]
+            bp_module_uuid = bp["modules"][0]["uuid"]
+            rp_uuid = rp["header"]["uuid"]
+            rp_module_uuid = rp["modules"][0]["uuid"]
+            self.assertEqual(bp["dependencies"], [{"uuid": rp_uuid, "version": [1, 0, 0]}])
+            self.assertEqual(bp["header"]["min_engine_version"], [1, 26, 50])
+            self.assertEqual(rp["header"]["min_engine_version"], [1, 26, 50])
+            ids = [bp_uuid, bp_module_uuid, rp_uuid, rp_module_uuid]
+            self.assertEqual(len(ids), len(set(ids)))
+            for value in ids:
+                self.assertEqual(str(uuid_module.UUID(value)), value)
+            self.assertTrue((root / "README.md").is_file())
+            self.assertTrue((root / "PROJECT_STATE.md").is_file())
+            self.assertEqual(result["features_generated"], [])
+            self.assertEqual(result["runtime_status"], "NOT RUN")
+
+    def test_create_addon_project_refuses_existing_destination_without_touching_it(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as td:
+            existing = Path(td) / "my-addon"
+            existing.mkdir()
+            sentinel = existing / "keep.txt"
+            sentinel.write_text("preserve me", encoding="utf-8")
+            with patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": td}):
+                result = server.call_tool("create_addon_project", {
+                    "project_directory": "my-addon",
+                    "display_name": "Existing Add-On",
+                    "description": "Do not overwrite this.",
+                    "target_game_version": "1.26.50",
+                })
+            self.assertEqual(result["status"], "error")
+            self.assertEqual(result["error"]["code"], "INVALID_ARGUMENT")
+            self.assertEqual(sentinel.read_text(encoding="utf-8"), "preserve me")
+            self.assertEqual(list(existing.iterdir()), [sentinel])
+
+    def test_create_addon_project_rejects_paths_and_bad_versions_before_writing(self):
+        good = {"project_directory": "fresh-addon", "display_name": "Fresh Add-On", "description": "Starter.", "target_game_version": "1.26.50"}
+        for unsafe in ("../escape", "folder/nested", "C:\\outside", ".", "..", "bad--slug", "UPPER"):
+            with self.subTest(project_directory=unsafe):
+                args = dict(good, project_directory=unsafe)
+                with self.assertRaisesRegex(ValueError, "project_directory"):
+                    server._validate_arguments("create_addon_project", args)
+        for version in ("1.26", "1.26.50-preview", "v1.26.50", "1..50", "001.26.50"):
+            with self.subTest(target_game_version=version):
+                args = dict(good, target_game_version=version)
+                with self.assertRaisesRegex(ValueError, "target_game_version"):
+                    server._validate_arguments("create_addon_project", args)
+
+    def test_create_addon_project_is_listed_as_write_capable(self):
+        listing = server.handle_message({"jsonrpc": "2.0", "id": 9, "method": "tools/list", "params": {}})
+        creator = next(tool for tool in listing["result"]["tools"] if tool["name"] == "create_addon_project")
+        self.assertFalse(creator["annotations"]["readOnlyHint"])
+        self.assertFalse(creator["annotations"]["idempotentHint"])
+        self.assertIn("new", creator["description"].lower())
 
     def test_rejects_extra_argument(self):
         with self.assertRaisesRegex(ValueError, "unexpected argument"):
@@ -68,10 +141,14 @@ class SchemaTests(unittest.TestCase):
         self.assertLessEqual(len(server.WORKFLOW_INSTRUCTIONS), 512)
         self.assertIn("inspect_archive", server.WORKFLOW_INSTRUCTIONS)
         self.assertIn("compare_baseline", server.WORKFLOW_INSTRUCTIONS)
-        self.assertIn("never modify/delete files", server.WORKFLOW_INSTRUCTIONS)
+        self.assertIn("create_addon_project", server.WORKFLOW_INSTRUCTIONS)
+        self.assertIn("create_addon_item", server.WORKFLOW_INSTRUCTIONS)
+        self.assertIn("create_addon_recipe", server.WORKFLOW_INSTRUCTIONS)
         self.assertIn("MCT CLI", server.WORKFLOW_INSTRUCTIONS)
-        self.assertIn("stays read-only", server.WORKFLOW_INSTRUCTIONS)
+        self.assertIn("Audit/reference tools are read-only", server.WORKFLOW_INSTRUCTIONS)
+        self.assertIn("create_addon_recipe", server.WORKFLOW_INSTRUCTIONS)
         self.assertIn("diff_packs", server.WORKFLOW_INSTRUCTIONS)
+        self.assertIn("search_mojang_samples", server.WORKFLOW_INSTRUCTIONS)
 
     def test_filter_graph_matches_actual_edge_schema_for_all_domains(self):
         graph = {
@@ -196,6 +273,119 @@ class SchemaTests(unittest.TestCase):
         self.assertEqual(len(result["file_diff"]["added"]["items"]), server._DIFF_SAMPLE_LIMIT)
         self.assertTrue(result["file_diff"]["added"]["truncated"])
 
+    def test_diff_pack_duplicate_edges_are_matched_as_occurrences(self):
+        def edge(status):
+            return {"source_file": "RP/entity/test.json", "source_pointer": "$/geometry/default", "reference_kind": "client_geometry", "referenced_value": "geometry.test", "target_domain": "geometry", "status": status, "confidence": "LOW"}
+        baseline = {"tool_version": "0.8.0", "candidate": {}, "findings": [], "reference_graph": {"edges": [edge("resolved"), edge("resolved"), edge("unresolved")]}}
+        comparison = {"tool_version": "0.8.0", "candidate": {}, "baseline": {}, "file_diff": {"added": [], "removed": [], "modified": []}, "findings": [], "reference_graph": {"edges": [edge("unresolved"), edge("unresolved"), edge("unresolved")]}}
+        result = server._summarize_pack_diff(comparison, baseline)
+        self.assertEqual(result["summary"]["reference_regressions"], 2)
+        self.assertEqual(result["summary"]["new_unresolved_references"], 0)
+
+    def test_diff_pack_new_unresolved_reference_requires_review(self):
+        baseline = {"tool_version": "0.8.0", "candidate": {}, "findings": [], "reference_graph": {"edges": []}}
+        edge = {"source_file": "RP/entity/test.json", "source_pointer": "$/geometry/default", "reference_kind": "client_geometry", "referenced_value": "geometry.missing", "target_domain": "geometry", "status": "heuristic_unresolved", "confidence": "LOW"}
+        comparison = {"tool_version": "0.8.0", "candidate": {}, "baseline": {}, "file_diff": {"added": [], "removed": [], "modified": []}, "findings": [], "reference_graph": {"edges": [edge]}}
+        result = server._summarize_pack_diff(comparison, baseline)
+        self.assertEqual(result["summary"]["new_unresolved_references"], 1)
+        self.assertEqual(result["recommendation"], "REVIEW")
+
+    def test_diff_pack_reports_severity_deescalations_in_summary(self):
+        finding_old = {"title": "Known issue", "path": "RP/a.json", "severity": "HIGH", "confidence": "HIGH"}
+        finding_new = {"title": "Known issue", "path": "RP/a.json", "severity": "LOW", "confidence": "HIGH"}
+        baseline = {"tool_version": "0.8.0", "candidate": {}, "findings": [finding_old], "reference_graph": {"edges": []}}
+        comparison = {"tool_version": "0.8.0", "candidate": {}, "baseline": {}, "file_diff": {"added": [], "removed": [], "modified": []}, "findings": [finding_new], "reference_graph": {"edges": []}}
+        result = server._summarize_pack_diff(comparison, baseline)
+        self.assertEqual(result["summary"]["severity_deescalations"], 1)
+        self.assertEqual(result["finding_delta"]["severity_deescalations"]["count"], 1)
+
+    def test_diff_pack_rejects_malformed_findings_and_overlapping_file_buckets(self):
+        baseline = {"tool_version": "0.8.0", "candidate": {}, "findings": [], "reference_graph": {"edges": []}}
+        base_comparison = {"tool_version": "0.8.0", "candidate": {}, "baseline": {}, "file_diff": {"added": [], "removed": [], "modified": []}, "findings": [], "reference_graph": {"edges": []}}
+        malformed = {**base_comparison, "findings": [{"path": "RP/a.json", "severity": "HIGH"}]}
+        with self.assertRaisesRegex(RuntimeError, "finding is missing"):
+            server._summarize_pack_diff(malformed, baseline)
+        overlapping = {**base_comparison, "file_diff": {"added": ["RP/a.json"], "removed": ["RP/a.json"], "modified": []}}
+        with self.assertRaisesRegex(RuntimeError, "buckets overlap"):
+            server._summarize_pack_diff(overlapping, baseline)
+        invalid_severity = {**base_comparison, "findings": [{"title": "Issue", "path": "RP/a.json", "severity": "SEVERE"}]}
+        with self.assertRaisesRegex(RuntimeError, "severity is invalid"):
+            server._summarize_pack_diff(invalid_severity, baseline)
+
+
+    def test_diff_pack_rejects_unsafe_file_diff_paths(self):
+        base = {"tool_version": "0.8.1", "candidate": {}, "findings": [], "reference_graph": {"edges": []}}
+        for unsafe_path in (
+            "../outside.json", "RP/../outside.json", "/absolute.json", "C:/outside.json",
+            "RP/./odd.json", "RP\\..\\outside.json", "RP/a.json\x00bad",
+            "RP\\models\\a.json", "RP//models/a.json", "RP/models//a.json",
+            "RP/models/", "RP/models/\tbad.json", "RP/models/line\nbreak.json",
+        ):
+            with self.subTest(path=unsafe_path):
+                comparison = {"tool_version": "0.8.1", "candidate": {}, "baseline": {}, "file_diff": {"added": [unsafe_path], "removed": [], "modified": []}, "findings": [], "reference_graph": {"edges": []}}
+                with self.assertRaisesRegex(RuntimeError, "invalid path|absolute path|traversal|non-canonical"):
+                    server._summarize_pack_diff(comparison, base)
+
+    def test_diff_pack_rejects_noncanonical_separator_aliases_before_overlap_checks(self):
+        base = {"tool_version": "0.8.3", "candidate": {}, "findings": [], "reference_graph": {"edges": []}}
+        aliases = {"added": ["RP/models/a.json"], "removed": ["RP\\models\\a.json"], "modified": []}
+        comparison = {"tool_version": "0.8.3", "candidate": {}, "baseline": {}, "file_diff": aliases, "findings": [], "reference_graph": {"edges": []}}
+        with self.assertRaisesRegex(RuntimeError, "non-canonical path separator"):
+            server._summarize_pack_diff(comparison, base)
+
+    def test_diff_pack_accepts_canonical_nested_relative_paths(self):
+        base = {"tool_version": "0.8.3", "candidate": {}, "findings": [], "reference_graph": {"edges": []}}
+        comparison = {"tool_version": "0.8.3", "candidate": {}, "baseline": {}, "file_diff": {"added": ["RP/models/entity/a.geo.json"], "removed": [], "modified": []}, "findings": [], "reference_graph": {"edges": []}}
+        result = server._summarize_pack_diff(comparison, base)
+        self.assertEqual(result["file_diff"]["added"]["items"], ["RP/models/entity/a.geo.json"])
+
+    def test_diff_pack_verifies_baseline_artifact_hash_provenance(self):
+        baseline_hash = "a" * 64
+        candidate_hash = "b" * 64
+        baseline = {"tool_version": "0.8.1", "candidate": {"path": "baseline.mcaddon", "sha256": baseline_hash}, "findings": [], "reference_graph": {"edges": []}}
+        comparison = {"tool_version": "0.8.1", "candidate": {"path": "candidate.mcaddon", "sha256": candidate_hash}, "baseline": {"path": "baseline.mcaddon", "sha256": baseline_hash}, "file_diff": {"added": [], "removed": [], "modified": []}, "findings": [], "reference_graph": {"edges": []}}
+        result = server._summarize_pack_diff(comparison, baseline)
+        self.assertEqual(result["artifact_provenance"], {"status": "verified", "candidate_sha256": candidate_hash, "baseline_sha256": baseline_hash, "baseline_hash_match": True})
+
+        mismatched = {**comparison, "baseline": {"path": "baseline.mcaddon", "sha256": "c" * 64}}
+        with self.assertRaisesRegex(RuntimeError, "SHA-256 mismatch"):
+            server._summarize_pack_diff(mismatched, baseline)
+
+    def test_diff_pack_rejects_malformed_artifact_hashes(self):
+        baseline = {"tool_version": "0.8.1", "candidate": {"sha256": "not-a-hash"}, "findings": [], "reference_graph": {"edges": []}}
+        comparison = {"tool_version": "0.8.1", "candidate": {}, "baseline": {}, "file_diff": {"added": [], "removed": [], "modified": []}, "findings": [], "reference_graph": {"edges": []}}
+        with self.assertRaisesRegex(RuntimeError, "SHA-256 is malformed"):
+            server._summarize_pack_diff(comparison, baseline)
+
+
+    def test_diff_pack_matches_exact_severity_before_pairing_duplicate_fingerprints(self):
+        old_low = {"title": "Repeated issue", "path": "RP/a.json", "severity": "LOW", "confidence": "MEDIUM"}
+        old_medium = {"title": "Repeated issue", "path": "RP/a.json", "severity": "MEDIUM", "confidence": "MEDIUM"}
+        new_medium = {"title": "Repeated issue", "path": "RP/a.json", "severity": "MEDIUM", "confidence": "HIGH"}
+        new_high = {"title": "Repeated issue", "path": "RP/a.json", "severity": "HIGH", "confidence": "HIGH"}
+        baseline = {"tool_version": "0.8.2", "candidate": {}, "findings": [old_low, old_medium], "reference_graph": {"edges": []}}
+        comparison = {"tool_version": "0.8.2", "candidate": {}, "baseline": {}, "file_diff": {"added": [], "removed": [], "modified": []}, "findings": [new_medium, new_high], "reference_graph": {"edges": []}}
+        result = server._summarize_pack_diff(comparison, baseline)
+        self.assertEqual(result["summary"]["severity_escalations"], 1)
+        self.assertEqual(result["summary"]["severity_deescalations"], 0)
+        self.assertEqual(result["summary"]["new_findings"], 0)
+        self.assertEqual(result["summary"]["resolved_findings"], 0)
+        self.assertEqual(result["finding_delta"]["severity_escalations"]["items"][0]["baseline"], "LOW")
+        self.assertEqual(result["finding_delta"]["severity_escalations"]["items"][0]["candidate"], "HIGH")
+
+    def test_diff_pack_pairs_closest_duplicate_severity_when_counts_differ(self):
+        old_low = {"title": "Repeated issue", "path": "RP/a.json", "severity": "LOW"}
+        old_blocker = {"title": "Repeated issue", "path": "RP/a.json", "severity": "BLOCKER"}
+        new_high = {"title": "Repeated issue", "path": "RP/a.json", "severity": "HIGH"}
+        baseline = {"tool_version": "0.8.2", "candidate": {}, "findings": [old_low, old_blocker], "reference_graph": {"edges": []}}
+        comparison = {"tool_version": "0.8.2", "candidate": {}, "baseline": {}, "file_diff": {"added": [], "removed": [], "modified": []}, "findings": [new_high], "reference_graph": {"edges": []}}
+        result = server._summarize_pack_diff(comparison, baseline)
+        self.assertEqual(result["summary"]["severity_deescalations"], 1)
+        self.assertEqual(result["finding_delta"]["severity_deescalations"]["items"][0]["baseline"], "BLOCKER")
+        self.assertEqual(result["finding_delta"]["severity_deescalations"]["items"][0]["candidate"], "HIGH")
+        self.assertEqual(result["summary"]["resolved_findings"], 1)
+        self.assertEqual(result["finding_delta"]["no_longer_reported"]["items"][0]["severity"], "LOW")
+
     def test_diff_packs_runs_read_only_against_archives(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -271,7 +461,7 @@ class SchemaTests(unittest.TestCase):
                 call = server.handle_message({"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "inspect_archive", "arguments": {"archive_path": "fixture.mcaddon"}}})
                 bad = server.handle_message({"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {"name": "inspect_archive", "arguments": {"archive_path": str(root.parent / "outside.mcaddon")}}})
                 self.assertEqual(init["result"]["serverInfo"]["version"], server.SERVER_VERSION)
-                self.assertEqual(len(tools["result"]["tools"]), 8)
+                self.assertEqual(len(tools["result"]["tools"]), 14)
                 self.assertEqual(call["result"]["structuredContent"]["status"], "completed")
                 self.assertTrue(bad["result"]["isError"])
                 self.assertEqual(bad["result"]["structuredContent"]["status"], "error")
@@ -354,7 +544,8 @@ class SchemaTests(unittest.TestCase):
         from archive_safety import MAX_ARCHIVE_BYTES, MAX_ARCHIVE_MEMBERS, MAX_MEMBER_BYTES, MAX_UNCOMPRESSED_BYTES
         analyzer_path = SERVER_PATH.parents[1] / "skills" / "automated-validation" / "scripts" / "bedrock_audit.py"
         source = analyzer_path.read_text(encoding="utf-8")
-        self.assertIn("from archive_safety import validate_zip_limits", source)
+        self.assertIn("from archive_safety import", source)
+        self.assertIn("validate_zip_limits", source)
         self.assertEqual(MAX_ARCHIVE_BYTES, 256 * 1024 * 1024)
         self.assertEqual(MAX_UNCOMPRESSED_BYTES, 512 * 1024 * 1024)
         self.assertEqual(MAX_ARCHIVE_MEMBERS, 50_000)
@@ -382,6 +573,450 @@ class SchemaTests(unittest.TestCase):
                     os.environ.pop("MINECRAFT_BEDROCK_WORKSPACE", None)
                 else:
                     os.environ["MINECRAFT_BEDROCK_WORKSPACE"] = old
+
+
+
+    def test_mojang_sample_search_finds_exact_identifier_and_domain_example(self):
+        item_result = server.call_tool("search_mojang_samples", {
+            "query": "minecraft:apple", "category": "item", "limit": 5
+        })
+        self.assertEqual(item_result["status"], "completed")
+        self.assertEqual(item_result["target_version"], "1.26.50.4")
+        self.assertTrue(any(row["path"] == "behavior_pack/items/apple.json" for row in item_result["results"]))
+        self.assertEqual(item_result["source_archive_sha256"], "c0b6151f5f9a0c31ebe3c909dfc82d97f12473ed2c6e039aa7e22d667042026c")
+
+        geometry_result = server.call_tool("search_mojang_samples", {
+            "query": "geometry goat", "category": "geometry", "limit": 3
+        })
+        self.assertEqual(geometry_result["status"], "completed")
+        self.assertEqual(geometry_result["results"][0]["path"], "resource_pack/models/entity/goat.geo.json")
+        self.assertIsNotNone(geometry_result["results"][0]["bundled_reference"])
+
+    def test_mojang_sample_search_has_bounded_results_and_defaults(self):
+        result = server.call_tool("search_mojang_samples", {"query": "texture"})
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(len(result["results"]), 10)
+        self.assertTrue(result["truncated"])
+        self.assertEqual(result["category"], "all")
+
+    def test_mojang_sample_search_rejects_invalid_category_limit_and_blank_query(self):
+        with self.assertRaisesRegex(ValueError, "category must be one of"):
+            server._validate_arguments("search_mojang_samples", {"query": "item", "category": "made_up"})
+        with self.assertRaisesRegex(ValueError, "limit must be between"):
+            server._validate_arguments("search_mojang_samples", {"query": "item", "limit": 21})
+        with self.assertRaisesRegex(ValueError, "limit must be an integer"):
+            server._validate_arguments("search_mojang_samples", {"query": "item", "limit": True})
+        with self.assertRaisesRegex(ValueError, "query must contain"):
+            server._validate_arguments("search_mojang_samples", {"query": "   "})
+
+    def test_read_mojang_sample_returns_bundled_example_and_verified_hash(self):
+        result = server.call_tool("read_mojang_sample", {"sample_path": "behavior_pack/items/apple.json"})
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(result["source"], "bundled_curated_sample")
+        self.assertTrue(result["content_hash_matches_index"])
+        self.assertIn('"minecraft:item"', result["content_excerpt"])
+        self.assertEqual(result["sample_path"], "behavior_pack/items/apple.json")
+
+    def test_read_mojang_sample_refuses_unsafe_or_unindexed_path(self):
+        bad = server.call_tool("read_mojang_sample", {"sample_path": "../escape.json"})
+        self.assertEqual(bad["status"], "error")
+        self.assertEqual(bad["error"]["code"], "INVALID_ARGUMENT")
+        unknown = server.call_tool("read_mojang_sample", {"sample_path": "behavior_pack/not-real.json"})
+        self.assertEqual(unknown["status"], "error")
+        self.assertIn("not present", unknown["error"]["message"])
+
+    def test_read_mojang_sample_can_read_one_indexed_file_from_workspace_archive(self):
+        from unittest.mock import patch
+        import gzip
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            archive = root / "source.zip"
+            sample_bytes = b'{"format_version":"1.26.30","minecraft:item":{"description":{"identifier":"demo:thing"}}}\n'
+            with zipfile.ZipFile(archive, "w") as zf:
+                zf.writestr("behavior_pack/items/example.json", sample_bytes)
+            index_path = root / "index.json.gz"
+            payload = {
+                "target_version": "1.26.50.4", "archive_sha256": "source-hash",
+                "entries": [{"path": "behavior_pack/items/example.json", "category": "item",
+                             "size_bytes": len(sample_bytes), "sha256": __import__("hashlib").sha256(sample_bytes).hexdigest(),
+                             "identifiers": ["demo:thing"], "json_parsed": True}]
+            }
+            with gzip.open(index_path, "wt", encoding="utf-8") as out:
+                json.dump(payload, out)
+            with patch.object(server, "MOJANG_SAMPLE_INDEX", index_path), patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": td}):
+                result = server.call_tool("read_mojang_sample", {
+                    "sample_path": "behavior_pack/items/example.json", "archive_path": "source.zip"
+                })
+            self.assertEqual(result["status"], "completed")
+            self.assertEqual(result["source"], "user_supplied_archive")
+            self.assertTrue(result["content_hash_matches_index"])
+            self.assertIn("demo:thing", result["content_excerpt"])
+
+
+
+class CreateAddonItemTests(unittest.TestCase):
+    def _scaffold(self, workspace: Path):
+        from unittest.mock import patch
+        with patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": str(workspace)}):
+            result = server.call_tool("create_addon_project", {
+                "project_directory": "test-addon", "display_name": "Test Add-on",
+                "description": "Test scaffold for item creation.", "target_game_version": "1.26.50"
+            })
+        self.assertEqual(result["status"], "created")
+        return workspace / "test-addon"
+
+    def test_creates_item_definition_lang_and_atlas_without_fake_texture(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as td:
+            workspace = Path(td)
+            project = self._scaffold(workspace)
+            with patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": td}):
+                result = server.call_tool("create_addon_item", {
+                    "project_directory":"test-addon", "item_name":"Ruby Shard", "item_slug":"ruby_shard", "target_game_version":"1.26.50"
+                })
+            self.assertEqual(result["status"], "created")
+            bp_item = project / "behavior_packs/test-addon_BP/items/ruby_shard.json"
+            item = json.loads(bp_item.read_text(encoding="utf-8"))
+            self.assertEqual(item["minecraft:item"]["description"]["identifier"], "test_addon:ruby_shard")
+            self.assertEqual(item["minecraft:item"]["components"]["minecraft:icon"]["textures"]["default"], "ruby_shard")
+            lang = project / "resource_packs/test-addon_RP/texts/en_US.lang"
+            self.assertEqual(lang.read_text(encoding="utf-8"), "item.ruby_shard.name=Ruby Shard\n")
+            atlas = json.loads((project / "resource_packs/test-addon_RP/textures/item_texture.json").read_text(encoding="utf-8"))
+            self.assertEqual(atlas["texture_data"]["ruby_shard"]["textures"], "textures/items/ruby_shard")
+            self.assertFalse((project / "resource_packs/test-addon_RP/textures/items/ruby_shard.png").exists())
+            self.assertEqual(result["texture_status"], "texture_file_not_created")
+            self.assertEqual(result["runtime_status"], "NOT RUN")
+
+    def test_accepts_existing_png_at_expected_path_and_reports_it_mapped(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as td:
+            workspace=Path(td); project=self._scaffold(workspace)
+            texture=project/"resource_packs/test-addon_RP/textures/items/ruby_shard.png"
+            texture.parent.mkdir(parents=True,exist_ok=True)
+            texture.write_bytes(b"\x89PNG\r\n\x1a\n"+b"fixture-payload")
+            with patch.dict(os.environ,{"MINECRAFT_BEDROCK_WORKSPACE":td}):
+                result=server.call_tool("create_addon_item", {"project_directory":"test-addon","item_name":"Ruby Shard","item_slug":"ruby_shard","target_game_version":"1.26.50","texture_path":"resource_packs/test-addon_RP/textures/items/ruby_shard.png"})
+            self.assertEqual(result["status"],"created")
+            self.assertEqual(result["texture_status"],"mapped_existing_png")
+            self.assertTrue(texture.is_file())
+
+    def test_rejects_duplicate_item_files_without_overwrite(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as td:
+            workspace=Path(td); project=self._scaffold(workspace)
+            existing=project / "behavior_packs/test-addon_BP/items/ruby_shard.json"
+            existing.write_text('{"keep":true}\n', encoding="utf-8")
+            with patch.dict(os.environ,{"MINECRAFT_BEDROCK_WORKSPACE":td}):
+                result=server.call_tool("create_addon_item", {"project_directory":"test-addon","item_name":"Ruby Shard","item_slug":"ruby_shard","target_game_version":"1.26.50"})
+            self.assertEqual(result["status"],"error")
+            self.assertIn("refusing to overwrite",result["error"]["message"])
+            self.assertEqual(existing.read_text(encoding="utf-8"),'{"keep":true}\n')
+            self.assertFalse((project / "resource_packs/test-addon_RP/textures/item_texture.json").exists())
+
+    def test_rejects_non_scaffold_and_unsafe_texture_path(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as td:
+            workspace=Path(td); (workspace/"empty").mkdir()
+            with patch.dict(os.environ,{"MINECRAFT_BEDROCK_WORKSPACE":td}):
+                result=server.call_tool("create_addon_item", {"project_directory":"empty","item_name":"Ruby Shard","item_slug":"ruby_shard","target_game_version":"1.26.50"})
+            self.assertEqual(result["status"],"error")
+            self.assertIn("scaffold",result["error"]["message"])
+            base={"project_directory":"test-addon","item_name":"Ruby Shard","item_slug":"ruby_shard","target_game_version":"1.26.50"}
+            for bad in ("../outside.png", "/tmp/a.png", "C:/a.png", "resource_packs\\\\test-addon_RP/textures/items/ruby_shard.png", "resource_packs/test-addon_RP/textures/items/../ruby_shard.png"):
+                with self.subTest(texture_path=bad):
+                    with self.assertRaisesRegex(ValueError,"texture_path"):
+                        server._validate_arguments("create_addon_item",dict(base,texture_path=bad))
+
+    def test_existing_lang_or_atlas_requires_merge_instead_of_overwrite(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as td:
+            workspace=Path(td); project=self._scaffold(workspace)
+            atlas=project/"resource_packs/test-addon_RP/textures/item_texture.json"
+            atlas.parent.mkdir(parents=True,exist_ok=True)
+            atlas.write_text('{"texture_data":[]}\n',encoding="utf-8")
+            with patch.dict(os.environ,{"MINECRAFT_BEDROCK_WORKSPACE":td}):
+                result=server.call_tool("create_addon_item", {"project_directory":"test-addon","item_name":"Ruby Shard","item_slug":"ruby_shard","target_game_version":"1.26.50"})
+            self.assertEqual(result["status"],"error")
+            self.assertIn("must contain an object texture_data", result["error"]["message"])
+            self.assertEqual(atlas.read_text(encoding="utf-8"), '{"texture_data":[]}\n')
+            self.assertFalse((project/"behavior_packs/test-addon_BP/items/ruby_shard.json").exists())
+
+    def test_rejects_symlinked_pack_root_before_writing(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as td, tempfile.TemporaryDirectory() as outside:
+            workspace=Path(td); project=self._scaffold(workspace)
+            rp_root=project/"resource_packs/test-addon_RP"
+            saved=project/"resource_packs/test-addon_RP_real"
+            rp_root.rename(saved)
+            rp_root.symlink_to(Path(outside), target_is_directory=True)
+            with patch.dict(os.environ,{"MINECRAFT_BEDROCK_WORKSPACE":td}):
+                result=server.call_tool("create_addon_item", {"project_directory":"test-addon","item_name":"Ruby Shard","item_slug":"ruby_shard","target_game_version":"1.26.50"})
+            self.assertEqual(result["status"],"error")
+            self.assertIn("unsafe",result["error"]["message"])
+            self.assertEqual(list(Path(outside).iterdir()),[])
+
+    def test_merges_second_item_into_existing_atlas_and_localization(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as td:
+            workspace = Path(td); project = self._scaffold(workspace)
+            atlas_path = project / "resource_packs/test-addon_RP/textures/item_texture.json"
+            atlas_path.parent.mkdir(parents=True, exist_ok=True)
+            atlas_path.write_text(json.dumps({"resource_pack_name":"custom","texture_name":"atlas.items","keep_meta":True,"texture_data":{"first":{"textures":"textures/items/first"}}}, indent=2)+"\n", encoding="utf-8")
+            lang_path = project / "resource_packs/test-addon_RP/texts/en_US.lang"
+            lang_path.parent.mkdir(parents=True, exist_ok=True)
+            lang_path.write_text("# Keep existing translation\nitem.first.name=First Item\n", encoding="utf-8")
+            with patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": td}):
+                result = server.call_tool("create_addon_item", {"project_directory":"test-addon","item_name":"Ruby Shard","item_slug":"ruby_shard","target_game_version":"1.26.50"})
+            self.assertEqual(result["status"], "created")
+            atlas = json.loads(atlas_path.read_text(encoding="utf-8"))
+            self.assertTrue(atlas["keep_meta"])
+            self.assertEqual(set(atlas["texture_data"]), {"first", "ruby_shard"})
+            self.assertEqual(lang_path.read_text(encoding="utf-8"), "# Keep existing translation\nitem.first.name=First Item\nitem.ruby_shard.name=Ruby Shard\n")
+            self.assertTrue((project / "behavior_packs/test-addon_BP/items/ruby_shard.json").exists())
+
+    def test_rejects_duplicate_atlas_key_without_modifying_any_shared_file(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as td:
+            workspace = Path(td); project = self._scaffold(workspace)
+            atlas_path = project / "resource_packs/test-addon_RP/textures/item_texture.json"
+            atlas_path.parent.mkdir(parents=True, exist_ok=True)
+            original_atlas = json.dumps({"texture_data":{"ruby_shard":{"textures":"textures/items/original"}}}) + "\n"
+            atlas_path.write_text(original_atlas, encoding="utf-8")
+            lang_path = project / "resource_packs/test-addon_RP/texts/en_US.lang"
+            lang_path.parent.mkdir(parents=True, exist_ok=True)
+            original_lang = "item.keep.name=Keep\n"
+            lang_path.write_text(original_lang, encoding="utf-8")
+            with patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": td}):
+                result = server.call_tool("create_addon_item", {"project_directory":"test-addon","item_name":"Ruby Shard","item_slug":"ruby_shard","target_game_version":"1.26.50"})
+            self.assertEqual(result["status"], "error")
+            self.assertIn("already contains key", result["error"]["message"])
+            self.assertEqual(atlas_path.read_text(encoding="utf-8"), original_atlas)
+            self.assertEqual(lang_path.read_text(encoding="utf-8"), original_lang)
+            self.assertFalse((project / "behavior_packs/test-addon_BP/items/ruby_shard.json").exists())
+
+    def test_rejects_malformed_lang_without_modifying_atlas(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as td:
+            workspace = Path(td); project = self._scaffold(workspace)
+            atlas_path = project / "resource_packs/test-addon_RP/textures/item_texture.json"
+            atlas_path.parent.mkdir(parents=True, exist_ok=True)
+            original_atlas = json.dumps({"texture_data":{"keep":{"textures":"textures/items/keep"}}}) + "\n"
+            atlas_path.write_text(original_atlas, encoding="utf-8")
+            lang_path = project / "resource_packs/test-addon_RP/texts/en_US.lang"
+            lang_path.parent.mkdir(parents=True, exist_ok=True)
+            lang_path.write_text("malformed line without equals\n", encoding="utf-8")
+            with patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": td}):
+                result = server.call_tool("create_addon_item", {"project_directory":"test-addon","item_name":"Ruby Shard","item_slug":"ruby_shard","target_game_version":"1.26.50"})
+            self.assertEqual(result["status"], "error")
+            self.assertIn("malformed line", result["error"]["message"])
+            self.assertEqual(atlas_path.read_text(encoding="utf-8"), original_atlas)
+            self.assertEqual(lang_path.read_text(encoding="utf-8"), "malformed line without equals\n")
+            self.assertFalse((project / "behavior_packs/test-addon_BP/items/ruby_shard.json").exists())
+
+    def test_rejects_duplicate_localization_key_without_overwrite(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as td:
+            workspace = Path(td); project = self._scaffold(workspace)
+            lang_path = project / "resource_packs/test-addon_RP/texts/en_US.lang"
+            lang_path.parent.mkdir(parents=True, exist_ok=True)
+            original_lang = "item.ruby_shard.name=Existing Name\n"
+            lang_path.write_text(original_lang, encoding="utf-8")
+            with patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": td}):
+                result = server.call_tool("create_addon_item", {"project_directory":"test-addon","item_name":"Ruby Shard","item_slug":"ruby_shard","target_game_version":"1.26.50"})
+            self.assertEqual(result["status"], "error")
+            self.assertIn("already exists", result["error"]["message"])
+            self.assertEqual(lang_path.read_text(encoding="utf-8"), original_lang)
+            self.assertFalse((project / "behavior_packs/test-addon_BP/items/ruby_shard.json").exists())
+
+    def test_item_tool_is_write_capable_and_schema_closed(self):
+        tool=server.TOOL_BY_NAME["create_addon_item"]
+        self.assertFalse(tool["annotations"]["readOnlyHint"])
+        self.assertFalse(tool["annotations"]["idempotentHint"])
+        self.assertFalse(tool["inputSchema"]["additionalProperties"])
+        self.assertIn("create_addon_item",server.WORKFLOW_INSTRUCTIONS)
+
+
+
+class CreateAddonBlockTests(unittest.TestCase):
+    def _scaffold(self, workspace: Path):
+        from unittest.mock import patch
+        with patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": str(workspace)}):
+            result = server.call_tool("create_addon_project", {
+                "project_directory": "block-addon", "display_name": "Block Add-on",
+                "description": "Test scaffold for block creation.", "target_game_version": "1.26.50"
+            })
+        self.assertEqual(result["status"], "created")
+        return workspace / "block-addon"
+
+    def test_creates_block_and_terrain_atlas_mapping(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as td:
+            workspace=Path(td); project=self._scaffold(workspace)
+            with patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": td}):
+                result=server.call_tool("create_addon_block", {"project_directory":"block-addon","block_name":"Ruby Ore","block_slug":"ruby_ore","target_game_version":"1.26.50"})
+            self.assertEqual(result["status"], "created")
+            bp=project/"behavior_packs/block-addon_BP/blocks/ruby_ore.block.json"
+            block=json.loads(bp.read_text(encoding="utf-8"))
+            self.assertEqual(block["minecraft:block"]["description"]["identifier"], "block_addon:ruby_ore")
+            self.assertEqual(block["minecraft:block"]["components"]["minecraft:material_instances"]["*"]["texture"], "ruby_ore")
+            atlas_path=project/"resource_packs/block-addon_RP/textures/terrain_texture.json"
+            atlas=json.loads(atlas_path.read_text(encoding="utf-8"))
+            self.assertEqual(atlas["texture_data"]["ruby_ore"]["textures"], "textures/blocks/ruby_ore")
+            self.assertFalse((project/"resource_packs/block-addon_RP/textures/blocks/ruby_ore.png").exists())
+            self.assertEqual(result["runtime_status"], "NOT RUN")
+
+    def test_merges_existing_terrain_atlas_and_preserves_metadata(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as td:
+            workspace=Path(td); project=self._scaffold(workspace)
+            atlas_path=project/"resource_packs/block-addon_RP/textures/terrain_texture.json"
+            atlas_path.parent.mkdir(parents=True,exist_ok=True)
+            atlas_path.write_text(json.dumps({"texture_name":"atlas.terrain","keep":True,"texture_data":{"stone":{"textures":"textures/blocks/stone"}}})+"\n",encoding="utf-8")
+            with patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": td}):
+                result=server.call_tool("create_addon_block", {"project_directory":"block-addon","block_name":"Ruby Ore","block_slug":"ruby_ore","target_game_version":"1.26.50"})
+            self.assertEqual(result["status"], "created")
+            atlas=json.loads(atlas_path.read_text(encoding="utf-8"))
+            self.assertTrue(atlas["keep"])
+            self.assertEqual(set(atlas["texture_data"]), {"stone","ruby_ore"})
+
+    def test_duplicate_atlas_key_fails_before_creating_block(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as td:
+            workspace=Path(td); project=self._scaffold(workspace)
+            atlas_path=project/"resource_packs/block-addon_RP/textures/terrain_texture.json"
+            atlas_path.parent.mkdir(parents=True,exist_ok=True)
+            original=json.dumps({"texture_data":{"ruby_ore":{"textures":"textures/blocks/old"}}})+"\n"
+            atlas_path.write_text(original,encoding="utf-8")
+            with patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": td}):
+                result=server.call_tool("create_addon_block", {"project_directory":"block-addon","block_name":"Ruby Ore","block_slug":"ruby_ore","target_game_version":"1.26.50"})
+            self.assertEqual(result["status"], "error")
+            self.assertIn("already contains key",result["error"]["message"])
+            self.assertEqual(atlas_path.read_text(encoding="utf-8"), original)
+            self.assertFalse((project/"behavior_packs/block-addon_BP/blocks/ruby_ore.block.json").exists())
+
+    def test_block_tool_is_write_capable_and_schema_closed(self):
+        tool=server.TOOL_BY_NAME["create_addon_block"]
+        self.assertFalse(tool["annotations"]["readOnlyHint"])
+        self.assertFalse(tool["annotations"]["idempotentHint"])
+        self.assertFalse(tool["inputSchema"]["additionalProperties"])
+        self.assertIn("create_addon_block",server.WORKFLOW_INSTRUCTIONS)
+
+
+class CreateAddonRecipeTests(unittest.TestCase):
+    def _scaffold(self, workspace: Path):
+        from unittest.mock import patch
+        with patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": str(workspace)}):
+            result = server.call_tool("create_addon_project", {
+                "project_directory": "recipe-addon", "display_name": "Recipe Add-on",
+                "description": "Test scaffold for recipe creation.", "target_game_version": "1.26.50"
+            })
+        self.assertEqual(result["status"], "created")
+        return workspace / "recipe-addon"
+
+    def _create_item(self, workspace: Path, slug: str, display: str):
+        from unittest.mock import patch
+        with patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": str(workspace)}):
+            result = server.call_tool("create_addon_item", {
+                "project_directory":"recipe-addon", "item_name":display, "item_slug":slug, "target_game_version":"1.26.50"
+            })
+        self.assertEqual(result["status"], "created")
+        return "recipe_addon:" + slug
+
+    def test_creates_shapeless_recipe_for_project_item(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as td:
+            workspace=Path(td); project=self._scaffold(workspace)
+            custom=self._create_item(workspace,"ruby_shard","Ruby Shard")
+            args={"project_directory":"recipe-addon","recipe_slug":"ruby_from_dust","recipe_type":"shapeless","result_identifier":custom,"ingredients":["minecraft:redstone","minecraft:quartz"],"target_game_version":"1.26.50"}
+            with patch.dict(os.environ,{"MINECRAFT_BEDROCK_WORKSPACE":td}):
+                result=server.call_tool("create_addon_recipe",args)
+            self.assertEqual(result["status"],"created")
+            data=json.loads((project/"behavior_packs/recipe-addon_BP/recipes/ruby_from_dust.json").read_text(encoding="utf-8"))
+            recipe=data["minecraft:recipe_shapeless"]
+            self.assertEqual(data["format_version"],"1.20.10")
+            self.assertEqual(recipe["description"]["identifier"],"recipe_addon:ruby_from_dust")
+            self.assertEqual(recipe["result"],{"item":custom,"count":1})
+            self.assertEqual(recipe["ingredients"],[{"item":"minecraft:redstone"},{"item":"minecraft:quartz"}])
+            self.assertEqual(result["runtime_status"],"NOT RUN")
+
+    def test_creates_shaped_recipe_with_exact_pattern_mapping(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as td:
+            workspace=Path(td); project=self._scaffold(workspace)
+            custom=self._create_item(workspace,"ruby_shard","Ruby Shard")
+            args={"project_directory":"recipe-addon","recipe_slug":"ruby_block","recipe_type":"shaped","result_identifier":custom,"pattern":["RR","RR"],"key_mapping":{"R":custom},"result_count":1,"target_game_version":"1.26.50"}
+            with patch.dict(os.environ,{"MINECRAFT_BEDROCK_WORKSPACE":td}):
+                result=server.call_tool("create_addon_recipe",args)
+            self.assertEqual(result["status"],"created")
+            data=json.loads((project/"behavior_packs/recipe-addon_BP/recipes/ruby_block.json").read_text(encoding="utf-8"))
+            recipe=data["minecraft:recipe_shaped"]
+            self.assertEqual(recipe["pattern"],["RR","RR"])
+            self.assertEqual(recipe["key"],{"R":{"item":custom}})
+
+    def test_custom_block_can_be_recipe_result(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as td:
+            workspace=Path(td); project=self._scaffold(workspace)
+            with patch.dict(os.environ,{"MINECRAFT_BEDROCK_WORKSPACE":td}):
+                block_result=server.call_tool("create_addon_block", {"project_directory":"recipe-addon","block_name":"Ruby Ore","block_slug":"ruby_ore","target_game_version":"1.26.50"})
+                self.assertEqual(block_result["status"],"created")
+                recipe_result=server.call_tool("create_addon_recipe", {"project_directory":"recipe-addon","recipe_slug":"ruby_ore_recipe","recipe_type":"shaped","result_identifier":"recipe_addon:ruby_ore","pattern":["S"],"key_mapping":{"S":"minecraft:stone"},"target_game_version":"1.26.50"})
+            self.assertEqual(recipe_result["status"],"created")
+            recipe=json.loads((project/"behavior_packs/recipe-addon_BP/recipes/ruby_ore_recipe.json").read_text(encoding="utf-8"))
+            self.assertEqual(recipe["minecraft:recipe_shaped"]["result"]["item"],"recipe_addon:ruby_ore")
+
+    def test_rejects_custom_result_or_ingredient_not_defined_in_project(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as td:
+            workspace=Path(td); project=self._scaffold(workspace)
+            with patch.dict(os.environ,{"MINECRAFT_BEDROCK_WORKSPACE":td}):
+                bad_result=server.call_tool("create_addon_recipe",{"project_directory":"recipe-addon","recipe_slug":"bad_result","recipe_type":"shapeless","result_identifier":"other_pack:missing_item","ingredients":["minecraft:stick"],"target_game_version":"1.26.50"})
+                bad_ingredient=server.call_tool("create_addon_recipe",{"project_directory":"recipe-addon","recipe_slug":"bad_ingredient","recipe_type":"shapeless","result_identifier":"minecraft:diamond","ingredients":["other_pack:missing_item"],"target_game_version":"1.26.50"})
+            self.assertEqual(bad_result["status"],"error")
+            self.assertIn("not defined",bad_result["error"]["message"])
+            self.assertEqual(bad_ingredient["status"],"error")
+            self.assertIn("not defined",bad_ingredient["error"]["message"])
+            recipe_dir=project/"behavior_packs/recipe-addon_BP/recipes"
+            self.assertEqual(list(recipe_dir.glob("*.json")),[])
+
+    def test_rejects_invalid_shaped_pattern_before_writing(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as td:
+            workspace=Path(td); self._scaffold(workspace)
+            cases=[
+                {"pattern":["AB","A"],"key_mapping":{"A":"minecraft:stone","B":"minecraft:dirt"}},
+                {"pattern":["AX"],"key_mapping":{"A":"minecraft:stone"}},
+                {"pattern":["  "],"key_mapping":{"A":"minecraft:stone"}},
+                {"pattern":["A"],"key_mapping":{"AA":"minecraft:stone"}},
+            ]
+            with patch.dict(os.environ,{"MINECRAFT_BEDROCK_WORKSPACE":td}):
+                for index,extra in enumerate(cases):
+                    with self.subTest(case=index):
+                        args={"project_directory":"recipe-addon","recipe_slug":f"bad_recipe_{index}","recipe_type":"shaped","result_identifier":"minecraft:diamond","target_game_version":"1.26.50",**extra}
+                        result=server.call_tool("create_addon_recipe",args)
+                        self.assertEqual(result["status"],"error")
+            recipe_dir=workspace/"recipe-addon/behavior_packs/recipe-addon_BP/recipes"
+            self.assertEqual(list(recipe_dir.glob("*.json")),[])
+
+    def test_recipe_collision_does_not_overwrite(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as td:
+            workspace=Path(td); project=self._scaffold(workspace)
+            recipe=project/"behavior_packs/recipe-addon_BP/recipes/ruby_from_dust.json"
+            recipe.write_text('{"keep":true}\n',encoding="utf-8")
+            with patch.dict(os.environ,{"MINECRAFT_BEDROCK_WORKSPACE":td}):
+                result=server.call_tool("create_addon_recipe",{"project_directory":"recipe-addon","recipe_slug":"ruby_from_dust","recipe_type":"shapeless","result_identifier":"minecraft:diamond","ingredients":["minecraft:stick"],"target_game_version":"1.26.50"})
+            self.assertEqual(result["status"],"error")
+            self.assertTrue(recipe.read_text(encoding="utf-8").startswith('{"keep":true}'))
+
+    def test_recipe_requires_scaffold_version_and_closed_write_tool_schema(self):
+        tool=server.TOOL_BY_NAME["create_addon_recipe"]
+        self.assertFalse(tool["annotations"]["readOnlyHint"])
+        self.assertFalse(tool["annotations"]["idempotentHint"])
+        self.assertFalse(tool["inputSchema"]["additionalProperties"])
+        normalized=server._validate_arguments("create_addon_recipe",{"project_directory":"recipe-addon","recipe_slug":"recipe_a","recipe_type":"shapeless","result_identifier":"minecraft:diamond","ingredients":["minecraft:stick"],"target_game_version":"1.26.50"})
+        self.assertEqual(normalized["result_count"],1)
+        self.assertIn("create_addon_recipe",server.WORKFLOW_INSTRUCTIONS)
 
 
 if __name__ == "__main__":

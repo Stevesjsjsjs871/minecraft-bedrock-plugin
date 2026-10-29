@@ -77,3 +77,59 @@ Benchmark-harness unit tests use synthetic test reports only. They validate eval
 | DIFF-003 | Graph edge changes from resolved to unresolved | Report reference regression with source pointer and confidence | Resource graph regression missed |
 | DIFF-004 | More than 100 changed files | Return at most 100 examples while retaining full count and `truncated` | Output size bound regression |
 | DIFF-005 | Input archives are compared | Both archives remain byte-for-byte unchanged and runtime is `NOT RUN` | Read-only safety contract regression |
+
+
+## 0.8.1 `diff_packs` regression coverage
+
+Tests cover duplicate edge multiplicity, newly unresolved references triggering review, severity de-escalation summary parity, malformed findings and file-diff bucket overlap.
+
+
+## 0.8.5: from-scratch project scaffold tests
+
+| ID | Test | Expected invariant | Failure meaning |
+|---|---|---|---|
+| CREATE-001 | New BP/RP scaffold | Creates a fresh project with both manifests and starter docs | Scaffold creation or file layout failed |
+| CREATE-002 | Manifest dependency | BP dependency UUID/version matches RP header UUID/version | Import activation linkage may be broken |
+| CREATE-003 | Manifest UUID uniqueness | Four header/module UUIDs are distinct valid UUIDs | Pack identity collision or malformed manifest |
+| CREATE-004 | Existing destination | Returns a clear error without changing pre-existing files | Existing project could be overwritten |
+| CREATE-005 | Directory-name confinement | Rejects absolute/nested/traversal paths; only workspace child name accepted | Potential out-of-workspace write |
+| CREATE-006 | Target version validation | Rejects malformed/non-three-part versions before writing | Manifest min_engine_version may be invalid |
+
+The scaffold tests validate file creation and static manifest relationships only. They do not show that Minecraft imports the project or that any gameplay feature works.
+
+
+| CRE-001 | New custom item slice | BP item JSON and RP atlas/localization created in a fresh scaffold; target version/dependency validated; collisions refused | Missing linkage, unsafe writes, overwritten files or fabricated runtime claims |
+
+
+## 0.8.8 content-authoring regression coverage
+
+| ID | Scenario | Expected invariant |
+|---|---|---|
+| ITEM-008 | Second item added when atlas and localization already contain unrelated entries | Existing metadata, atlas mappings, language comments and translations are preserved; new entries appear once. |
+| ITEM-009 | Atlas slug collision | Operation fails before creating BP item or modifying either shared RP file. |
+| ITEM-010 | Malformed localization line | Operation fails closed and atlas/language files remain byte-for-byte unchanged. |
+| ITEM-011 | Localization key collision | Operation fails without overwriting existing localization or creating BP item content. |
+
+
+## 0.8.9 block-authoring regression coverage
+
+| ID | Scenario | Expected invariant |
+|---|---|---|
+| BLOCK-001 | Create a block in a fresh linked BP/RP scaffold | BP block identifier and RP terrain atlas key agree; no fake PNG is created. |
+| BLOCK-002 | Add block to an existing valid terrain atlas | Unrelated metadata and texture mappings remain intact. |
+| BLOCK-003 | Terrain atlas key collision | Operation fails before creating or overwriting the BP block file. |
+| BLOCK-004 | Write-capable schema metadata | `create_addon_block` rejects unknown arguments and is not marked read-only/idempotent. |
+
+
+## 0.9.0 crafting recipe authoring regression coverage
+
+| ID | Scenario | Expected invariant |
+|---|---|---|
+| RECIPE-001 | Shapeless recipe with vanilla ingredients and an existing custom result | Valid `minecraft:recipe_shapeless` JSON is written with the result/count and namespaced recipe ID |
+| RECIPE-002 | Shaped recipe with a complete symbol map | Pattern, key map and ingredients are mutually consistent |
+| RECIPE-003 | Custom result or ingredient missing from project BP definitions | Operation fails before writing any recipe |
+| RECIPE-004 | Pattern rows have different widths, unknown symbols or unused keys | Operation fails before writing |
+| RECIPE-005 | Recipe target already exists | Existing bytes remain unchanged; no overwrite |
+| RECIPE-006 | Tool schema and defaults | Write-capable annotation, closed schema and default result count are correct |
+
+These are synthetic static tests; they do not verify recipe unlocking or crafting in the Minecraft engine.

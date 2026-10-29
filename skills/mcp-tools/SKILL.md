@@ -1,54 +1,68 @@
 ---
 name: mcp-tools
-description: Use when the Minecraft Bedrock Engineer local MCP tools are available and a pack needs a direct, structured, read-only audit or reference query.
+description: Use when Minecraft Bedrock Engineer local MCP tools are available to scaffold a BP/RP project, create starter items/blocks/recipes, or run structured read-only pack audits and reference queries.
 ---
 
-Workflow priority: choose tools by task, not by rote. For an unfamiliar archive or a request focused on archive integrity/path anomalies, call `inspect_archive` first. Use `audit_pack` for a general static audit; `compare_baseline` for before/after regressions; `get_resource_graph` for resource-reference questions; and `validate_manifest`, `audit_geometry`, or `audit_animation` for focused checks. Cite exact paths and evidence, distinguish confirmed findings from heuristics, state coverage gaps, and mark game/runtime behavior `NOT RUN` unless actually tested. Never modify or delete pack contents automatically.
+Workflow priority: for a genuinely new add-on, use `create_addon_project` first and verify its output; never target an existing directory. For an unfamiliar archive or path anomalies, call `inspect_archive` first. Use `audit_pack` for general static checks; `compare_baseline` for full before/after reports; `diff_packs` for concise regressions; `get_resource_graph` for cross-resource references; and `validate_manifest`, `audit_geometry`, or `audit_animation` for focused checks. Cite paths/evidence, distinguish confirmed findings from heuristics, disclose coverage gaps, and mark game/runtime behavior `NOT RUN` unless actually tested.
 
 # Minecraft Bedrock Engineer MCP tools
 
-The bundled MCP server is a local stdio process. It exposes eight read-only tools with closed JSON input schemas (`additionalProperties: false`), path and argument validation, structured JSON results/errors, and annotations identifying read-only behavior. The release version is read from package-root `VERSION`; analyzer/server and both plugin manifests are tested against this source.
+The bundled MCP server is a local stdio process. It exposes fourteen tools: four explicitly write-capable project/content creation tools and ten read-only analysis/reference tools. All have closed JSON schemas. The release version is read from package-root `VERSION`; analyzer/server and both plugin manifests are expected to use that same version.
 
-## Tools
+## Project creation tools
 
-- `audit_pack`: run the complete static analyzer on an archive.
-- `compare_baseline`: run the analyzer with a candidate and baseline archive and return the full report including file-level changes.
-- `diff_packs`: summarize file, finding, severity and reference regressions in a bounded report without applying a patch.
-- `get_resource_graph`: return the resource reference graph, optionally filtered by a fixed domain enum. Filters use actual edge fields: `source_file`, `source_pointer`, `target_domain`, `reference_kind` and `referenced_value`. An explicit `target_domain` is authoritative; string/path heuristics are used only when that field is absent, to prevent cross-domain leakage.
-- `validate_manifest`: return manifest/dependency checks and related findings.
-- `audit_geometry`: return geometry, bone, cube and UV checks/findings.
-- `audit_animation`: return animation/controller checks and related findings.
-- `inspect_archive`: list archive metadata and unsafe/duplicate path indicators without extracting files.
+- `create_addon_project`: creates a new directory directly under the configured workspace root. It writes a minimal `behavior_packs/<name>_BP` and `resource_packs/<name>_RP`, unique UUIDs, format-version-2 manifests, a BP dependency pointing to the RP header UUID, common content directories, `README.md`, and `PROJECT_STATE.md`. The default development target is supplied by the caller (normally Bedrock 1.26.50).
+- `create_addon_item`: writes one custom item into a project made by `create_addon_project`, including BP item JSON, RP atlas mapping and localization. Conservatively merges valid shared resources and refuses collisions/malformed state. Does not generate a PNG.
+- `create_addon_block`: writes a starter custom block definition and merges a texture key into a valid RP terrain atlas. Does not generate a PNG.
+- `create_addon_recipe`: writes one shaped or shapeless crafting-table recipe; custom identifiers must resolve to item/block definitions in the project BP.
+- All four creation tools refuse unsafe destinations and are limited to a validated project under the configured workspace root.
+- The scaffold creates structure only; the item, block and recipe tools generate limited static content slices, not runtime-tested features. They do not create entity graphs, image textures, custom geometry, animations, UI or script code.
+- Treat creation as a write operation and report its actual returned path and files. Do not infer that Minecraft can load it until validation/import has been performed.
 
-## Tool selection
+## Read-only analysis and reference tools
 
-- For creation-from-scratch or content-writing requests, state the boundary honestly: these eight MCP tools are read-only and cannot create packs or edit files. Consult `creator-tools-bridge` for an MCT handoff when a trusted local shell and an already-installed CLI are available; otherwise explain that the CLI must be set up locally with the user's authorization.
-- After MCT creates or changes content, use this plugin as the independent audit/regression layer. Preserve a baseline and return a reviewed diff; never auto-apply suggested repairs from audit findings.
-- For claims about finding quality, use `audit-benchmark` and reviewed real-pack labels. Synthetic regression tests are not a measurement of real-world precision.
+- `audit_pack`: full static analyzer report for an archive.
+- `compare_baseline`: full comparison report for candidate and baseline.
+- `diff_packs`: bounded summary of file, finding, severity and resource-reference changes.
+- `get_resource_graph`: static resource-reference graph by domain.
+- `validate_manifest`: manifest UUID/dependency checks.
+- `audit_geometry`: geometry, bones, cubes and UV checks.
+- `audit_animation`: animation/controller checks.
+- `inspect_archive`: archive metadata/path checks without extracting payloads.
 
-- Do not call all eight tools by default; invoke only those needed.
-- `inspect_archive` checks archive metadata and paths but does not read file payloads; it is not a substitute for `audit_pack`.
-- For an overall quality review, prefer `audit_pack`; add focused tools only when useful.
-- For regressions, compare the candidate to the supplied baseline before recommending changes.
-- Findings should include paths/evidence and confidence. Unresolved/dynamic references and heuristics are not confirmed defects.
+## Content authoring after scaffold
 
-## Safety and interpretation
+Use the built-in `create_addon_item`, `create_addon_block`, and `create_addon_recipe` tools for their supported starter templates. For entities, custom geometry, textures, animations, UI, or script features, prefer supported Mojang Creator Tools capabilities when actually available. If using an approved local CLI, verify its installed version and help before create/add/validate/render/export workflows. Do not install, download, deploy, or overwrite content silently. Be explicit when a requested authoring feature exceeds the available tools.
 
-The server does not extract archives, execute pack scripts, edit files, delete resources, launch Minecraft, or make network requests. Archive paths must resolve inside the configured workspace (defaults to current working directory); set `MINECRAFT_BEDROCK_WORKSPACE` to an explicit workspace. ZIP-compatible inputs are limited to `.mcaddon`, `.mcpack`, `.mcworld`, and `.zip`.
+## Evidence and safety
 
-The MCP wrapper and standalone CLI both call package-root `archive_safety.py` before reading payloads. Shared limits: 256 MiB compressed archive, 50,000 archive entries, 128 MiB per regular file member, and 512 MiB total declared uncompressed regular-file payload. These are resource-safety limits, not Minecraft format limits. `inspect_archive` reports regular-file `member_count` separately from total `entry_count`. The analyzer can report heuristic or unresolved references; such reports are not runtime proof.
+The static analyzer does not execute pack scripts, launch Minecraft or prove runtime behavior. For existing projects, inspect before editing and preserve user functionality. Never automatically delete or rewrite resources from an audit finding. For real-world quality claims, use `audit-benchmark` with independently reviewed licensed cases; synthetic tests are not real-pack accuracy metrics.
 
-The package contains a local stdio server, not a hosted remote MCP endpoint. Uploading this package does not deploy a cloud service or make the local process available on ChatGPT web/mobile by itself. The target host must support and launch local stdio MCP plugins. On Windows, change `python3` to the configured Python executable if needed.
-
-## Report validation
-
-The analyzer report schema is `skills/automated-validation/references/report-schema.json` (JSON Schema Draft 2020-12). Validate a report with `python skills/automated-validation/scripts/validate_report.py report.json`. The helper and regression harness require `jsonschema`. A schema-valid report is structurally consistent, not proof that resources work in game.
-
-## Error handling
-
-Successful analyses return structured report objects containing checks, findings, evidence, coverage and runtime status. Invalid arguments, unavailable files, invalid archives, timeouts and internal errors return structured errors instead of silently returning empty findings. Runtime status remains `NOT RUN` unless actual runtime testing occurred.
+The MCP server is a local stdio process, not a hosted remote service. It is available only in hosts that launch local stdio MCP plugins and have access to the configured workspace. On Windows, the `python3` command may need to be configured to the installed Python executable.
 
 
-## `diff_packs` 0.8.0
+## Mojang sample search and read (0.8.6)
 
-Use `diff_packs` when the user asks what changed between two pack versions or which regressions may have been introduced. It runs read-only audits of both archives and returns bounded lists for file additions/removals/modifications, finding deltas, severity changes and reference-graph regressions. Each list reports its full count and whether the displayed sample is truncated. Newly unresolved links and resolution regressions may be heuristic; inspect their confidence, source file and JSON pointer before treating them as defects. `HOLD` means current high-severity findings were detected, while `REVIEW` requires manual review of medium findings, removals, new findings or reference regressions. All runtime checks remain `NOT RUN`; the tool never applies patches or modifies files. Use `compare_baseline` when the full raw analyzer report is required.
+The bundled `mojang-samples-index.json.gz` is an index of path, size, SHA-256 where available, resource category and a bounded list of literal identifiers from the user-provided `bedrock-samples` archive. It identifies the source archive by SHA-256 and is labelled 1.26.50.4. Use `search_mojang_samples` with a query such as `minecraft:apple`, `geometry goat`, `recipe emerald`, or a filename. Results are scored and capped at 20. If `bundled_reference` is present, `read_mojang_sample` can return that curated example without an external archive. For other indexed text files, put the original ZIP inside the configured workspace and supply its `archive_path`. The ZIP is checked against workspace and size/path constraints; no extraction occurs. Returned content is capped at 12,000 characters. A source hash mismatch is surfaced rather than silently treated as a verified match.
+
+The index is not a full schema validator and does not imply runtime compatibility. The full 169 MB source ZIP is not packaged. Do not bundle vanilla assets into generated add-ons just because they appear in the index; respect Mojang's license and the Minecraft EULA.
+
+
+## Item authoring 0.8.7
+
+Use `create_addon_item` after a clean scaffold. It creates a namespaced BP item JSON, an RP `textures/item_texture.json` mapping, and an `en_US.lang` display-name key. Existing atlas/lang files are refused rather than rewritten; an optional existing PNG is signature-checked and mapped, but no PNG is generated. Item rendering remains `NOT RUN` until a valid texture is supplied and Minecraft is tested.
+
+
+## Item authoring 0.8.8
+
+`create_addon_item` can now conservatively merge a new texture-atlas key into a valid existing `item_texture.json` and append a new `en_US.lang` entry while retaining unrelated entries and comments. Malformed JSON, malformed localization lines, duplicate keys, an existing key/slug collision, unsafe paths, or non-regular shared files are rejected before writing any item definition. Generated outputs are staged and installed through same-directory atomic replacement; rollback is attempted if an installation step fails. Texture image generation is not included: a valid PNG at the expected path is still required for a correctly rendered in-game icon.
+
+
+## Block authoring 0.8.9
+
+`create_addon_block` creates a starter custom block JSON and adds its texture key to RP `textures/terrain_texture.json`. Existing valid `texture_data` entries and unrelated atlas metadata are preserved; malformed JSON and duplicate texture keys are rejected before the BP definition is written. A texture PNG is not synthesized; supply it at `resource_packs/<project>_RP/textures/blocks/<block_slug>.png` for rendering. Static output does not establish in-game compatibility.
+
+
+## Crafting recipe authoring 0.9.0
+
+`create_addon_recipe` writes one shaped or shapeless crafting-table recipe into the existing scaffold. For shaped recipes, supply `pattern` and `key_mapping`; each row must be 1–3 characters, rows must have equal width, and mapping keys must exactly match non-space pattern symbols. For shapeless recipes, supply 1–9 ingredient identifiers. Custom result and ingredient IDs must be defined by an item/block JSON in the same BP; `minecraft:` IDs are treated as vanilla references. The generator checks BP/RP linkage/version and refuses recipe-file collisions. It does not create recipe ingredients or textures, and cannot prove recipe unlock/engine behavior. Game tests remain `NOT RUN`.

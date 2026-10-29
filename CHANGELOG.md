@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.0
+- Synchronized GitHub source to the published Minecraft Bedrock Engineer 0.9.0 release.
+- Added the write-capable `create_addon_recipe` tool for shaped and shapeless crafting-table recipes, including pattern/key-map validation, ingredient/result identifier checks, output counts, collision protection, and BP/RP scaffold checks.
+- Added recipe-authoring skill guidance and regression coverage; local targeted authoring tests passed (22 tests) and Mojang Samples index tests passed (6 tests).
+- Full local MCP regression remains partially unverified because the staging copy of the analyzer is a stub; the existing analyzer files in this repository are preserved. Minecraft runtime crafting was not tested.
+
 ## 0.8.0
 - Synchronized the repository to the Minecraft Bedrock Engineer 0.8.0 Plugin Creator source.
 - Added the eighth read-only MCP tool, `diff_packs`, for file changes, finding deltas, severity changes, and resource-graph regressions between two archives.

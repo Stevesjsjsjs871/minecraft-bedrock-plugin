@@ -1,8 +1,8 @@
 {
   "interface": {
     "displayName": "Minecraft Bedrock Engineer",
-    "shortDescription": "Audit Bedrock packs and models",
-    "longDescription": "A version-aware Minecraft Bedrock engineering toolkit: inspect BP/RP projects, validate manifests, audit geometry and animations, produce evidence-backed resource graphs, compare baselines, and run strict read-only local MCP tools. Coverage is explicit; static analysis is not proof of in-game behavior.",
+    "shortDescription": "Create & audit Bedrock add-ons",
+    "longDescription": "Create new Minecraft Bedrock BP/RP projects, generate starter items, blocks and shaped/shapeless crafting recipes, reuse version-labelled Mojang samples, and audit packs with evidence-based static checks.",
     "developerName": "Private project",
     "category": "Developer tools",
     "capabilities": [
@@ -11,14 +11,14 @@
       "Interactive"
     ],
     "defaultPrompt": [
-      "Continue my existing Minecraft Bedrock 1.26.50 project. Inspect actual files and verified project state, make the smallest safe implementation, preserve existing functionality, run available checks, compare against baseline, and report what was and was not verified.",
+      "Create a new Minecraft Bedrock add-on from scratch or implement a feature in my clean project. Search version-matched samples, make real project file changes only within the selected project, validate the generated BP/RP resources, and report what was and was not verified.",
       "Audit this Bedrock add-on or candidate release. Check archive integrity, BP/RP manifests and dependency links, JSON/JavaScript, resource references, identifiers, and regressions against a baseline. Provide evidence and severity; do not delete resources.",
       "Research this Minecraft Bedrock feature for the exact target version. Prioritize official documentation and matching Mojang samples, verify API and format compatibility, compare viable implementations, cite sources, then implement if I asked for implementation."
     ]
   },
   "name": "minecraft-bedrock-engineer",
-  "version": "0.8.0",
-  "description": "A version-aware Minecraft Bedrock engineering toolkit with read-only local MCP tools for pack audits, manifests, geometry, animations, resource graphs and baseline comparisons.",
+  "version": "0.9.0",
+  "description": "A Minecraft Bedrock development toolkit for creating BP/RP projects, generating items, blocks and crafting recipes, searching version-labelled Mojang samples, and auditing packs with evidence-based checks.",
   "author": {
     "name": "Plugin owner"
   },
@@ -42,7 +42,25 @@
     "read-only-tools",
     "real-pack-benchmark",
     "minecraft-creator-tools",
-    "audit-quality"
+    "audit-quality",
+    "from-scratch",
+    "project-scaffolding",
+    "addon-creation",
+    "linked-behavior-resource-packs",
+    "mojang-samples-index",
+    "sample-search",
+    "versioned-examples",
+    "item-authoring",
+    "block-authoring",
+    "recipe-authoring",
+    "geometry-reference",
+    "item-generation",
+    "content-authoring",
+    "texture-atlas",
+    "localization-generation",
+    "shaped-recipe",
+    "shapeless-recipe",
+    "crafting-table"
   ],
   "skills": "./skills",
   "mcpServers": "./.mcp.json"

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import gzip
+import hashlib
 import json
 import os
 import re
@@ -406,8 +407,104 @@ def _validate_arguments(name: str, args: Any) -> dict[str, Any]:
     return normalized
 
 
+def _sample_category(path: str) -> str:
+    """Classify version-labelled examples shipped with the source tree."""
+    for prefix, category in (
+        ("resource_pack/models/entity/", "geometry"),
+        ("resource_pack/animations/", "animation"),
+        ("resource_pack/entity/", "client_entity"),
+        ("behavior_pack/items/", "item"),
+        ("behavior_pack/blocks/", "block"),
+        ("behavior_pack/recipes/", "recipe"),
+    ):
+        if path.startswith(prefix):
+            return category
+    return "other"
+
+
+def _sample_identifiers(value: Any) -> list[str]:
+    """Harvest literal identifiers from curated JSON examples."""
+    found: set[str] = set()
+    def visit(node: Any, depth: int = 0) -> None:
+        if depth > 16:
+            return
+        if isinstance(node, dict):
+            for key, child in node.items():
+                if key == "identifier" and isinstance(child, str) and re.fullmatch(r"[A-Za-z0-9_.:-]{1,160}", child):
+                    found.add(child)
+                elif key in {"geometry", "animation", "animation_controller", "render_controller"}:
+                    if isinstance(child, str) and re.fullmatch(r"[A-Za-z0-9_.:-]{1,160}", child):
+                        found.add(child)
+                    elif isinstance(child, dict):
+                        found.update(v for v in child.values() if isinstance(v, str) and re.fullmatch(r"[A-Za-z0-9_.:-]{1,160}", v))
+                visit(child, depth + 1)
+        elif isinstance(node, list):
+            for child in node[:5000]:
+                visit(child, depth + 1)
+    visit(value)
+    return sorted(found)[:500]
+
+
+def _build_curated_mojang_sample_index() -> dict[str, Any]:
+    """Build a small, honest fallback when the generated full index is not packaged."""
+    metadata_path = MOJANG_SAMPLE_REFERENCE_ROOT / "INDEX_METADATA.json"
+    try:
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        reference_root = MOJANG_SAMPLE_REFERENCE_ROOT.resolve(strict=True)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"curated Mojang sample references are unavailable or invalid: {exc}") from exc
+    if not isinstance(metadata, dict) or not isinstance(metadata.get("target_version"), str):
+        raise ValueError("curated Mojang sample metadata has an invalid shape")
+
+    entries: list[dict[str, Any]] = []
+    for sample_path, bundled_rel in _BUNDLED_SAMPLE_FILES.items():
+        try:
+            file_path = (reference_root / bundled_rel).resolve(strict=True)
+            file_path.relative_to(reference_root)
+            if not file_path.is_file() or file_path.stat().st_size > MAX_SAMPLE_READ_BYTES:
+                continue
+            raw = file_path.read_bytes()
+            content = raw.decode("utf-8")
+        except (OSError, RuntimeError, ValueError, UnicodeDecodeError):
+            continue
+        parsed: Any = None
+        json_parsed = False
+        if file_path.suffix.lower() == ".json":
+            try:
+                parsed = json.loads(content)
+                json_parsed = isinstance(parsed, (dict, list))
+            except json.JSONDecodeError:
+                pass
+        entries.append({
+            "path": sample_path,
+            "category": _sample_category(sample_path),
+            "size_bytes": len(raw),
+            "sha256": hashlib.sha256(raw).hexdigest(),
+            "identifiers": _sample_identifiers(parsed) if json_parsed else [],
+            "json_parsed": json_parsed,
+            "search_terms": sorted(set(re.findall(r"[a-z0-9_.:-]{3,}", content.lower())))[:12000],
+        })
+    if not entries:
+        raise ValueError("no readable curated Mojang sample examples are available")
+    return {
+        "target_version": metadata["target_version"],
+        "source": "mojang_bedrock_samples_curated_fallback",
+        "archive_sha256": metadata.get("zip_sha256"),
+        "archive_stats": {
+            "source_archive_entry_count": metadata.get("entry_count"),
+            "source_archive_indexed_count": metadata.get("indexed_count"),
+            "curated_fallback_entry_count": len(entries),
+            "full_index_available": False,
+        },
+        "index_mode": "curated_fallback",
+        "entries": entries,
+    }
+
+
 def _load_mojang_sample_index() -> dict[str, Any]:
-    """Load the bundled, compressed, metadata-only index; never access the network."""
+    """Load the full offline index, or fall back to packaged curated examples."""
+    if not MOJANG_SAMPLE_INDEX.is_file():
+        return _build_curated_mojang_sample_index()
     try:
         with gzip.open(MOJANG_SAMPLE_INDEX, "rt", encoding="utf-8") as stream:
             payload = json.load(stream)
@@ -415,6 +512,7 @@ def _load_mojang_sample_index() -> dict[str, Any]:
         raise ValueError(f"bundled Mojang sample index is unavailable or invalid: {exc}") from exc
     if not isinstance(payload, dict) or not isinstance(payload.get("entries"), list):
         raise ValueError("bundled Mojang sample index has an invalid shape")
+    payload.setdefault("index_mode", "full_index")
     return payload
 
 
@@ -436,11 +534,15 @@ def _search_mojang_samples(args: dict[str, Any]) -> dict[str, Any]:
         category_text = str(entry.get("category", "")).lower()
         ids = entry.get("identifiers") if isinstance(entry.get("identifiers"), list) else []
         id_text = " ".join(v.lower() for v in ids if isinstance(v, str))
+        search_terms = entry.get("search_terms") if isinstance(entry.get("search_terms"), list) else []
+        search_text = " ".join(v.lower() for v in search_terms if isinstance(v, str))
         score = 0
         if query in path_text:
             score += 24
         if query in id_text:
             score += 30
+        if search_text and query in search_text:
+            score += 8
         matched = 0
         for token in tokens:
             token_match = False
@@ -459,6 +561,9 @@ def _search_mojang_samples(args: dict[str, Any]) -> dict[str, Any]:
                     score += 3
             if token in id_text:
                 score += 10
+                token_match = True
+            if token in search_text:
+                score += 2
                 token_match = True
             if token in category_text:
                 score += 3
@@ -490,6 +595,7 @@ def _search_mojang_samples(args: dict[str, Any]) -> dict[str, Any]:
         "source": payload.get("source"),
         "source_archive_sha256": payload.get("archive_sha256"),
         "index_stats": payload.get("archive_stats"),
+        "index_mode": payload.get("index_mode", "full_index"),
         "total_matches": total,
         "truncated": total > limit,
         "results": [result for _, result in matches[:limit]],
@@ -566,6 +672,7 @@ def _read_mojang_sample(args: dict[str, Any]) -> dict[str, Any]:
         "category": indexed.get("category"),
         "target_version": payload.get("target_version"),
         "source_archive_sha256": payload.get("archive_sha256"),
+        "index_mode": payload.get("index_mode", "full_index"),
         "content_sha256": digest,
         "content_hash_matches_index": digest == indexed_digest if indexed_digest else None,
         "source": source,

@@ -8,7 +8,7 @@ import argparse, hashlib, json, re, sys, zipfile
 from pathlib import PurePosixPath
 from typing import Any
 
-TOOL_VERSION = "0.6.3"
+TOOL_VERSION = "0.6.4"
 PATH_KEYS = {"texture", "texture_path", "path", "file", "sound", "particle_effect"}
 IDENTIFIER_KEYS = {"geometry", "animation", "animations", "animation_controller", "animation_controllers", "render_controllers", "materials"}
 

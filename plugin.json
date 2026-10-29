@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "minecraft-bedrock-engineer",
-  "version": "1.0.6",
+  "version": "1.0.9",
   "description": "A Minecraft Bedrock development toolkit for creating BP/RP projects, generating items, blocks, crafting recipes and entities, optionally orchestrating an installed MCT CLI for validation and safe staged entity generation, searching version-labelled Mojang samples, and auditing packs with evidence-based checks.",
   "author": {
     "name": "Plugin owner"
@@ -53,7 +53,12 @@
     "release-readiness",
     "validation-runbook",
     "mcp-contract-testing",
-    "mcp-registry-integrity"
+    "mcp-registry-integrity",
+    "procedural-texture",
+    "pixel-art",
+    "png-generator",
+    "ore-veins",
+    "wood-grain"
   ],
   "extensions": {
     "com.openai": {

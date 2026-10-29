@@ -7,7 +7,7 @@ Workflow priority: for a genuinely new add-on, use `create_addon_project` first 
 
 # Minecraft Bedrock Engineer MCP tools
 
-The bundled MCP server is a local stdio process. It exposes fourteen tools: four explicitly write-capable project/content creation tools and ten read-only analysis/reference tools. All have closed JSON schemas. The release version is read from package-root `VERSION`; analyzer/server and both plugin manifests are expected to use that same version.
+The bundled MCP server is a local stdio process. It exposes twenty tools: seven write-capable authoring tools (project, content, entity and texture generation) and thirteen read-only analysis/reference tools. All have closed JSON schemas. The release version is read from package-root `VERSION`; analyzer/server and both plugin manifests are expected to use that same version.
 
 ## Project creation tools
 
@@ -16,7 +16,7 @@ The bundled MCP server is a local stdio process. It exposes fourteen tools: four
 - `create_addon_block`: writes a starter custom block definition and merges a texture key into a valid RP terrain atlas. Does not generate a PNG.
 - `create_addon_recipe`: writes one shaped or shapeless crafting-table recipe; custom identifiers must resolve to item/block definitions in the project BP.
 - All four creation tools refuse unsafe destinations and are limited to a validated project under the configured workspace root.
-- The scaffold creates structure only; the item, block and recipe tools generate limited static content slices, not runtime-tested features. They do not create entity graphs, image textures, custom geometry, animations, UI or script code.
+- The scaffold creates structure only; item, block, recipe and entity tools generate limited static content slices, not runtime-tested features. The generate_texture tool creates procedural PNGs only; it does not paint UV-aware entity layouts, generate AI images, create animations/UI/scripts, or prove runtime compatibility.
 - Treat creation as a write operation and report its actual returned path and files. Do not infer that Minecraft can load it until validation/import has been performed.
 
 ## Read-only analysis and reference tools
@@ -32,7 +32,14 @@ The bundled MCP server is a local stdio process. It exposes fourteen tools: four
 
 ## Content authoring after scaffold
 
-Use the built-in `create_addon_item`, `create_addon_block`, and `create_addon_recipe` tools for their supported starter templates. For entities, custom geometry, textures, animations, UI, or script features, prefer supported Mojang Creator Tools capabilities when actually available. If using an approved local CLI, verify its installed version and help before create/add/validate/render/export workflows. Do not install, download, deploy, or overwrite content silently. Be explicit when a requested authoring feature exceeds the available tools.
+Use the built-in `create_addon_item`, `create_addon_block`, `create_addon_recipe`, `create_addon_entity`, and `generate_texture` tools for their supported starter templates. For advanced entity geometry, animations, UI, or script features, prefer supported Mojang Creator Tools capabilities when actually available. If using an approved local CLI, verify its installed version and help before create/add/validate/render/export workflows. Do not install, download, deploy, or overwrite content silently. Be explicit when a requested authoring feature exceeds the available tools.
+
+## Procedural texture authoring
+
+- `generate_texture` accepts an existing `project_directory` and an RP-relative `output_path` under `textures/`, such as `textures/blocks/ruby_ore.png`, plus dimensions, style, RGB colors, seed and alpha.
+- Supported styles: `pixel_noise`, `checker`, `stripes`, `solid`, `vertical_gradient`, `horizontal_gradient`, `brick`, `stone_noise`, `ore_veins` and `wood_grain`.
+- The tool validates the linked BP/RP scaffold, requires existing parent folders, rejects traversal and symlink escapes, and refuses to overwrite an existing texture. Output is deterministic and atomic.
+- This is a procedural starter generator, not AI image synthesis or a UV-aware entity texture painter. Minecraft import/rendering remains `NOT RUN` until tested in game.
 
 ## Evidence and safety
 

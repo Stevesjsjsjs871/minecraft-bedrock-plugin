@@ -1,10 +1,12 @@
 # Changelog
 
 ## 0.9.0
-- Synchronized GitHub source to the published Minecraft Bedrock Engineer 0.9.0 release.
+- Synchronized GitHub source to the Minecraft Bedrock Engineer 0.9.0 source release.
 - Added the write-capable `create_addon_recipe` tool for shaped and shapeless crafting-table recipes, including pattern/key-map validation, ingredient/result identifier checks, output counts, collision protection, and BP/RP scaffold checks.
-- Added recipe-authoring skill guidance and regression coverage; local targeted authoring tests passed (22 tests) and Mojang Samples index tests passed (6 tests).
-- Full local MCP regression remains partially unverified because the staging copy of the analyzer is a stub; the existing analyzer files in this repository are preserved. Minecraft runtime crafting was not tested.
+- Added recipe-authoring skill guidance and regression coverage; targeted authoring tests (22 tests) and Mojang Samples index tests (6 tests) were reported as passing in the development notes.
+- **Verification limitation:** the complete MCP regression suite has not been confirmed against the full repository source in this session. The analyzer files were preserved; do not interpret a partial/stubbed staging test as a full pass.
+- **Minecraft runtime:** recipe unlocking, crafting, and rendering were not tested in-game.
+- The repository source version is `0.9.0`; publishing a GitHub Release/tag is a separate step and is not confirmed by this changelog entry.
 
 ## 0.8.0
 - Synchronized the repository to the Minecraft Bedrock Engineer 0.8.0 Plugin Creator source.
@@ -39,13 +41,4 @@
 
 ## 0.6.4
 - Added regression-evals skill and a standard-library regression harness.
-- Added synthetic positive and negative analyzer scenarios.
-
-## 0.6.3
-- Expanded resource-reference indexing and graph coverage metadata.
-
-## 0.6.2
-- Added initial cross-resource reference graph support.
-
-## 0.5.0
-- Added geometry, UV, texture and animation static checks.
+- Added synthetic positive and negative regression scenarios for the analyzer.

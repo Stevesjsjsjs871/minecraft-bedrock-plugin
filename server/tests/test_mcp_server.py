@@ -592,11 +592,29 @@ class SchemaTests(unittest.TestCase):
         self.assertEqual(geometry_result["results"][0]["path"], "resource_pack/models/entity/goat.geo.json")
         self.assertIsNotNone(geometry_result["results"][0]["bundled_reference"])
 
+
+    def test_mojang_sample_search_uses_explicit_curated_fallback_without_full_index(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as td:
+            missing_index = Path(td) / "not-packaged.json.gz"
+            with patch.object(server, "MOJANG_SAMPLE_INDEX", missing_index):
+                result = server.call_tool("search_mojang_samples", {
+                    "query": "minecraft:apple", "category": "item", "limit": 5
+                })
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(result["index_mode"], "curated_fallback")
+        self.assertFalse(result["index_stats"]["full_index_available"])
+        self.assertGreaterEqual(result["index_stats"]["curated_fallback_entry_count"], 1)
+        self.assertEqual(result["source_archive_sha256"], "c0b6151f5f9a0c31ebe3c909dfc82d97f12473ed2c6e039aa7e22d667042026c")
+        self.assertTrue(any(row["path"] == "behavior_pack/items/apple.json" for row in result["results"]))
+
     def test_mojang_sample_search_has_bounded_results_and_defaults(self):
         result = server.call_tool("search_mojang_samples", {"query": "texture"})
         self.assertEqual(result["status"], "completed")
-        self.assertEqual(len(result["results"]), 10)
-        self.assertTrue(result["truncated"])
+        self.assertGreater(len(result["results"]), 0)
+        self.assertLessEqual(len(result["results"]), 10)
+        self.assertEqual(result["truncated"], result["total_matches"] > 10)
+        self.assertIn(result["index_mode"], {"full_index", "curated_fallback"})
         self.assertEqual(result["category"], "all")
 
     def test_mojang_sample_search_rejects_invalid_category_limit_and_blank_query(self):

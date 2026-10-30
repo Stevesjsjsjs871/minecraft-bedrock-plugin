@@ -1,5 +1,8 @@
 # Plugin package changelog
 
+## Unreleased
+- Animation-controller states now accept Bedrock animation blend entries as single-key alias-to-Molang objects as well as plain alias strings. The alias must resolve in the linked client entity; blend expressions receive bounded text validation only and are not executed.
+
 ## 1.1.1 — Animation-controller state machines
 - Adds `minecraft-bedrock-animation-controller-authoring` as a dedicated stdio MCP server.
 - Adds `create_animation_controller` to generate RP state-machine JSON from an initial state, state animation aliases, transition destinations/conditions, optional entry/exit commands and blend durations.

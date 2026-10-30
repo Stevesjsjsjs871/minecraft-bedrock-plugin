@@ -59,6 +59,8 @@ class ContractTests(unittest.TestCase):
         self.assertFalse(creator["annotations"]["readOnlyHint"])
         self.assertTrue(validator["annotations"]["readOnlyHint"])
         self.assertFalse(creator["annotations"]["destructiveHint"])
+        animation_items = creator["inputSchema"]["properties"]["states"]["items"]["properties"]["animations"]["items"]
+        self.assertEqual({item["type"] for item in animation_items["anyOf"]}, {"string", "object"})
 
     def test_initialize_and_tools_list_protocol(self):
         init = server.handle_message({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-03-26"}})
@@ -116,6 +118,65 @@ class ControllerCreationTests(unittest.TestCase):
                 {"walking": "query.modified_move_speed > 0.01"},
                 {"idle": "query.is_sprinting"},
             ])
+
+    def test_blended_animation_alias_object_is_preserved_and_counted(self):
+        with tempfile.TemporaryDirectory() as td:
+            project = scaffold(Path(td))
+            args = valid_args()
+            args["states"][0]["animations"] = ["idle", {"walk": "query.modified_move_speed"}]
+            with patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": td}):
+                result = server.call_tool("create_animation_controller", args)
+                checked = server.call_tool("validate_animation_controller", {
+                    "project_directory": "forest-addon",
+                    "controller_file": "animation_controllers/forest_guardian.animation_controllers.json",
+                    "client_entity_file": "entity/forest_guardian.entity.json",
+                    "animation_alias": "forest_guardian",
+                })
+            self.assertEqual(result["status"], "created")
+            controller_path = project / "resource_packs/forest-addon_RP/animation_controllers/forest_guardian.animation_controllers.json"
+            controller = json.loads(controller_path.read_text(encoding="utf-8"))
+            definition = controller["animation_controllers"][result["controller_identifier"]]
+            self.assertEqual(definition["states"]["idle"]["animations"], ["idle", {"walk": "query.modified_move_speed"}])
+            self.assertEqual(result["molang_expressions"], 3)
+            self.assertEqual(checked["status"], "valid")
+            self.assertEqual(checked["molang_expressions_inspected"], 3)
+            self.assertEqual(checked["referenced_animation_aliases"], ["idle", "walk"])
+
+    def test_rejects_blended_animation_with_multiple_aliases_without_writes(self):
+        with tempfile.TemporaryDirectory() as td:
+            project = scaffold(Path(td))
+            args = valid_args()
+            args["states"][0]["animations"] = [{"idle": "1.0", "walk": "1.0"}]
+            with patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": td}):
+                result = server.call_tool("create_animation_controller", args)
+            self.assertEqual(result["status"], "error")
+            self.assertIn("exactly one animation alias", result["error"]["message"])
+            controller_path = project / "resource_packs/forest-addon_RP/animation_controllers/forest_guardian.animation_controllers.json"
+            self.assertFalse(controller_path.exists())
+
+    def test_rejects_missing_alias_in_blended_animation_without_writes(self):
+        with tempfile.TemporaryDirectory() as td:
+            project = scaffold(Path(td))
+            args = valid_args()
+            args["states"][0]["animations"] = [{"missing": "1.0"}]
+            with patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": td}):
+                result = server.call_tool("create_animation_controller", args)
+            self.assertEqual(result["status"], "error")
+            self.assertIn("not defined", result["error"]["message"])
+            controller_path = project / "resource_packs/forest-addon_RP/animation_controllers/forest_guardian.animation_controllers.json"
+            self.assertFalse(controller_path.exists())
+
+    def test_rejects_invalid_blend_expression_without_writes(self):
+        with tempfile.TemporaryDirectory() as td:
+            project = scaffold(Path(td))
+            args = valid_args()
+            args["states"][0]["animations"] = [{"walk": "query.foo\nquery.bar"}]
+            with patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": td}):
+                result = server.call_tool("create_animation_controller", args)
+            self.assertEqual(result["status"], "error")
+            self.assertIn("Molang string", result["error"]["message"])
+            controller_path = project / "resource_packs/forest-addon_RP/animation_controllers/forest_guardian.animation_controllers.json"
+            self.assertFalse(controller_path.exists())
 
     def test_rejects_transition_array_entries_with_multiple_targets_without_writes(self):
         with tempfile.TemporaryDirectory() as td:
@@ -279,6 +340,27 @@ class ControllerValidationTests(unittest.TestCase):
                 })
             self.assertEqual(checked["status"], "error")
             self.assertIn("missing state", checked["error"]["message"])
+
+    def test_validator_rejects_missing_blend_animation_alias(self):
+        with tempfile.TemporaryDirectory() as td:
+            project = scaffold(Path(td))
+            with patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": td}):
+                created = server.call_tool("create_animation_controller", valid_args())
+            self.assertEqual(created["status"], "created")
+            controller_path = project / "resource_packs/forest-addon_RP/animation_controllers/forest_guardian.animation_controllers.json"
+            data = json.loads(controller_path.read_text(encoding="utf-8"))
+            definition = data["animation_controllers"][created["controller_identifier"]]
+            definition["states"]["idle"]["animations"] = [{"missing": "query.modified_move_speed"}]
+            controller_path.write_text(json.dumps(data), encoding="utf-8")
+            with patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": td}):
+                checked = server.call_tool("validate_animation_controller", {
+                    "project_directory": "forest-addon",
+                    "controller_file": "animation_controllers/forest_guardian.animation_controllers.json",
+                    "client_entity_file": "entity/forest_guardian.entity.json",
+                    "animation_alias": "forest_guardian",
+                })
+            self.assertEqual(checked["status"], "error")
+            self.assertIn("missing client-entity animation alias", checked["error"]["message"])
 
     def test_symlinked_project_and_path_traversal_are_rejected(self):
         with tempfile.TemporaryDirectory() as td, tempfile.TemporaryDirectory() as outside:

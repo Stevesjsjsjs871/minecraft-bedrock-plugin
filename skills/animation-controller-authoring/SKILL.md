@@ -12,7 +12,7 @@ description: Use when creating or auditing Minecraft Bedrock animation controlle
 
 ## Controller model
 - An animation controller is an RP state machine under `animation_controllers/` with one or more named states and an `initial_state`.
-- Each state's `animations` list references aliases exposed by the linked client entity's `description.animations`, not arbitrary file paths.
+- Each state's `animations` list references aliases exposed by the linked client entity's `description.animations`, not arbitrary file paths. Entries may be plain alias strings or single-key objects such as `{ "walk": "query.modified_move_speed" }` to blend an animation by a Molang expression.
 - `transitions` map destination state names to Molang conditions. Every target must exist in the same controller.
 - `on_entry` and `on_exit` values are Molang command strings. `blend_transition` is a numeric blend duration; check exact engine semantics for the target build.
 - The client entity binds the controller identifier under `description.animations` and activates its alias through `description.scripts.animate` (either unconditional alias or alias-to-Molang mapping).
@@ -28,12 +28,17 @@ description: Use when creating or auditing Minecraft Bedrock animation controlle
 ## Safety and limits
 - Never overwrite an existing controller file or remap an existing client-entity alias to a different resource.
 - Reject symlinks, path traversal, malformed/duplicate-key JSON, unresolved state targets and animation aliases not present on the client entity.
-- Molang strings receive bounded text validation only. This is not a Molang parser or interpreter.
+- Molang strings receive bounded text validation only, including animation blend expressions. This is not a Molang parser or interpreter.
 - The authoring tool updates two RP files. It stages the client-entity replacement, refuses concurrent changes detected during the operation, and removes the newly created controller if the client-entity update fails.
 
 ## Required report
 Include target version, project/entity/controller identifiers, initial state, states and transitions count, referenced animation aliases, files created/updated, checks actually run, Molang/runtime caveats and in-game test plan. Mark Minecraft runtime behavior `NOT RUN` unless it was actually tested.
 
+
+## Animation blending and transition ordering
+- Animation entries may be alias strings or single-key alias-to-Molang objects. The alias must already exist in the client entity; the expression is bounded and checked for printable text only.
+- Example: `["base_pose", { "walk": "query.modified_move_speed" }]` preserves the blend expression in generated Bedrock JSON.
+- `validate_animation_controller` inspects the alias and expression shape but does not execute Molang.
 
 ## Transition ordering and input compatibility
 - Prefer an ordered array of one-key objects, for example `[{ "walking": "query.modified_move_speed > 0.01" }, { "idle": "query.is_sprinting" }]`. Bedrock evaluates transition entries in order and processes at most one transition per frame.

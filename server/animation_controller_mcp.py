@@ -52,7 +52,23 @@ _STATE_SCHEMA = {
     "required": ["name"],
     "properties": {
         "name": {"type": "string", "minLength": 1, "maxLength": 32},
-        "animations": {"type": "array", "maxItems": _MAX_ANIMATIONS_PER_STATE, "items": {"type": "string", "minLength": 1, "maxLength": 64}},
+        "animations": {
+            "type": "array",
+            "maxItems": _MAX_ANIMATIONS_PER_STATE,
+            "items": {
+                "description": "Animation aliases may be plain strings or single-key objects mapping an alias to a Molang blend expression.",
+                "anyOf": [
+                    {"type": "string", "minLength": 1, "maxLength": 64},
+                    {
+                        "type": "object",
+                        "minProperties": 1,
+                        "maxProperties": 1,
+                        "propertyNames": {"pattern": "^[A-Za-z][A-Za-z0-9_]{0,63}$"},
+                        "additionalProperties": {"type": "string", "minLength": 1, "maxLength": _MAX_MOLANG_LENGTH}
+                    }
+                ]
+            }
+        },
         "transitions": {
             "description": "Preferred: ordered array of single-key target/condition objects, matching Bedrock transition priority. Legacy object maps are also accepted for compatibility.",
             "anyOf": [
@@ -82,7 +98,7 @@ _STATE_SCHEMA = {
 TOOLS = [
     _schema_tool(
         "create_animation_controller",
-        "Create a Bedrock animation controller in an existing linked BP/RP scaffold and bind it to an existing RP client-entity JSON. States may select existing entity animation aliases, transition conditions are Molang expressions, and existing entity data is preserved. Refuses collisions, malformed JSON, unresolved animation aliases, unsafe paths and unlinked manifests. Static validation only; Molang execution and Minecraft runtime remain NOT RUN.",
+        "Create a Bedrock animation controller in an existing linked BP/RP scaffold and bind it to an existing RP client-entity JSON. State animations accept existing aliases as strings or single-key alias-to-Molang blend objects; transition conditions are Molang expressions. Existing entity data is preserved. Refuses collisions, malformed JSON, unresolved aliases, unsafe paths and unlinked manifests. Static validation only; Molang execution and Minecraft runtime remain NOT RUN.",
         {
             "project_directory": {"type": "string", "minLength": 1, "maxLength": 63},
             "target_game_version": {"type": "string", "minLength": 5, "maxLength": 20},
@@ -113,7 +129,7 @@ TOOLS = [
 TOOL_BY_NAME = {tool["name"]: tool for tool in TOOLS}
 WORKFLOW_INSTRUCTIONS = (
     "Animation controller workflow: create_animation_controller creates a new RP controller and links it to an existing RP client entity. "
-    "State animation names must be aliases already mapped in client_entity.description.animations. "
+    "State animation aliases must already exist in client_entity.description.animations; use strings or single-key alias-to-Molang blend objects. "
     "Prefer ordered transition arrays to preserve Bedrock transition priority; legacy object maps remain accepted. validate_animation_controller checks static structure and linkage only. "
     "Do not claim Molang execution or in-game animation behavior was tested."
 )
@@ -255,7 +271,7 @@ def _validate_molang(value: Any, label: str) -> str:
     return value.strip()
 
 
-def _validate_states(raw_states: Any, initial_state: Any, available_animation_aliases: set[str]) -> tuple[dict[str, Any], int, int, list[str]]:
+def _validate_states(raw_states: Any, initial_state: Any, available_animation_aliases: set[str]) -> tuple[dict[str, Any], int, int, list[str], int]:
     if not isinstance(raw_states, list) or not 1 <= len(raw_states) <= _MAX_STATES:
         raise ValueError(f"states must contain 1 to {_MAX_STATES} state objects")
     names: set[str] = set()
@@ -282,15 +298,37 @@ def _validate_states(raw_states: Any, initial_state: Any, available_animation_al
 
         animations = raw.get("animations", [])
         if not isinstance(animations, list) or len(animations) > _MAX_ANIMATIONS_PER_STATE:
-            raise ValueError(f"{label}.animations must be an array with at most {_MAX_ANIMATIONS_PER_STATE} aliases")
-        for alias in animations:
-            if not isinstance(alias, str) or not _ALIAS.fullmatch(alias):
-                raise ValueError(f"{label}.animations entries must be animation aliases")
-            if alias not in available_animation_aliases:
-                raise ValueError(f"animation alias {alias!r} is not defined in the linked client entity")
-        if animations:
-            state["animations"] = list(animations)
-            animation_aliases.update(animations)
+            raise ValueError(f"{label}.animations must be an array with at most {_MAX_ANIMATIONS_PER_STATE} entries")
+        normalized_animations: list[Any] = []
+        for animation_index, entry in enumerate(animations):
+            if isinstance(entry, str):
+                alias = entry
+                if not _ALIAS.fullmatch(alias):
+                    raise ValueError(f"{label}.animations[{animation_index}] must be a valid animation alias")
+                if alias not in available_animation_aliases:
+                    raise ValueError(f"animation alias {alias!r} is not defined in the linked client entity")
+                normalized_animations.append(alias)
+                animation_aliases.add(alias)
+                continue
+
+            if isinstance(entry, dict):
+                if len(entry) != 1:
+                    raise ValueError(f"{label}.animations[{animation_index}] must contain exactly one animation alias")
+                alias, blend = next(iter(entry.items()))
+                if not isinstance(alias, str) or not _ALIAS.fullmatch(alias):
+                    raise ValueError(f"{label}.animations[{animation_index}] contains an invalid animation alias")
+                if alias not in available_animation_aliases:
+                    raise ValueError(f"animation alias {alias!r} is not defined in the linked client entity")
+                expression = _validate_molang(blend, f"{label}.animations[{animation_index}].{alias}")
+                normalized_animations.append({alias: expression})
+                animation_aliases.add(alias)
+                molang_count += 1
+                continue
+
+            raise ValueError(f"{label}.animations[{animation_index}] must be an alias string or a single-key alias-to-Molang object")
+
+        if normalized_animations:
+            state["animations"] = normalized_animations
 
         # Prefer an ordered array so transition priority is explicit. Keep the
         # original object-map shorthand for backward compatibility with 1.1.1 callers.
@@ -340,7 +378,7 @@ def _validate_states(raw_states: Any, initial_state: Any, available_animation_al
             target = next(iter(transition))
             if target not in names:
                 raise ValueError(f"state {state_name!r} transitions to unknown state {target!r}")
-    return clean, len(names), transition_count, sorted(animation_aliases)
+    return clean, len(names), transition_count, sorted(animation_aliases), molang_count
 
 
 def _check_identifier_unique(directory: Path, identifier: str) -> None:
@@ -388,7 +426,7 @@ def _create_controller(args: dict[str, Any]) -> dict[str, Any]:
     if alias in existing_animations and existing_animations[alias] != identifier:
         raise ValueError(f"animation alias {alias!r} is already mapped to a different resource")
     available = {key for key, value in existing_animations.items() if isinstance(key, str) and isinstance(value, str) and key != alias}
-    states, state_count, transition_count, referenced_aliases = _validate_states(args["states"], args["initial_state"], available)
+    states, state_count, transition_count, referenced_aliases, state_molang_count = _validate_states(args["states"], args["initial_state"], available)
     animate_condition = args.get("animate_condition")
     if animate_condition is not None:
         animate_condition = _validate_molang(animate_condition, "animate_condition")
@@ -460,7 +498,7 @@ def _create_controller(args: dict[str, Any]) -> dict[str, Any]:
         "referenced_animation_aliases": referenced_aliases,
         "files_created": [controller_path.relative_to(project).as_posix()],
         "files_updated": [client_path.relative_to(project).as_posix()],
-        "molang_expressions": transition_count + sum(len(state.get("on_entry", [])) + len(state.get("on_exit", [])) for state in states.values()) + (1 if animate_condition is not None else 0),
+        "molang_expressions": state_molang_count + (1 if animate_condition is not None else 0),
         "molang_validation": "TEXT SHAPE ONLY — EXPRESSIONS NOT EXECUTED",
         "target_game_version": args["target_game_version"],
         "mcp_server_version": SERVER_VERSION,
@@ -506,10 +544,18 @@ def _validate_controller_file(project: Path, rp_root: Path, controller_file: str
         animations_list = state.get("animations", [])
         if not isinstance(animations_list, list):
             raise ValueError(f"state {state_name!r} animations must be an array")
-        for value in animations_list:
-            if not isinstance(value, str) or value not in animations:
-                raise ValueError(f"state {state_name!r} references missing client-entity animation alias: {value!r}")
-            referenced.add(value)
+        for animation_index, value in enumerate(animations_list):
+            if isinstance(value, str):
+                animation_alias = value
+            elif isinstance(value, dict) and len(value) == 1:
+                animation_alias, blend = next(iter(value.items()))
+                _validate_molang(blend, f"state {state_name}.animations[{animation_index}].{animation_alias}")
+                molang += 1
+            else:
+                raise ValueError(f"state {state_name!r} contains a malformed animation entry at index {animation_index}")
+            if not isinstance(animation_alias, str) or animation_alias not in animations:
+                raise ValueError(f"state {state_name!r} references missing client-entity animation alias: {animation_alias!r}")
+            referenced.add(animation_alias)
         state_transitions = state.get("transitions", [])
         if not isinstance(state_transitions, list):
             raise ValueError(f"state {state_name!r} transitions must be an array")

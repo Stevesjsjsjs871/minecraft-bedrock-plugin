@@ -49,7 +49,7 @@ Local isolated fixture results:
 - Two builds with identical source, commit and epoch produced identical tar.gz bytes.
 - Tampered sidecar, bytecode cache, symlink, Windows drive/traversal paths, invalid Git SHA, overwrite and output-inside-source cases were rejected.
 
-The repository's GitHub Actions workflow discovers both package-integrity test files. Initial PR CI #41089549833 passed the package-integrity step but failed 10/12 audit-benchmark tests because jsonschema was not installed. Added a pinned jsonschema==4.26.0 requirements file and workflow install step; final PR-head CI #41090698773 completed SUCCESS on 9465977e38de02dd2f53acbe0f16cc3c56311866: compileall PASS; geometry/UV 18/18; PNG/texture 22/22; package integrity/provenance 34/34; Mojang indexer 6/6; audit benchmark 12/12; release metadata check PASS. The pinned jsonschema==4.26.0 dependency installed successfully.
+The repository's GitHub Actions workflow discovers both package-integrity test files. Initial PR CI #41089549833 passed the package-integrity step but failed 10/12 audit-benchmark tests because jsonschema was not installed. Added a pinned jsonschema==4.26.0 requirements file and workflow install step; final PR-head CI #41090941115 completed SUCCESS on c12ebb55e196e602992db91d0b49442f5d1c055a: compileall PASS; geometry/UV 18/18; PNG/texture 22/22; package integrity/provenance 34/34; Mojang indexer 6/6; audit benchmark 12/12; release metadata check PASS. The pinned jsonschema==4.26.0 dependency installed successfully.
 
 ## Not run / blockers
 

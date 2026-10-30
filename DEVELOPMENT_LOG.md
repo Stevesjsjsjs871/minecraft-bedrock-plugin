@@ -26,7 +26,7 @@ Acceptance:
 ### Verification
 - GitHub Actions PR validation run #143 (`41016593483`) completed successfully on Ubuntu with Python 3.12. The decoded job log confirms: 140 server tests, 14 targeted PNG-validator tests, 23 targeted texture-auditor tests, 12 benchmark tests, 6 Mojang indexer tests, 12 procedural texture tests and 9 package-integrity tests. That is 216 test executions and 179 distinct test cases because the PNG and texture-auditor suites are also included in the 140-test server discovery run.
 - Python compilation passed; package-integrity audit passed; analyzer regression and report-schema checks passed; version, manifests, prompts, MCP tool registration and both MCP configurations passed. The workflow emitted non-failing Node.js 20 and `punycode` deprecation warnings.
-- The validation run tested code commit `184a5eef`. The later head commit `d49c5f9` only updates this journal; no executable code or tests changed after #143. Tests were run by GitHub Actions, not locally in this environment.
+- The validation run tested executable-code commit `184a5eef`. Every later commit on this branch changes only `DEVELOPMENT_LOG.md`; no executable code or tests changed after #143. Tests were run by GitHub Actions, not locally in this environment.
 - Minecraft import/rendering and Creator Tools CLI execution remain NOT RUN.
 
 ### Release and safety

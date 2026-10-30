@@ -13,7 +13,7 @@ The texture-link auditor computed `summary.analysis_complete` before reading the
 
 Acceptance:
 1. Any late finding that prevents inspection of an atlas or definition must force `analysis_complete=false`.
-2. Fully inspected but defective PNGs and missing BP-to-atlas keys remain reportable errors without automatically implying the scan itself was incomplete.
+2. Existing severity and completeness semantics for broken texture targets and missing BP-to-atlas keys remain unchanged; this stage only corrects findings that prevent the auditor from covering an atlas or definition.
 3. Regression tests cover missing, unsafe and malformed atlas inputs plus unrecognized definitions.
 4. Existing MCP contract, read-only behavior, plugin identity, manifests and three original default prompts remain unchanged.
 
@@ -24,14 +24,15 @@ Acceptance:
 - This journal records the work on the GitHub branch `fix/texture-audit-completeness-20261030`.
 
 ### Verification
-- Pending final GitHub Actions validation for this branch. Results will be recorded after the workflow completes.
+- GitHub Actions PR validation run #143 (`41016593483`) completed successfully on Ubuntu with Python 3.12. All configured steps passed: compilation; MCP/server tests; shared PNG validator tests; texture-link auditor tests; benchmark, Mojang indexer, texture generator and package-integrity suites; package-integrity audit; analyzer regression/report-schema checks; package/version/manifest/prompt/MCP configuration checks.
+- The connector's fetched job summary exposes step conclusions but not a consolidated unit-test count; no test count is claimed here. The tests were run by GitHub Actions, not locally in this environment.
 - Minecraft import/rendering and Creator Tools CLI execution remain NOT RUN.
 
 ### Release and safety
 - Plugin Creator was inspected but not modified. Its current version remains 1.0.14; no new release was created.
 - No public GitHub release was created and no PR was merged.
 - No Spatial GUI was introduced.
-- The three original default prompts were not modified.
+- The three original default prompts were not modified; root and compatibility manifests still contain the same three prompts.
 
 ### Next priority
-Review the newly identified source-parity gap between Plugin Creator 1.0.14 and GitHub `main`: the packaged `server/mcp_server.py` does not contain the five MCT/entity tools present on `main`. Resolve this only through a separately authorized Plugin Creator update; until then, keep release claims scoped to the actual packaged source.
+Resolve the source-parity gap between Plugin Creator 1.0.14 and GitHub `main`: the packaged `server/mcp_server.py` is 2,003 lines and registers 14 tools, while GitHub `main` is 2,802 lines and registers 19. The package is missing `create_addon_entity`, `creator_tools_status`, `creator_tools_catalog`, `validate_with_mct` and `create_entity_with_mct`. Prepare a guarded sync plan, but do not update Plugin Creator or create a new release without explicit user confirmation.

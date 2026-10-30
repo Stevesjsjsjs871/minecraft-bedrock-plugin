@@ -19,13 +19,15 @@ jobs:
           python-version: "3.12"
       - name: Install report-schema validator
         run: python -m pip install jsonschema
-      - name: Compile analyzer, MCP server and evaluation tools
+      - name: Compile analyzer, MCP servers and evaluation tools
         run: |
           python -m py_compile archive_safety.py
           python -m py_compile server/mcp_server.py server/tests/test_mcp_server.py
           python -m py_compile server/texture_generator_mcp.py server/tests/test_texture_generator_mcp.py
           python -m py_compile server/png_validation.py server/tests/test_png_validation.py
           python -m py_compile server/texture_link_audit_mcp.py server/tests/test_texture_link_audit_mcp.py
+          python -m py_compile server/entity_authoring_mcp.py server/tests/test_entity_authoring_mcp.py
+          python -m py_compile server/animation_controller_mcp.py server/tests/test_animation_controller_mcp.py
           python -m py_compile skills/automated-validation/scripts/bedrock_audit.py
           python -m py_compile skills/automated-validation/scripts/validate_report.py
           python -m py_compile skills/regression-evals/scripts/regression_tests.py
@@ -61,7 +63,7 @@ jobs:
           import runpy
           from pathlib import Path
 
-          expected = "1.0.14"
+          expected = "1.1.1"
           assert Path("VERSION").read_text(encoding="utf-8").strip() == expected
           root = json.loads(Path("plugin.json").read_text(encoding="utf-8"))
           compat = json.loads(Path(".codex-plugin/plugin.json").read_text(encoding="utf-8"))
@@ -71,9 +73,19 @@ jobs:
           server = runpy.run_path("server/mcp_server.py")
           texture_server = runpy.run_path("server/texture_generator_mcp.py")
           texture_auditor = runpy.run_path("server/texture_link_audit_mcp.py")
+          entity_server = runpy.run_path("server/entity_authoring_mcp.py")
+          animation_server = runpy.run_path("server/animation_controller_mcp.py")
           assert server["SERVER_VERSION"] == expected
           assert texture_server["SERVER_VERSION"] == expected
           assert texture_auditor["SERVER_VERSION"] == expected
+          assert entity_server["SERVER_VERSION"] == expected
+          assert animation_server["SERVER_VERSION"] == expected
+          entity_tools = {tool["name"]: tool for tool in entity_server["TOOLS"]}
+          assert "create_addon_entity" in entity_tools
+          assert entity_tools["create_addon_entity"]["annotations"]["readOnlyHint"] is False
+          animation_tools = {tool["name"]: tool for tool in animation_server["TOOLS"]}
+          assert {"create_animation_controller", "validate_animation_controller"} <= set(animation_tools)
+          assert animation_tools["validate_animation_controller"]["annotations"]["readOnlyHint"] is True
           texture_tools = {tool["name"]: tool for tool in texture_server["TOOLS"]}
           assert {"generate_texture", "register_texture_atlas"} <= set(texture_tools)
           assert texture_tools["register_texture_atlas"]["annotations"]["idempotentHint"] is True
@@ -85,9 +97,15 @@ jobs:
               servers = config.get("mcpServers", {})
               texture = servers.get("minecraft-bedrock-texture-generator")
               audit = servers.get("minecraft-bedrock-texture-link-auditor")
+              entity = servers.get("minecraft-bedrock-entity-authoring")
+              animation = servers.get("minecraft-bedrock-animation-controller-authoring")
               assert texture and texture.get("type") == "stdio"
               assert any("server/texture_generator_mcp.py" in arg.replace("\\", "/") for arg in texture.get("args", []))
               assert audit and audit.get("type") == "stdio"
               assert any("server/texture_link_audit_mcp.py" in arg.replace("\\", "/") for arg in audit.get("args", []))
-          print("PASS: manifests, prompts, texture authoring/audit MCP tools, three MCP servers and both MCP configurations are synchronized at", expected)
+              assert entity and entity.get("type") == "stdio"
+              assert any("server/entity_authoring_mcp.py" in arg.replace("\\", "/") for arg in entity.get("args", []))
+              assert animation and animation.get("type") == "stdio"
+              assert any("server/animation_controller_mcp.py" in arg.replace("\\", "/") for arg in animation.get("args", []))
+          print("PASS: manifests, prompts, entity/animation authoring, texture authoring/audit and five MCP servers are synchronized at", expected)
           PY

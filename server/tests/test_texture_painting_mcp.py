@@ -14,7 +14,7 @@ import types
 # The production package already contains its shared PNG validator. The isolated
 # overlay suite may have injected the UV-audit IHDR-only shim before this module;
 # extend that test-local shim without affecting the production implementation.
-validation = sys.modules.get("png_validation") or types.ModuleType("png_validation")
+validation = types.ModuleType("png_validation")
 if not hasattr(validation, "PngValidationError"):
     class PngValidationError(ValueError):
         pass
@@ -49,9 +49,12 @@ if not hasattr(validation, "validate_png_bytes"):
     validation.validate_png_bytes = validate_png_bytes
 if not hasattr(validation, "validate_png_file"):
     validation.validate_png_file = lambda path, **kwargs: validation.validate_png_bytes(path.read_bytes(), **kwargs)
-sys.modules["png_validation"] = validation
+SERVER_DIR = Path(__file__).resolve().parents[1]
+if str(SERVER_DIR) not in sys.path:
+    sys.path.insert(0, str(SERVER_DIR))
 
-import texture_painting_mcp as painter
+with patch.dict(sys.modules, {"png_validation": validation}):
+    import texture_painting_mcp as painter
 
 
 def png_chunk(kind: bytes, data: bytes) -> bytes:

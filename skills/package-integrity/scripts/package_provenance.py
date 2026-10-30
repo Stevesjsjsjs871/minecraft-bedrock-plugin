@@ -446,6 +446,15 @@ def verify_archive(archive: Path, sidecar: Path) -> dict[str, Any]:
             metadata_total = 0
             header_count = 0
 
+            def _proc_gnusparse_01(self, next_member, pax_headers):
+                raise PackageSafetyError("GNU sparse PAX maps are not supported in release archives")
+
+            def _proc_gnusparse_00(self, next_member, raw_headers):
+                raise PackageSafetyError("GNU sparse PAX headers are not supported in release archives")
+
+            def _proc_gnusparse_10(self, next_member, pax_headers, tarfile_object):
+                raise PackageSafetyError("GNU sparse PAX maps are not supported in release archives")
+
             def _proc_member(self, tarfile_object):
                 type(self).header_count += 1
                 if type(self).header_count > MAX_ARCHIVE_HEADERS:

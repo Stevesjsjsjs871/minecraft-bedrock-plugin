@@ -264,5 +264,16 @@ class BuildSkillsPackageTests(unittest.TestCase):
             verify_archive(alias_archive, Path(str(alias_archive) + ".sha256"))
 
 
+    def test_rejects_gnu_sparse_pax_map_before_sparse_processing(self):
+        entries = self._valid_tar_entries()
+        entries[0] = (
+            self._tar_info("README.md", pax_headers={"GNU.sparse.map": "0,1"}),
+            entries[0][1],
+        )
+        archive, sidecar = self._write_custom_archive(entries)
+        with self.assertRaisesRegex(PackageSafetyError, "GNU sparse PAX"):
+            verify_archive(archive, sidecar)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

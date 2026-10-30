@@ -42,10 +42,10 @@ Make package integrity a fail-closed release gate and add a deterministic Skills
 Local isolated fixture results:
 
 - python -m compileall -q . — PASS.
-- python -m unittest discover -s . -p 'test_*.py' -v — 29/29 PASS.
+- python -m unittest discover -s . -p 'test_*.py' -v — 30/30 PASS.
 - Deterministic archive smoke test — PASS.
 - Two builds with identical source, commit and epoch produced identical tar.gz bytes.
-- Tampered sidecar, bytecode cache, symlink, invalid Git SHA, overwrite and output-inside-source cases were rejected.
+- Tampered sidecar, bytecode cache, symlink, Windows drive/traversal paths, invalid Git SHA, overwrite and output-inside-source cases were rejected.
 
 The repository's GitHub Actions workflow automatically discovers both package-integrity test files. A PR-triggered CI run is pending.
 

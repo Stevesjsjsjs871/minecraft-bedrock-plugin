@@ -186,6 +186,21 @@ class GeometryUvCliTests(unittest.TestCase):
         else:
             self.assertEqual(os.environ[cli.WORKSPACE_ENV], old)
 
+
+    def test_backend_uses_real_png_validator_after_isolated_mcp_tests(self):
+        auditor, _, validator = cli._load_backend(ROOT)
+        import png_validation
+
+        self.assertEqual(
+            Path(auditor.__file__).resolve(),
+            (ROOT / "server" / "geometry_uv_audit_mcp.py").resolve(),
+        )
+        self.assertEqual(
+            Path(png_validation.__file__).resolve(),
+            (ROOT / "server" / "png_validation.py").resolve(),
+        )
+        self.assertIs(validator, png_validation.validate_png_file)
+
     def test_missing_backend_fails_closed(self):
         with tempfile.TemporaryDirectory() as empty_root:
             with patch.object(cli, "ROOT", Path(empty_root)):

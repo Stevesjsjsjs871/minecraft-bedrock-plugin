@@ -211,3 +211,18 @@ Synchronize the two GitHub manifests to the current Plugin Creator 1.0.11 manife
 - Plugin Creator remains at `1.0.11` with the same current release ID. It was not updated; no public release was published.
 - The compressed index is metadata-only: it enables offline search across paths/categories/sizes/eligible hashes/selected identifiers, but does not include original file bytes. The full source ZIP remains external; reading non-curated text files still requires that ZIP in the configured workspace. Minecraft import/rendering remains `NOT RUN`.
 - Next priority: add a separate versioned corpus for the newer stable Mojang samples release, then extend sample search to select an explicit source version without changing the default game target `1.26.50` or replacing the 1.26.50.4 corpus.
+
+
+### Final follow-up — bundled-index MCP integration and reusable dispatch
+- Added `test_bundled_full_mojang_index_is_loaded_by_mcp_search` in `server/tests/test_mcp_server.py`. With the generated gzip present, it loads the real 22,252-entry corpus through the MCP server and verifies that `search_mojang_samples` returns `index_mode: full_index` and the expected apple item path. This closes the gap where package integrity validated the gzip but MCP integration previously exercised only curated examples/fallback.
+- Restricted automatic push-triggered generation to the candidate branch, while allowing an owner-triggered `workflow_dispatch` on `main` after merge. The commit step refuses every branch other than the candidate branch or `main`.
+- Build workflow run #3 `40996339142` passed end-to-end. It downloaded and fully CRC-tested the pinned source again, regenerated the same index SHA-256 `48429d64391157553e6760b7f568e5e6d5d05fa6517427b5a1156c8bc18e61fc` and size `1128406` bytes, ran **148 unit tests** (102 MCP/server, 12 benchmark, 6 sample-index, 12 texture, 16 package-integrity), passed Python compilation, 18/18 analyzer regressions and identity/version/prompt/MCP checks. It produced no generated-index diff, confirming reproducible output in the pinned Python 3.12.10 environment.
+- Final PR validation run #125 `40996347272` passed on head `ce16052bf066ecf65d91ab14f06822b3238585d1`: the same **148 tests** passed; package-integrity audit returned **17 PASS, 0 WARN, 0 FAIL**; regression cases passed **18/18**; all compile and identity/MCP checks passed.
+- Final portability run #16 `40996347246` passed on the same head: Ubuntu passed 26/26 in 0.376s; Windows passed 26/26 in 0.893s.
+- The earlier bot-authored head had PR workflows marked `action_required`; the owner-authored log commit triggered the successful #125/#16 runs. No unresolved check remains on the current head.
+- Current PR #2 head: `ce16052bf066ecf65d91ab14f06822b3238585d1`, 25 commits ahead and 0 behind `main`; PR remains Draft/open/unmerged.
+
+### Next-version research
+- The latest non-preview Mojang Bedrock Samples release listed by the official GitHub Releases API is `v1.26.60.5`, published 2026-10-28.
+- Its full asset is `bedrock-samples-v1.26.60.5-full.zip`, asset ID `685756898`, size `169569258` bytes, SHA-256 `d93dea9aa1fb241a3184cc9f9a074a2ff34bd1b3c00d859b09c24b4b9e4e9adf`, tag commit `15701fa9c13923f12662984c32c124327e40e3d3`.
+- Next priority: add this as a **separate versioned corpus**, preserve the 1.26.50.4 index and default target `1.26.50`, and extend MCP sample search with an explicit source-version selector. Do not mix preview assets into the stable corpus.

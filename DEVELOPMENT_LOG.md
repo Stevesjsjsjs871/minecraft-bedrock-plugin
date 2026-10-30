@@ -173,3 +173,41 @@ Synchronize the two GitHub manifests to the current Plugin Creator 1.0.11 manife
 - Linter/type-check, macOS, network filesystems, Minecraft import/rendering and real Creator Tools CLI runtime remain `NOT RUN`.
 - A subsequent log-only commit `5adf80bcca272ac697f112bdc08eee6e20a1bfdf` records this audit. It changes only `DEVELOPMENT_LOG.md`; the tested code head is `1763c39532c157ff3b5ade1eb3cdd4dca2827c1f`.
 - GitHub releases API returned no published repository releases. Plugin Creator remains private at 1.0.11 and the same current release ID; no Plugin Creator update or public release was made.
+
+
+## 2026-10-30 — restore the full Mojang 1.26.50.4 metadata index
+
+### Verified baseline
+- Started from PR #2 head `fc4fe7f0a850e370ecbfd2e380b2f222f9cd5540`; GitHub `main` remained `4eb35503095c735d725597bdb2f517f4bf188803`.
+- Plugin Creator remained private at version `1.0.11`, plugin ID `plugins_6ae33ff6e8d8819182f246d8d3d97323`, current release ID `pluginrel_6ae3d2b1b6888191bf4727998f694e48`.
+- Confirmed the current Plugin Creator package contains `mojang-samples-index.json.gz` (1,128,413 bytes), while the GitHub branch did not. The indexer and its tests in Plugin Creator matched the GitHub versions byte-for-byte.
+- Official Mojang release API confirmed tag `v1.26.50.4`, release date 2026-09-16, source commit `46ba6ea985fb5a92d79a9419198f10dda14c199d`, full asset ID `567172887`, size `169385576` bytes, and SHA-256 `c0b6151f5f9a0c31ebe3c909dfc82d97f12473ed2c6e039aa7e22d667042026c`. The metadata's previous ZIP digest matched the official asset exactly.
+
+### Implementation
+- Added `.github/workflows/build-mojang-samples-index.yml`. It downloads only the pinned official **full** release asset, verifies its exact byte size and SHA-256, tests every ZIP member CRC, checks archive counts, runs the existing no-extraction indexer, verifies per-category counts, records the generated gzip SHA-256/size, runs the full project test suites and deep package audit, then commits only the generated index and its metadata to this Draft PR branch.
+- Updated `INDEX_METADATA.json` with the canonical official asset name, release tag/URL/date/commit, asset ID/size/digest, generated index filename/digest/size, indexer path and Python version.
+- Updated the Bedrock development skill, corpus README and root README to distinguish the metadata-only index from the original 169 MB ZIP. The ZIP and binary texture/sound contents are **not** bundled.
+- Strengthened package-integrity checks for schema/dataset identity, archive filename, index policy, uncompressed size, category counts, optional compressed-index digest/size, and fail-closed behavior when metadata pins an index that is missing.
+- Added four negative package-integrity cases and a deterministic-gzip repeatability assertion.
+
+### Verification and correction history
+- Build workflow run #1 `40995942311` downloaded the official asset, verified size/SHA/full CRC, generated the index and matched corpus statistics. It then failed in the package-integrity unit tests: an over-escaped version regex rejected the valid four-part target version, causing one fixture failure and five follow-on test errors. No index was committed by that run.
+- Corrected the regex and expanded workflow path triggers in commit `81e7b39d60c03acbe498833142d336786e2d0e4a`.
+- Build workflow run #2 `40996020167` completed successfully. It repeated the official asset SHA/size/full CRC verification and generated:
+  - ZIP entries: **22,859**
+  - Indexed entries: **22,252**
+  - Declared uncompressed bytes: **319,437,100**
+  - Generated gzip size: **1,128,406 bytes**
+  - Generated gzip SHA-256: `48429d64391157553e6760b7f568e5e6d5d05fa6517427b5a1156c8bc18e61fc`
+  - Python used for generation: **3.12.10**
+- Build workflow run #2 passed all **147 unit tests**: MCP/server 101, benchmark 12, sample index 6, texture generator 12, package integrity 16. Python compilation passed; analyzer regression cases passed **18/18**; identity/version/three-prompt/MCP checks passed.
+- Deep package-integrity audit on the generated index: **17 PASS, 0 WARN, 0 FAIL**. The previous missing-index warning is eliminated on this candidate.
+- The workflow committed the binary index and updated metadata as `bc5239a3cee4ccbb11194ea0d68453f042a2d168`.
+- PR validation run #122 on the pre-generated-index code head `81e7b39` passed. Portability run #13 on that same code head passed on Ubuntu and Windows. After the generated index was pushed by GitHub Actions, PR validation run #123 and portability run #14 were returned as `action_required` with no jobs; the build workflow itself had already run the full unit, compile, regression and package-integrity checks against the generated-index working tree. A fresh owner-authored PR commit is being used to request normal PR checks on the final tree.
+- Non-failing Node.js 20 / `punycode` deprecation warnings remain in the existing Actions toolchain. A dedicated linter/type-check and Minecraft runtime import/render test remain `NOT RUN`.
+
+### Safety, state and next step
+- GitHub `main` was not changed. PR #2 remains open, Draft and unmerged; its head is now `bc5239a`, 23 commits ahead and 0 behind `main`.
+- Plugin Creator remains at `1.0.11` with the same current release ID. It was not updated; no public release was published.
+- The compressed index is metadata-only: it enables offline search across paths/categories/sizes/eligible hashes/selected identifiers, but does not include original file bytes. The full source ZIP remains external; reading non-curated text files still requires that ZIP in the configured workspace. Minecraft import/rendering remains `NOT RUN`.
+- Next priority: add a separate versioned corpus for the newer stable Mojang samples release, then extend sample search to select an explicit source version without changing the default game target `1.26.50` or replacing the 1.26.50.4 corpus.

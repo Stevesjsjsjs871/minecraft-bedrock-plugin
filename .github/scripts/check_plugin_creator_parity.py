@@ -41,7 +41,7 @@ def _safe_relative_path(raw: str) -> str:
     if not raw or "\x00" in raw or "\\" in raw:
         raise ParityError(f"unsafe archive path: {raw!r}")
     path = PurePosixPath(raw)
-    if path.is_absolute() or any(part in {"", ".", ".."} for part in path.parts):
+    if path.is_absolute() or (path.parts and path.parts[0].endswith(":")) or any(part in {"", ".", ".."} for part in path.parts):
         raise ParityError(f"unsafe archive path: {raw!r}")
     normalized = path.as_posix()
     if normalized != raw.rstrip("/"):
@@ -101,6 +101,8 @@ class ArchiveIndex:
         self.handle: zipfile.ZipFile | tarfile.TarFile
         self.entries: dict[str, zipfile.ZipInfo | tarfile.TarInfo] = {}
         self.errors: list[str] = []
+        if path.is_symlink() or not path.is_file():
+            raise ParityError("archive path must be an existing non-symlink file")
         self._open_and_index()
 
     def _open_and_index(self) -> None:
@@ -120,6 +122,7 @@ class ArchiveIndex:
             raise ParityError(f"archive contains too many entries: {len(members)} > {MAX_ARCHIVE_ENTRIES}")
 
         total_size = 0
+        folded_names: dict[str, str] = {}
         for member in members:
             if self.kind == "zip":
                 assert isinstance(member, zipfile.ZipInfo)
@@ -153,6 +156,11 @@ class ArchiveIndex:
             if relative in self.entries:
                 self.errors.append(f"duplicate archive entry: {relative}")
                 continue
+            folded = relative.casefold()
+            if folded in folded_names and folded_names[folded] != relative:
+                self.errors.append(f"case-insensitive archive path collision: {folded_names[folded]} and {relative}")
+                continue
+            folded_names[folded] = relative
             if size < 0 or size > MAX_ARCHIVE_FILE_BYTES:
                 self.errors.append(f"archive entry exceeds size limit: {relative}")
                 continue
@@ -266,7 +274,10 @@ def _metadata_errors(archive: ArchiveIndex) -> list[str]:
 
 
 def audit_archive(archive_path: Path, repo_root: Path) -> dict[str, Any]:
-    expected, repository_errors = _collect_repository_files(repo_root)
+    try:
+        expected, repository_errors = _collect_repository_files(repo_root)
+    except (OSError, ParityError) as exc:
+        expected, repository_errors = {}, [f"unable to inspect repository root: {exc}"]
     report: dict[str, Any] = {
         "status": "FAIL",
         "archive": str(archive_path),
@@ -289,12 +300,18 @@ def audit_archive(archive_path: Path, repo_root: Path) -> dict[str, Any]:
         report["extra"] = sorted(actual_names - expected_names)
 
         matched = 0
-        for relative in sorted(expected_names & actual_names):
+        for relative in sorted(actual_names):
             try:
                 archive_bytes = archive.read(relative)
-                repository_bytes = expected[relative].read_bytes()
             except (OSError, zipfile.BadZipFile, tarfile.TarError, RuntimeError, ParityError) as exc:
-                report["errors"].append(f"unable to compare {relative}: {exc}")
+                report["errors"].append(f"unable to read archive entry {relative}: {exc}")
+                continue
+            if relative not in expected:
+                continue
+            try:
+                repository_bytes = expected[relative].read_bytes()
+            except OSError as exc:
+                report["errors"].append(f"unable to read repository file {relative}: {exc}")
                 continue
             if archive_bytes != repository_bytes:
                 report["mismatched"].append({

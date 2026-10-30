@@ -61,3 +61,32 @@ The first CI run against the post-review commit (41079873258) failed one newly a
 The renderer only draws axis-aligned rectangle edges, so the general clipper was unnecessary. It was replaced with bounded horizontal/vertical interval clipping. The clipped endpoints are now clamped directly to the finite output canvas before Bresenham rasterization. Regression tests cover extreme horizontal and vertical crossings and parallel segments outside the canvas.
 
 The failed run was not hidden; a fresh CI run on the corrected HEAD is required.
+
+
+## Final CI verification
+
+- Corrected code commit: 1b84062ecce7e04fc1d7bbdf1155bf62f04f0bcc.
+- GitHub Actions run: 41080176006 — **SUCCESS** on the corrected code commit.
+- Runner: Ubuntu 24.04.5, Python 3.12.
+- Server regression suite: 359/359.
+- PNG validator: 15/15.
+- Texture-link auditor: 20/20.
+- Benchmark evaluator: 12/12.
+- Mojang Samples indexer: 6/6.
+- Procedural texture generator: 12/12.
+- Package Integrity tests: 11/11.
+- Standalone geometry analyzer: 28/28.
+- Standalone UV template renderer and PNG safety: 29/29.
+- MCP capability contract: 4/4.
+- Python compilation, package-integrity audit, analyzer regression and manifest/version/MCP checks: PASS.
+- The earlier failed run 41079873258 was retained in the audit trail; the failure was the extreme-line clipping test and is covered by the corrected axis-aligned clipping implementation.
+
+The successful run is tied to the code-bearing commit above. No executable files changed after that commit. The current PR remains a draft stacked on PR #18.
+
+## Final scope status
+
+- GitHub PR #19: open, draft, not merged.
+- PR #18 dependency: open, draft, not merged.
+- Plugin Creator 1.5.12 was not modified; Release ID pluginrel_6ae4b2ea22f88191a00187713b7e9b91 remains the inspected source snapshot.
+- The Skills-only Plugin Creator inventory still contains one generated .pyc under package-integrity and no BUILD_PROVENANCE.json; package-hygiene/provenance work remains separate.
+- Minecraft runtime, Blockbench interoperability, actual face-orientation sampling and texture binding remain NOT RUN.

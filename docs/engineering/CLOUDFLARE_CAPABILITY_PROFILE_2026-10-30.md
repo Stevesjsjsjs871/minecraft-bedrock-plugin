@@ -42,3 +42,26 @@ These are static source checks, not Python test execution. Python compilation an
 ## Next step
 
 Review the PR and require CI to pass on its head. Only then consider syncing the source branch to a single release snapshot. Do not merge automatically or update Plugin Creator without a separately authorized release action.
+
+
+## Follow-up after first PR CI run
+
+The first PR workflow run, **#41062741228**, failed in the existing server regression suite after the compile step had passed (326 tests: 1 failure, 2 import errors).
+
+Root causes were inherited from this feature branch and were not introduced by the capability manifest:
+
+- `test_geometry_uv_audit_mcp.py` installed a `png_validation` test shim globally in `sys.modules`.
+- `test_reference_texture_transfer_mcp.py` replaced that module globally with a different shim.
+- This polluted later imports: `test_png_validation` could not import `validate_png_bytes`, and `test_texture_link_audit_mcp` could not import `validate_png_file`.
+- `test_mcp_server` expected a versioned README subsection, but the README only had the generic `## Release overview` heading.
+
+Corrections committed to the PR branch:
+
+- Both shims now use `patch.dict(sys.modules, ...)` only while importing the module under test, restoring the previous global module state afterward.
+- `test_png_validation` now asserts that its import resolves to the repository's real `server/png_validation.py`.
+- README heading is now `## 1.4.0: Release overview`.
+- `test_mcp_server` verifies that the original three default prompts remain unchanged and in order, while allowing unique extensions.
+- Package Integrity now accepts 1–32 unique non-empty default prompts and has regression tests for 11 prompts and duplicates.
+- README validation evidence now correctly says 16-server MCP registry parity.
+
+The initial failure is recorded, not hidden. The corrected code has **NOT YET BEEN RE-TESTED** by a subsequent GitHub Actions run; the latest CI result remains failure #41062741228 until a new run passes.

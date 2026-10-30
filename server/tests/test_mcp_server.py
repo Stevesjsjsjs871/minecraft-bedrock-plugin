@@ -677,7 +677,9 @@ class SchemaTests(unittest.TestCase):
             }
             with gzip.open(index_path, "wt", encoding="utf-8") as out:
                 json.dump(payload, out)
-            with patch.object(server, "MOJANG_SAMPLE_INDEX", index_path), patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": td}):
+            catalog = dict(server.MOJANG_SAMPLE_SOURCE_CATALOG["1.26.50.4"])
+            catalog["source_asset_sha256"] = payload["archive_sha256"]
+            with patch.object(server, "MOJANG_SAMPLE_INDEX", index_path), patch.dict(server.MOJANG_SAMPLE_SOURCE_CATALOG, {"1.26.50.4": catalog}), patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": td}):
                 result = server.call_tool("read_mojang_sample", {
                     "sample_path": "behavior_pack/items/example.json", "archive_path": "source.zip"
                 })
@@ -708,7 +710,9 @@ class SchemaTests(unittest.TestCase):
             }
             with gzip.open(index_path, "wt", encoding="utf-8") as out:
                 json.dump(payload, out)
-            with patch.object(server, "MOJANG_SAMPLE_INDEX", index_path), patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": td}):
+            catalog = dict(server.MOJANG_SAMPLE_SOURCE_CATALOG["1.26.50.4"])
+            catalog["source_asset_sha256"] = payload["archive_sha256"]
+            with patch.object(server, "MOJANG_SAMPLE_INDEX", index_path), patch.dict(server.MOJANG_SAMPLE_SOURCE_CATALOG, {"1.26.50.4": catalog}), patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": td}):
                 result = server.call_tool("read_mojang_sample", {
                     "sample_path": "behavior_pack/items/example.json", "archive_path": "source.zip"
                 })
@@ -1338,6 +1342,7 @@ class MojangSampleVersionSelectionTests(unittest.TestCase):
         self.assertGreater(len(result["results"]), 0)
 
     def test_preview_index_target_version_must_match_selected_source(self):
+        import gzip
         import tempfile
         from unittest.mock import patch
         payload = dict(self._preview_payload())
@@ -1353,6 +1358,7 @@ class MojangSampleVersionSelectionTests(unittest.TestCase):
                     server._load_mojang_sample_index(self.PREVIEW_VERSION)
 
     def test_preview_index_archive_digest_must_match_pinned_release_asset(self):
+        import gzip
         import tempfile
         from unittest.mock import patch
         payload = dict(self._preview_payload())

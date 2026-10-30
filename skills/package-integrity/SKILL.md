@@ -45,6 +45,8 @@ Do not publish or install a candidate unless every check passes. A missing BUILD
 
 BUILD_PROVENANCE.json uses schema version 1. It records the full Git object ID, source date epoch, package version, file paths, byte sizes and SHA-256 hashes. payload_sha256 is the SHA-256 of the canonical, sorted JSON file inventory (path, size and per-file hash); it is not the hash of the compressed archive. The adjacent .sha256 sidecar hashes the exact .tar.gz bytes. The provenance file is excluded from its own payload inventory to avoid a recursive hash.
 
+The provenance file and SHA-256 sidecar provide integrity metadata, not a digital signature or independent identity attestation. Verify the recorded Git commit and successful CI run against a trusted repository before distributing a candidate.
+
 The builder excludes repository-only .git, .github, docs/engineering, dist, GITHUB_SYNC_NOTES.md and DEVELOPMENT_LOG.md. It does not silently remove bytecode or symlinks: it refuses to package them.
 
 The current GitHub mirror is known to be missing the binary mojang-samples-index.json.gz asset that exists in Plugin Creator 1.5.12. The builder can be unit-tested with synthetic fixtures, but a release candidate from this mirror must remain blocked until that exact pinned binary index is restored and the extracted-package checker passes. Do not replace it with a fabricated or partial index.

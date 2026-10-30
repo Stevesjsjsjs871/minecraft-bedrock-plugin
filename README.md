@@ -31,3 +31,11 @@
 - 1.0.10 added the separate procedural PNG texture generator.
 
 The original MCP server, plugin identity, permissions, default prompts and existing tools are preserved. Minecraft runtime remains `NOT RUN` unless explicitly reported otherwise.
+
+
+## Compatibility hardening on this branch
+
+- The original core `create_addon_entity` tool remains unchanged. The geometry-first server exposes the distinct `create_addon_entity_with_geometry` name so hosts that aggregate multiple MCP servers do not see two tools with different schemas under the same name.
+- The four existing Creator Tools bridge tools remain in the core server.
+- Animation-controller input now prefers ordered transition arrays, while accepting the original object-map shorthand for existing callers. Generated Bedrock JSON always uses the ordered array representation.
+- The registry contract test checks all five configured stdio servers, tool-name uniqueness, Creator Tools bridge presence, and the three original default prompts.

@@ -1,31 +1,29 @@
 ---
 name: package-integrity
-description: Use before publishing a Minecraft Bedrock Engineer package or diagnosing version, MCP configuration, prompt, skill inventory, tool registry, or Mojang sample-index drift.
+description: Use before publishing or updating Minecraft Bedrock Engineer to verify Skills-only package manifests, version parity, prompt parity, skill inventory, no-MCP architecture and bundled Mojang sample-index integrity.
 ---
 
-# Package Integrity Audit
+# Skills-only Package Integrity Audit
 
-## Purpose
-Run an offline structural audit of the actual package directory before creating a release candidate. The checker catches package drift that may not be visible from reviewing a changelog or updating the version number alone.
-
-## Run
-From the root of the extracted plugin package:
+Run from the root of the extracted plugin package:
 
 ```bash
-python skills/package-integrity/scripts/check_package_integrity.py .
-python skills/package-integrity/scripts/test_check_package_integrity.py -v
+python skills/package-integrity/scripts/check_skills_package.py .
+python skills/package-integrity/scripts/test_check_skills_package.py -v
 ```
 
-The script emits a JSON evidence report and a non-zero exit code for failures. The default audit checks required files, strict SemVer agreement across both manifests and `VERSION`, plugin identity, exact default-prompt parity, compatibility/MCP configuration references, skill frontmatter uniqueness, statically discoverable MCP tool names and dispatch comparisons, writer annotations, README version heading, and the Mojang sample-index metadata. If the generated gzip index is absent but the curated version-labelled sample files exist, it reports an explicit `WARN` for curated fallback rather than claiming the full index was verified.
+The checker is standard-library-only and read-only. It verifies:
+- Required package files and both plugin manifests parse as JSON.
+- Strict version parity across `plugin.json`, `.codex-plugin/plugin.json` and `VERSION`.
+- Plugin identity and exact default-prompt parity between manifests.
+- Both manifests point to `./skills`.
+- The Skills-only boundary: no MCP server declarations or `.mcp.json` / `mcp.json` configuration files.
+- Every `SKILL.md` has valid basic frontmatter with a unique skill name and non-empty description.
+- README version heading and explicit Skills-only architecture statement.
+- The bundled Mojang sample index decompresses and parses as JSON, with entry-count consistency when the index exposes a countable entries/files collection.
 
-To skip decompression of the sample index for a quick check, pass `--skip-deep-index`. This produces a warning, not a full pass for the index-content gate.
+The checker emits a JSON report and exits non-zero on failure. It does not install dependencies, execute add-on scripts, contact remote services, or launch Minecraft. The bundled regression tests use synthetic fixtures; they validate the checker, not game behavior.
 
-To repair only a recognized stale README first-line heading, use `--fix-readme-heading`. This option only changes the first line and preserves all remaining README content. It refuses unexpected heading formats and does not edit the manifest or version markers.
+Legacy `check_package_integrity.py` and its tests validate the retired server/registry architecture and are retained only as historical source. Do not use them as the release gate for current Skills-only releases.
 
-## Safety and interpretation
-
-- The checker is offline and read-only unless `--fix-readme-heading` is explicitly passed.
-- It never launches Minecraft, connects to the MCP host, executes add-on scripts, or extracts the Mojang sample archive.
-- A static registry audit is not a replacement for `server/tests/test_mcp_server.py`; the complete test suite must still run separately.
-- A report with `runtime_status: NOT RUN` does not prove import, rendering, behavior, or multiplayer compatibility in the game.
-- Never overwrite a user's pack just to make an audit pass. Fix the source of a finding, then rerun the full gate.
+Static package checks do not prove Minecraft import, rendering, gameplay, multiplayer, Blockbench interoperability or Script API runtime behavior. Report those as `NOT RUN` unless actually tested.

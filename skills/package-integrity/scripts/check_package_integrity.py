@@ -42,6 +42,7 @@ REQUIRED_FILES = (
     "skills/bedrock-development/scripts/index_mojang_samples.py",
     "skills/bedrock-development/scripts/test_index_mojang_samples.py",
     "skills/bedrock-development/references/mojang-samples-1.26.50.4/INDEX_METADATA.json",
+    "skills/bedrock-development/references/mojang-samples-1.26.50.4/mojang-samples-index.json.gz",
 )
 
 
@@ -138,8 +139,6 @@ def _registry_audit(server_path: Path, checks: list[dict[str, str]]) -> dict[str
     schema_errors: list[str] = []
     writer_readonly_errors: list[str] = []
     writer_names = {"create_addon_project", "create_addon_item", "create_addon_block", "create_addon_recipe"}
-    additional_writer_names = {"create_addon_entity", "create_entity_with_mct"}
-    all_writer_names = writer_names | additional_writer_names
     if len(assignments) != 1 or not isinstance(assignments[0], (ast.List, ast.Tuple)):
         schema_errors.append("Expected one statically declared TOOLS list")
     else:
@@ -173,9 +172,9 @@ def _registry_audit(server_path: Path, checks: list[dict[str, str]]) -> dict[str
                 schema_errors.append(f"{name}: required must be a literal list or tuple")
             kwargs = {kw.arg: kw.value for kw in entry.keywords if kw.arg}
             read_only_false = isinstance(kwargs.get("read_only"), ast.Constant) and kwargs["read_only"].value is False
-            if name in all_writer_names and not read_only_false:
+            if name in writer_names and not read_only_false:
                 writer_readonly_errors.append(f"{name} must explicitly be write-capable (read_only=False)")
-            if name not in all_writer_names and read_only_false:
+            if name not in writer_names and read_only_false:
                 writer_readonly_errors.append(f"{name} is marked write-capable but is not in the write-tool allowlist")
 
     duplicates = sorted({name for name in names if names.count(name) > 1})
@@ -265,28 +264,6 @@ def _index_audit(root: Path, checks: list[dict[str, str]], *, deep: bool) -> dic
     if not deep:
         checks.append({"id": "sample-index-content", "status": "WARN", "message": "Deep compressed-index validation skipped by option"})
         return {"target_version": target_version, "indexed_count": indexed_count, "entry_count": entry_count, "zip_sha256": sha}
-    if not index_path.is_file():
-        curated = [
-            p for p in base.rglob("*")
-            if p.is_file() and p.suffix.lower() in {".json", ".md", ".html", ".lang"}
-            and p.name != "INDEX_METADATA.json"
-        ]
-        if curated:
-            checks.append({
-                "id": "sample-index-content",
-                "status": "WARN",
-                "message": f"Full generated gzip index is absent; {len(curated)} curated source files remain available for fallback search",
-            })
-            return {
-                "target_version": target_version,
-                "indexed_count": indexed_count,
-                "entry_count": entry_count,
-                "zip_sha256": sha,
-                "index_mode": "curated_fallback",
-                "curated_file_count": len(curated),
-            }
-        checks.append({"id": "sample-index-content", "status": "FAIL", "message": "Compressed index is absent and no curated fallback files are present"})
-        return None
     try:
         with gzip.open(index_path, "rt", encoding="utf-8") as stream:
             index = json.load(stream)

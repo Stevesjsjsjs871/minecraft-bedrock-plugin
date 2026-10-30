@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
-"""Minecraft Bedrock Engineer core MCP server (STDIO-compatible, HTTP-gateway embeddable). Creates new projects and item slices; analysis tools remain read-only."""
+"""Local stdio MCP server for Minecraft Bedrock Engineer. Creates new projects and item slices; analysis tools remain read-only."""
 from __future__ import annotations
 
 import gzip
-import hashlib
 import json
 import os
 import re
 import shutil
 import subprocess
-import tempfile
 import sys
 import uuid
 import zipfile
@@ -28,18 +26,19 @@ from archive_safety import (  # noqa: E402
 )
 
 VERSION_FILE = ROOT / "VERSION"
-SERVER_VERSION = VERSION_FILE.read_text(encoding="utf-8").strip()\nMCP_SERVER_NAME = "minecraft-bedrock-engineer"\nMCP_TRANSPORTS = ("stdio", "http-gateway")
+SERVER_VERSION = VERSION_FILE.read_text(encoding="utf-8").strip()
 MAX_MEMBERS_RETURNED = 2000
 SUPPORTED_SUFFIXES = {".mcaddon", ".mcpack", ".mcworld", ".zip"}
 AUDITOR = ROOT / "skills" / "automated-validation" / "scripts" / "bedrock_audit.py"
 
 # Keep the priority workflow short and front-loaded for clients that expose it.
 WORKFLOW_INSTRUCTIONS = (
-    "Project: create_addon_project. Writers: create_addon_item, create_addon_block, create_addon_recipe, create_addon_entity, create_entity_with_mct. "
-    "MCT CLI: creator_tools_status/catalog/validate_with_mct. "
-    "Samples: search_mojang_samples/read_mojang_sample; inspect_archive, compare_baseline, diff_packs, audit_pack, get_resource_graph, validate_manifest, audit_geometry, audit_animation. "
-    "Audit/reference tools are read-only; preserve originals; no fake textures; cite evidence; runtime NOT RUN."
+    "Project: create_addon_project; content: create_addon_item, create_addon_block, create_addon_recipe. "
+    "Writes in scaffold; refuse collisions; no fake textures. Samples: search_mojang_samples/read_mojang_sample. "
+    "inspect_archive for ZIP safety; audit_pack/compare_baseline/diff_packs for audits; get_resource_graph/validate_manifest/audit_geometry/audit_animation for checks. "
+    "Cite evidence; runtime NOT RUN unless tested. Audit/reference tools are read-only; authoring needs a tool or approved MCT CLI."
 )
+
 
 def _tool(
     name: str,
@@ -50,7 +49,6 @@ def _tool(
     read_only: bool = True,
     destructive: bool = False,
     idempotent: bool = True,
-    open_world: bool = False,
 ) -> dict[str, Any]:
     return {
         "name": name,
@@ -65,7 +63,7 @@ def _tool(
             "readOnlyHint": read_only,
             "destructiveHint": destructive,
             "idempotentHint": idempotent,
-            "openWorldHint": open_world,
+            "openWorldHint": False,
         },
     }
 
@@ -147,21 +145,6 @@ TOOLS = [
         idempotent=False,
     ),
     _tool(
-        "create_addon_entity",
-        "Create a minimal custom entity as one coordinated BP/RP slice: BP entity, RP client entity, geometry and render controller. Validates the linked project and all paths before writing; refuses any output collision; never invents a PNG. Static generation only; runtime remains NOT RUN.",
-        {
-            "project_directory": {"type": "string", "minLength": 1, "maxLength": 63, "description": "One existing child directory of the configured workspace."},
-            "entity_name": {"type": "string", "minLength": 2, "maxLength": 80, "description": "Human-readable entity name, e.g. Forest Golem."},
-            "entity_slug": {"type": "string", "minLength": 2, "maxLength": 48, "description": "Lowercase snake_case identifier suffix, e.g. forest_golem."},
-            "texture_path": {"type": "string", "minLength": 1, "maxLength": 200, "description": "Optional project-relative PNG already inside this project's RP. If omitted, files reference textures/entity/<entity_slug>.png without creating a fake texture."},
-            "target_game_version": {"type": "string", "minLength": 5, "maxLength": 20, "description": "Three-part numeric target version matching the BP/RP scaffold, e.g. 1.26.50."},
-        },
-        ["project_directory", "entity_name", "entity_slug", "target_game_version"],
-        read_only=False,
-        destructive=False,
-        idempotent=False,
-    ),
-    _tool(
         "create_addon_recipe",
         "Create a shaped or shapeless crafting-table recipe in an EXISTING project scaffold. Validates the BP/RP scaffold, target version and custom identifiers; writes one new recipes/<slug>.json without overwriting existing files. Ingredients/results must be vanilla IDs or definitions already present in this project's BP. Static output only; runtime remains NOT RUN.",
         {
@@ -179,40 +162,6 @@ TOOLS = [
         read_only=False,
         destructive=False,
         idempotent=False,
-    ),
-    _tool(
-        "creator_tools_status",
-        "Read-only discovery of local Node.js, npm and Minecraft Creator Tools CLI. Checks installed commands only; never uses npx or installs packages.",
-        {},
-        [],
-    ),
-    _tool(
-        "creator_tools_catalog",
-        "Ask the installed MCT CLI for gallery template IDs and types. The CLI may access its own gallery/cache; no package is installed by this tool.",
-        {},
-        [],
-        read_only=True, destructive=False, idempotent=True, open_world=True,
-    ),
-    _tool(
-        "validate_with_mct",
-        "Validate a project with the installed MCT CLI on a temporary copy. Uses --offline/--isolated; MCT documents that some checks may still use the network.",
-        {
-            "project_directory": {"type": "string", "minLength": 1, "maxLength": 63, "description": "One existing child directory of the configured workspace."},
-            "suite": {"type": "string", "enum": ["main", "addon", "currentplatform", "all"], "description": "MCT validation suite; defaults to addon."},
-        },
-        ["project_directory"],
-        read_only=True, destructive=False, idempotent=True, open_world=True,
-    ),
-    _tool(
-        "create_entity_with_mct",
-        "Optional MCT handoff: generate from an explicit entity template in a bounded staging copy, audit against baseline, then merge only new pack files if no existing file changed and no new HIGH/BLOCKER finding appeared. No shell, npx, auto-install or deployment; MCT may access its gallery/cache.",
-        {
-            "project_directory": {"type": "string", "minLength": 1, "maxLength": 63, "description": "One existing child directory of the configured workspace."},
-            "template_id": {"type": "string", "minLength": 1, "maxLength": 64, "description": "An entity-template ID returned by creator_tools_catalog (gallery item type entityType)."},
-            "entity_slug": {"type": "string", "minLength": 1, "maxLength": 50, "description": "Lowercase letters, digits and underscores."},
-        },
-        ["project_directory", "template_id", "entity_slug"],
-        read_only=False, destructive=False, idempotent=False, open_world=True,
     ),
     _tool("audit_pack", "Run all supported static checks against a Bedrock ZIP-compatible archive. Returns the full structured report; runtime remains NOT RUN.", {"candidate_path": _PATH}, ["candidate_path"]),
     _tool("compare_baseline", "Compare a candidate archive against a baseline and report additions, removals, modifications and audit findings.", {"candidate_path": _PATH, "baseline_path": _PATH}, ["candidate_path", "baseline_path"]),
@@ -401,37 +350,6 @@ def _validate_arguments(name: str, args: Any) -> dict[str, Any]:
             parts = texture.split("/")
             if any(part in {"", ".", ".."} for part in parts) or not texture.endswith(".png"):
                 raise ValueError("texture_path must be a canonical relative path ending in .png")
-    if name == "create_addon_entity":
-        dirname = normalized["project_directory"]
-        if not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", dirname) or "--" in dirname:
-            raise ValueError("project_directory must be one lowercase kebab-case directory name, not a path")
-        if not normalized["entity_name"].strip() or normalized["entity_name"] != normalized["entity_name"].strip():
-            raise ValueError("entity_name must be nonblank and have no leading/trailing whitespace")
-        if not re.fullmatch(r"[a-z][a-z0-9]*(?:_[a-z0-9]+)*", normalized["entity_slug"]):
-            raise ValueError("entity_slug must be lowercase snake_case and start with a letter")
-        version = normalized["target_game_version"]
-        if not re.fullmatch(r"(?:0|[1-9][0-9]{0,2})\.(?:0|[1-9][0-9]{0,2})\.(?:0|[1-9][0-9]{0,2})", version):
-            raise ValueError("target_game_version must be a three-part numeric version, for example 1.26.50")
-        texture = normalized.get("texture_path")
-        if texture is not None:
-            if not texture.strip() or texture != texture.strip():
-                raise ValueError("texture_path must be nonblank and have no surrounding whitespace")
-            if "\\" in texture or "\x00" in texture or texture.startswith("/") or re.match(r"^[A-Za-z]:", texture):
-                raise ValueError("texture_path must be a safe relative POSIX path")
-            parts = texture.split("/")
-            if any(part in {"", ".", ".."} for part in parts) or not texture.lower().endswith(".png"):
-                raise ValueError("texture_path must be a canonical relative path ending in .png")
-    if name in {"validate_with_mct", "create_entity_with_mct"}:
-        dirname = normalized["project_directory"]
-        if not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", dirname) or "--" in dirname:
-            raise ValueError("project_directory must be one lowercase kebab-case directory name, not a path")
-    if name == "validate_with_mct":
-        normalized.setdefault("suite", "addon")
-    if name == "create_entity_with_mct":
-        if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]{0,63}", normalized["template_id"]):
-            raise ValueError("template_id must be a simple MCT gallery template ID, not a path or command")
-        if not re.fullmatch(r"[a-z0-9][a-z0-9_]{0,49}", normalized["entity_slug"]):
-            raise ValueError("entity_slug must contain only lowercase letters, digits and underscores")
     if name == "create_addon_recipe":
         dirname = normalized["project_directory"]
         if not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", dirname) or "--" in dirname:
@@ -488,104 +406,8 @@ def _validate_arguments(name: str, args: Any) -> dict[str, Any]:
     return normalized
 
 
-def _sample_category(path: str) -> str:
-    """Classify version-labelled examples shipped with the source tree."""
-    for prefix, category in (
-        ("resource_pack/models/entity/", "geometry"),
-        ("resource_pack/animations/", "animation"),
-        ("resource_pack/entity/", "client_entity"),
-        ("behavior_pack/items/", "item"),
-        ("behavior_pack/blocks/", "block"),
-        ("behavior_pack/recipes/", "recipe"),
-    ):
-        if path.startswith(prefix):
-            return category
-    return "other"
-
-
-def _sample_identifiers(value: Any) -> list[str]:
-    """Harvest literal identifiers from curated JSON examples."""
-    found: set[str] = set()
-    def visit(node: Any, depth: int = 0) -> None:
-        if depth > 16:
-            return
-        if isinstance(node, dict):
-            for key, child in node.items():
-                if key == "identifier" and isinstance(child, str) and re.fullmatch(r"[A-Za-z0-9_.:-]{1,160}", child):
-                    found.add(child)
-                elif key in {"geometry", "animation", "animation_controller", "render_controller"}:
-                    if isinstance(child, str) and re.fullmatch(r"[A-Za-z0-9_.:-]{1,160}", child):
-                        found.add(child)
-                    elif isinstance(child, dict):
-                        found.update(v for v in child.values() if isinstance(v, str) and re.fullmatch(r"[A-Za-z0-9_.:-]{1,160}", v))
-                visit(child, depth + 1)
-        elif isinstance(node, list):
-            for child in node[:5000]:
-                visit(child, depth + 1)
-    visit(value)
-    return sorted(found)[:500]
-
-
-def _build_curated_mojang_sample_index() -> dict[str, Any]:
-    """Build a small, honest fallback when the generated full index is not packaged."""
-    metadata_path = MOJANG_SAMPLE_REFERENCE_ROOT / "INDEX_METADATA.json"
-    try:
-        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-        reference_root = MOJANG_SAMPLE_REFERENCE_ROOT.resolve(strict=True)
-    except (OSError, json.JSONDecodeError) as exc:
-        raise ValueError(f"curated Mojang sample references are unavailable or invalid: {exc}") from exc
-    if not isinstance(metadata, dict) or not isinstance(metadata.get("target_version"), str):
-        raise ValueError("curated Mojang sample metadata has an invalid shape")
-
-    entries: list[dict[str, Any]] = []
-    for sample_path, bundled_rel in _BUNDLED_SAMPLE_FILES.items():
-        try:
-            file_path = (reference_root / bundled_rel).resolve(strict=True)
-            file_path.relative_to(reference_root)
-            if not file_path.is_file() or file_path.stat().st_size > MAX_SAMPLE_READ_BYTES:
-                continue
-            raw = file_path.read_bytes()
-            content = raw.decode("utf-8")
-        except (OSError, RuntimeError, ValueError, UnicodeDecodeError):
-            continue
-        parsed: Any = None
-        json_parsed = False
-        if file_path.suffix.lower() == ".json":
-            try:
-                parsed = json.loads(content)
-                json_parsed = isinstance(parsed, (dict, list))
-            except json.JSONDecodeError:
-                pass
-        entries.append({
-            "path": sample_path,
-            "category": _sample_category(sample_path),
-            "size_bytes": len(raw),
-            "sha256": hashlib.sha256(raw).hexdigest(),
-            "identifiers": _sample_identifiers(parsed) if json_parsed else [],
-            "json_parsed": json_parsed,
-            "search_terms": sorted(set(re.findall(r"[a-z0-9_.:-]{3,}", content.lower())))[:12000],
-        })
-    if not entries:
-        raise ValueError("no readable curated Mojang sample examples are available")
-    return {
-        "target_version": metadata["target_version"],
-        "source": "mojang_bedrock_samples_curated_fallback",
-        "archive_sha256": metadata.get("zip_sha256"),
-        "archive_stats": {
-            "source_archive_entry_count": metadata.get("entry_count"),
-            "source_archive_indexed_count": metadata.get("indexed_count"),
-            "curated_fallback_entry_count": len(entries),
-            "full_index_available": False,
-        },
-        "index_mode": "curated_fallback",
-        "entries": entries,
-    }
-
-
 def _load_mojang_sample_index() -> dict[str, Any]:
-    """Load the full offline index, or fall back to packaged curated examples."""
-    if not MOJANG_SAMPLE_INDEX.is_file():
-        return _build_curated_mojang_sample_index()
+    """Load the bundled, compressed, metadata-only index; never access the network."""
     try:
         with gzip.open(MOJANG_SAMPLE_INDEX, "rt", encoding="utf-8") as stream:
             payload = json.load(stream)
@@ -593,7 +415,6 @@ def _load_mojang_sample_index() -> dict[str, Any]:
         raise ValueError(f"bundled Mojang sample index is unavailable or invalid: {exc}") from exc
     if not isinstance(payload, dict) or not isinstance(payload.get("entries"), list):
         raise ValueError("bundled Mojang sample index has an invalid shape")
-    payload.setdefault("index_mode", "full_index")
     return payload
 
 
@@ -615,15 +436,11 @@ def _search_mojang_samples(args: dict[str, Any]) -> dict[str, Any]:
         category_text = str(entry.get("category", "")).lower()
         ids = entry.get("identifiers") if isinstance(entry.get("identifiers"), list) else []
         id_text = " ".join(v.lower() for v in ids if isinstance(v, str))
-        search_terms = entry.get("search_terms") if isinstance(entry.get("search_terms"), list) else []
-        search_text = " ".join(v.lower() for v in search_terms if isinstance(v, str))
         score = 0
         if query in path_text:
             score += 24
         if query in id_text:
             score += 30
-        if search_text and query in search_text:
-            score += 8
         matched = 0
         for token in tokens:
             token_match = False
@@ -642,9 +459,6 @@ def _search_mojang_samples(args: dict[str, Any]) -> dict[str, Any]:
                     score += 3
             if token in id_text:
                 score += 10
-                token_match = True
-            if token in search_text:
-                score += 2
                 token_match = True
             if token in category_text:
                 score += 3
@@ -676,7 +490,6 @@ def _search_mojang_samples(args: dict[str, Any]) -> dict[str, Any]:
         "source": payload.get("source"),
         "source_archive_sha256": payload.get("archive_sha256"),
         "index_stats": payload.get("archive_stats"),
-        "index_mode": payload.get("index_mode", "full_index"),
         "total_matches": total,
         "truncated": total > limit,
         "results": [result for _, result in matches[:limit]],
@@ -753,7 +566,6 @@ def _read_mojang_sample(args: dict[str, Any]) -> dict[str, Any]:
         "category": indexed.get("category"),
         "target_version": payload.get("target_version"),
         "source_archive_sha256": payload.get("archive_sha256"),
-        "index_mode": payload.get("index_mode", "full_index"),
         "content_sha256": digest,
         "content_hash_matches_index": digest == indexed_digest if indexed_digest else None,
         "source": source,
@@ -2068,607 +1880,6 @@ def _create_addon_recipe(args: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-
-def _create_addon_entity(args: dict[str, Any]) -> dict[str, Any]:
-    """Create a safe, linked BP/RP entity slice without overwriting existing files."""
-    workspace = _workspace_root()
-    project_name = args["project_directory"]
-    target = workspace / project_name
-    try:
-        project = target.resolve(strict=True)
-        project.relative_to(workspace)
-    except (OSError, ValueError) as exc:
-        raise ValueError(f"project directory does not exist inside the configured workspace: {project_name}") from exc
-    if target.is_symlink() or project != target or not project.is_dir():
-        raise ValueError("project_directory must be a real directory directly under the configured workspace")
-
-    bp_parent = project / "behavior_packs"
-    rp_parent = project / "resource_packs"
-    bp_root = bp_parent / f"{project_name}_BP"
-    rp_root = rp_parent / f"{project_name}_RP"
-    for parent, pack_root in ((bp_parent, bp_root), (rp_parent, rp_root)):
-        if parent.is_symlink() or not parent.is_dir() or pack_root.is_symlink() or not pack_root.is_dir():
-            raise ValueError("project BP/RP folder is missing or unsafe")
-        try:
-            parent.resolve(strict=True).relative_to(project)
-            pack_root.resolve(strict=True).relative_to(project)
-        except (OSError, ValueError) as exc:
-            raise ValueError("project BP/RP folder resolves outside the project") from exc
-        manifest_path = pack_root / "manifest.json"
-        if manifest_path.is_symlink() or not manifest_path.is_file():
-            raise ValueError("project BP/RP manifest is missing or unsafe")
-
-    try:
-        bp_manifest = json.loads((bp_root / "manifest.json").read_text(encoding="utf-8"))
-        rp_manifest = json.loads((rp_root / "manifest.json").read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise ValueError(f"project manifest is invalid JSON or unreadable: {exc}") from exc
-    if not isinstance(bp_manifest, dict) or not isinstance(rp_manifest, dict):
-        raise ValueError("project BP/RP manifests must be JSON objects")
-    bp_header, rp_header = bp_manifest.get("header"), rp_manifest.get("header")
-    bp_deps = bp_manifest.get("dependencies")
-    if not isinstance(bp_header, dict) or not isinstance(rp_header, dict) or not isinstance(bp_deps, list):
-        raise ValueError("project manifests are missing expected header/dependency objects")
-    rp_uuid = rp_header.get("uuid")
-    if not isinstance(rp_uuid, str) or not any(isinstance(dep, dict) and dep.get("uuid") == rp_uuid for dep in bp_deps):
-        raise ValueError("project BP/RP manifests do not contain a valid BP-to-RP UUID dependency")
-    if bp_header.get("min_engine_version") != rp_header.get("min_engine_version"):
-        raise ValueError("project BP/RP target versions differ; refusing to add content")
-    version_parts = [int(part) for part in args["target_game_version"].split(".")]
-    if bp_header.get("min_engine_version") != version_parts:
-        raise ValueError("target_game_version does not match this project's BP/RP min_engine_version")
-
-    slug = args["entity_slug"]
-    namespace = re.sub(r"[^a-z0-9_]", "_", project_name.lower().replace("-", "_"))
-    if not namespace or not namespace[0].isalpha():
-        namespace = f"addon_{namespace}"
-    identifier = f"{namespace}:{slug}"
-    geometry_id = f"geometry.{namespace}.{slug}"
-    render_controller_id = f"controller.render.{namespace}.{slug}"
-    expected_texture_rel = Path("textures") / "entity" / f"{slug}.png"
-    texture_ref = (Path("textures") / "entity" / slug).as_posix()
-    texture_path_arg = args.get("texture_path")
-    texture_status = "texture_file_not_created"
-
-    if texture_path_arg:
-        candidate = project / Path(*texture_path_arg.split("/"))
-        try:
-            resolved_texture = candidate.resolve(strict=True)
-            resolved_texture.relative_to(rp_root.resolve(strict=True))
-        except (OSError, ValueError) as exc:
-            raise ValueError("texture_path must resolve to an existing file inside this project's Resource Pack") from exc
-        if candidate.is_symlink() or not resolved_texture.is_file() or resolved_texture.suffix.lower() != ".png":
-            raise ValueError("texture_path must be a regular PNG file, not a symlink or directory")
-        current = candidate.parent
-        while current != rp_root:
-            if current.is_symlink():
-                raise ValueError("texture_path contains a symlinked parent")
-            current = current.parent
-            if current == project or current == current.parent:
-                raise ValueError("texture_path is not inside the Resource Pack")
-        with resolved_texture.open("rb") as stream:
-            if stream.read(8) != b"\x89PNG\r\n\x1a\n":
-                raise ValueError("texture_path does not have a PNG signature")
-        texture_ref = resolved_texture.relative_to(rp_root.resolve(strict=True)).with_suffix("").as_posix()
-        texture_status = "mapped_existing_png"
-
-    bp_rel = Path("entities") / f"{slug}.json"
-    client_rel = Path("entity") / f"{slug}.entity.json"
-    geometry_rel = Path("models") / "entity" / f"{slug}.geo.json"
-    controller_rel = Path("render_controllers") / f"{slug}.render_controllers.json"
-    outputs = [(bp_root, bp_rel), (rp_root, client_rel), (rp_root, geometry_rel), (rp_root, controller_rel)]
-    for pack_root, relative in outputs:
-        destination = pack_root / relative
-        parent = destination.parent
-        if parent.is_symlink() or not parent.is_dir():
-            raise ValueError(f"required output folder is missing or unsafe: {destination.relative_to(project).as_posix()}")
-        try:
-            parent.resolve(strict=True).relative_to(pack_root.resolve(strict=True))
-            destination.resolve(strict=False).relative_to(pack_root.resolve(strict=True))
-        except (OSError, ValueError) as exc:
-            raise ValueError(f"generated entity path escapes its pack: {destination.relative_to(project).as_posix()}") from exc
-        if destination.is_symlink() or destination.exists():
-            raise ValueError(f"entity output already exists or is a symlink; refusing to overwrite: {destination.relative_to(project).as_posix()}")
-
-    bp_entity = {
-        "format_version": "1.20.50",
-        "minecraft:entity": {
-            "description": {"identifier": identifier, "is_spawnable": True, "is_summonable": True, "is_experimental": False},
-            "components": {
-                "minecraft:type_family": {"family": [namespace, "mob"]},
-                "minecraft:health": {"value": 20, "max": 20},
-                "minecraft:collision_box": {"width": 0.8, "height": 1.8},
-                "minecraft:movement": {"value": 0.25},
-                "minecraft:movement.basic": {},
-                "minecraft:navigation.walk": {"can_path_over_water": True},
-                "minecraft:jump.static": {},
-                "minecraft:physics": {},
-                "minecraft:pushable": {"is_pushable": True, "is_pushable_by_piston": True},
-                "minecraft:behavior.float": {"priority": 0},
-                "minecraft:behavior.random_stroll": {"priority": 6, "speed_multiplier": 1.0},
-                "minecraft:behavior.look_at_player": {"priority": 7, "look_distance": 8.0, "probability": 0.02},
-                "minecraft:behavior.random_look_around": {"priority": 8}
-            }
-        }
-    }
-    client_entity = {
-        "format_version": "1.10.0",
-        "minecraft:client_entity": {
-            "description": {
-                "identifier": identifier,
-                "materials": {"default": "entity_alphatest"},
-                "textures": {"default": texture_ref},
-                "geometry": {"default": geometry_id},
-                "render_controllers": [render_controller_id]
-            }
-        }
-    }
-    geometry = {
-        "format_version": "1.12.0",
-        "minecraft:geometry": [{
-            "description": {
-                "identifier": geometry_id,
-                "texture_width": 64,
-                "texture_height": 64,
-                "visible_bounds_width": 2.0,
-                "visible_bounds_height": 2.5,
-                "visible_bounds_offset": [0, 1.25, 0]
-            },
-            "bones": [
-                {"name": "body", "pivot": [0, 12, 0], "cubes": [{"origin": [-4, 6, -2], "size": [8, 12, 4], "uv": [0, 0]}]},
-                {"name": "head", "parent": "body", "pivot": [0, 24, 0], "cubes": [{"origin": [-4, 18, -4], "size": [8, 8, 8], "uv": [0, 16]}]},
-                {"name": "left_leg", "pivot": [2, 12, 0], "cubes": [{"origin": [1, 0, -2], "size": [3, 6, 3], "uv": [0, 32]}]},
-                {"name": "right_leg", "pivot": [-2, 12, 0], "cubes": [{"origin": [-4, 0, -2], "size": [3, 6, 3], "uv": [16, 32]}]}
-            ]
-        }]
-    }
-    render_controller = {
-        "format_version": "1.8.0",
-        "render_controllers": {
-            render_controller_id: {
-                "geometry": "Geometry.default",
-                "materials": [{"*": "Material.default"}],
-                "textures": ["Texture.default"]
-            }
-        }
-    }
-
-    contents = [
-        (bp_root / bp_rel, json.dumps(bp_entity, ensure_ascii=False, indent=2) + "\n"),
-        (rp_root / client_rel, json.dumps(client_entity, ensure_ascii=False, indent=2) + "\n"),
-        (rp_root / geometry_rel, json.dumps(geometry, ensure_ascii=False, indent=2) + "\n"),
-        (rp_root / controller_rel, json.dumps(render_controller, ensure_ascii=False, indent=2) + "\n"),
-    ]
-    created: list[Path] = []
-    try:
-        for destination, payload in contents:
-            with destination.open("x", encoding="utf-8", newline="\n") as stream:
-                created.append(destination)
-                stream.write(payload)
-                stream.flush()
-                os.fsync(stream.fileno())
-    except Exception:
-        for destination in reversed(created):
-            try:
-                if destination.is_file() and not destination.is_symlink():
-                    destination.unlink()
-            except OSError:
-                pass
-        raise
-
-    return {
-        "status": "created",
-        "project_directory": str(project),
-        "entity_identifier": identifier,
-        "geometry_identifier": geometry_id,
-        "render_controller_identifier": render_controller_id,
-        "files_created": [path.relative_to(project).as_posix() for path, _payload in contents],
-        "texture_status": texture_status,
-        "texture_expected_path": f"resource_packs/{project_name}_RP/{expected_texture_rel.as_posix()}",
-        "texture_reference": texture_ref,
-        "target_game_version": args["target_game_version"],
-        "mcp_server_version": SERVER_VERSION,
-        "runtime_status": "NOT RUN",
-        "note": "Generated a coordinated BP entity, RP client-entity, geometry and render controller. A real PNG texture is still required if one was not supplied; animation, spawn-rule and in-game behavior were not tested."
-    }
-
-
-
-def _resolve_mct_scaffold(project_name: str) -> tuple[Path, Path, Path]:
-    """Resolve a direct workspace project with valid linked BP/RP manifests."""
-    workspace = _workspace_root()
-    target = workspace / project_name
-    try:
-        project = target.resolve(strict=True)
-        project.relative_to(workspace)
-    except (OSError, ValueError) as exc:
-        raise ValueError(f"project directory does not exist inside the configured workspace: {project_name}") from exc
-    if target.is_symlink() or project != target or not project.is_dir():
-        raise ValueError("project_directory must be a real directory directly under the configured workspace")
-    bp_root = project / "behavior_packs" / f"{project_name}_BP"
-    rp_root = project / "resource_packs" / f"{project_name}_RP"
-    for parent, pack_root in ((project / "behavior_packs", bp_root), (project / "resource_packs", rp_root)):
-        if parent.is_symlink() or not parent.is_dir() or pack_root.is_symlink() or not pack_root.is_dir():
-            raise ValueError("project BP/RP folder is missing or unsafe")
-        try:
-            parent.resolve(strict=True).relative_to(project)
-            pack_root.resolve(strict=True).relative_to(project)
-        except (OSError, ValueError) as exc:
-            raise ValueError("project BP/RP folder resolves outside the project") from exc
-        manifest_path = pack_root / "manifest.json"
-        if manifest_path.is_symlink() or not manifest_path.is_file():
-            raise ValueError("project BP/RP manifest is missing or unsafe")
-    try:
-        bp = json.loads((bp_root / "manifest.json").read_text(encoding="utf-8"))
-        rp = json.loads((rp_root / "manifest.json").read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise ValueError(f"project manifest is invalid JSON or unreadable: {exc}") from exc
-    if not isinstance(bp, dict) or not isinstance(rp, dict):
-        raise ValueError("project BP/RP manifests must be JSON objects")
-    bh, rh, deps = bp.get("header"), rp.get("header"), bp.get("dependencies")
-    if not isinstance(bh, dict) or not isinstance(rh, dict) or not isinstance(deps, list):
-        raise ValueError("project manifests are missing expected header/dependency objects")
-    if not isinstance(rh.get("uuid"), str) or not any(isinstance(d, dict) and d.get("uuid") == rh["uuid"] for d in deps):
-        raise ValueError("project BP/RP manifests do not contain a valid BP-to-RP UUID dependency")
-    if bh.get("min_engine_version") != rh.get("min_engine_version"):
-        raise ValueError("project BP/RP target versions differ")
-    return project, bp_root, rp_root
-
-
-def _validate_mct_project_tree(project: Path) -> dict[str, int]:
-    """Reject symlinks/special files, unsafe names and unbounded staging input."""
-    root = project.resolve(strict=True)
-    count = total = 0
-    for current, directories, filenames in os.walk(root, topdown=True, followlinks=False):
-        folder = Path(current)
-        if folder.is_symlink():
-            raise ValueError("MCT staging refuses symlinked directories")
-        for dirname in list(directories):
-            candidate = folder / dirname
-            if candidate.is_symlink():
-                raise ValueError("MCT staging refuses symlinked directories")
-            try:
-                candidate.resolve(strict=True).relative_to(root)
-            except (OSError, ValueError) as exc:
-                raise ValueError("project directory resolves outside the project") from exc
-        for filename in filenames:
-            path = folder / filename
-            if path.is_symlink() or not path.is_file():
-                raise ValueError("MCT staging refuses symlinks and non-regular files")
-            relative = path.relative_to(root).as_posix()
-            if not _safe_indexed_sample_path(relative) or any(ord(ch) < 32 or ord(ch) == 127 for ch in relative):
-                raise ValueError("MCT staging refuses non-canonical paths")
-            size = path.stat().st_size
-            if size > MAX_MEMBER_BYTES:
-                raise ValueError(f"project file exceeds the {MAX_MEMBER_BYTES}-byte staging limit")
-            total += size
-            count += 1
-            if total > MAX_UNCOMPRESSED_BYTES or count > MAX_ARCHIVE_MEMBERS:
-                raise ValueError("project exceeds the bounded MCT staging size or file-count limit")
-    return {"file_count": count, "total_bytes": total}
-
-
-def _mct_pack_snapshot(project: Path, project_name: str) -> dict[str, dict[str, Any]]:
-    """Hash regular files under the two expected pack roots."""
-    output: dict[str, dict[str, Any]] = {}
-    for root in (project / "behavior_packs" / f"{project_name}_BP", project / "resource_packs" / f"{project_name}_RP"):
-        resolved_root = root.resolve(strict=True)
-        for current, directories, filenames in os.walk(root, topdown=True, followlinks=False):
-            folder = Path(current)
-            if folder.is_symlink():
-                raise ValueError("MCT snapshot refuses symlinked pack directories")
-            for dirname in list(directories):
-                if (folder / dirname).is_symlink():
-                    raise ValueError("MCT snapshot refuses symlinked pack directories")
-            for filename in filenames:
-                path = folder / filename
-                if path.is_symlink() or not path.is_file():
-                    raise ValueError("MCT snapshot refuses symlinks and non-regular files")
-                try:
-                    path.resolve(strict=True).relative_to(resolved_root)
-                except (OSError, ValueError) as exc:
-                    raise ValueError("MCT snapshot file resolves outside its pack root") from exc
-                digest = hashlib.sha256()
-                with path.open("rb") as stream:
-                    for block in iter(lambda: stream.read(1024 * 1024), b""):
-                        digest.update(block)
-                output[path.relative_to(project).as_posix()] = {"sha256": digest.hexdigest(), "size_bytes": path.stat().st_size}
-    return output
-
-
-def _create_mct_pack_archive(project: Path, project_name: str, destination: Path) -> None:
-    """Package expected BP/RP roots for static baseline/candidate comparison."""
-    _validate_mct_project_tree(project)
-    _mct_pack_snapshot(project, project_name)
-    with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        for label, root in (
-            ("BP", project / "behavior_packs" / f"{project_name}_BP"),
-            ("RP", project / "resource_packs" / f"{project_name}_RP"),
-        ):
-            for current, directories, filenames in os.walk(root, topdown=True, followlinks=False):
-                folder = Path(current)
-                if folder.is_symlink() or any((folder / name).is_symlink() for name in directories):
-                    raise ValueError("MCT audit archive refuses symlinked directories")
-                for filename in filenames:
-                    path = folder / filename
-                    if path.is_symlink() or not path.is_file():
-                        raise ValueError("MCT audit archive refuses symlinks and non-regular files")
-                    archive.write(path, f"{label}/{path.relative_to(root).as_posix()}")
-
-
-def _mct_command(command: list[str], cwd: Path, timeout: int = 60) -> dict[str, Any]:
-    """Run an explicit local executable without shell dispatch or package installation."""
-    try:
-        process = subprocess.run(
-            command, cwd=str(cwd), capture_output=True, text=True, timeout=timeout,
-            check=False, shell=False, env={**os.environ, "NO_COLOR": "1", "CI": "1"},
-        )
-    except subprocess.TimeoutExpired:
-        return {"exit_code": None, "timed_out": True, "stdout": "", "stderr": f"command exceeded the {timeout}-second limit"}
-    except OSError as exc:
-        return {"exit_code": None, "launch_error": str(exc)[:1000], "stdout": "", "stderr": ""}
-    stdout = process.stdout if isinstance(process.stdout, str) else ""
-    stderr = process.stderr if isinstance(process.stderr, str) else ""
-    return {
-        "exit_code": process.returncode, "timed_out": False,
-        "stdout": stdout[:12000], "stderr": stderr[:12000],
-        "stdout_truncated": len(stdout) > 12000, "stderr_truncated": len(stderr) > 12000,
-    }
-
-
-def _extract_cli_json(text_value: str) -> Any:
-    try:
-        return json.loads(text_value)
-    except json.JSONDecodeError:
-        decoder = json.JSONDecoder()
-        for index, char in enumerate(text_value):
-            if char != "{":
-                continue
-            try:
-                value, _end = decoder.raw_decode(text_value[index:])
-            except json.JSONDecodeError:
-                continue
-            if isinstance(value, dict):
-                return value
-    return None
-
-
-def _creator_tools_status() -> dict[str, Any]:
-    workspace = _workspace_root()
-    tools: dict[str, Any] = {}
-    for name in ("node", "npm", "mct"):
-        executable = shutil.which(name)
-        if not executable:
-            tools[name] = {"status": "not_found", "path": None}
-            continue
-        command = [executable, "version", "--json"] if name == "mct" else [executable, "--version"]
-        result = _mct_command(command, workspace, timeout=8)
-        parsed = _extract_cli_json(result.get("stdout", "")) if name == "mct" else None
-        tools[name] = {
-            "status": "available" if result.get("exit_code") == 0 else "check_failed",
-            "path": executable,
-            "version": parsed.get("version") if isinstance(parsed, dict) else result.get("stdout", "").strip(),
-            "version_payload": parsed if isinstance(parsed, dict) else None,
-            "result": result,
-        }
-    return {
-        "status": "available" if tools["mct"]["status"] == "available" else "mct_not_installed",
-        "tools": tools, "automatic_install_performed": False, "npx_used": False,
-        "mcp_server_version": SERVER_VERSION, "runtime_status": "NOT RUN",
-    }
-
-
-def _creator_tools_catalog() -> dict[str, Any]:
-    executable = shutil.which("mct")
-    if not executable:
-        return {
-            "status": "not_available",
-            "message": "MCT CLI is not installed. Install it explicitly; this tool never uses npx or installs packages.",
-            "automatic_install_performed": False, "runtime_status": "NOT RUN",
-        }
-    command = [executable, "add", "--list-types", "--json", "--offline", "--isolated"]
-    result = _mct_command(command, _workspace_root(), timeout=60)
-    payload = _extract_cli_json(result.get("stdout", ""))
-    return {
-        "status": "completed" if result.get("exit_code") == 0 and isinstance(payload, dict) else "catalog_failed",
-        "catalog": payload, "command": command, "command_result": result,
-        "note": "The MCT CLI may load its gallery from a local cache or remote source; --offline/--isolated do not guarantee every operation is network-free.",
-        "automatic_install_performed": False, "runtime_status": "NOT RUN", "mcp_server_version": SERVER_VERSION,
-    }
-
-
-def _validate_with_mct(args: dict[str, Any]) -> dict[str, Any]:
-    project_name = args["project_directory"]
-    project, _bp_root, _rp_root = _resolve_mct_scaffold(project_name)
-    tree_info = _validate_mct_project_tree(project)
-    executable = shutil.which("mct")
-    if not executable:
-        return {
-            "status": "not_available", "project_directory": str(project),
-            "message": "MCT CLI is not installed. Install it explicitly and ensure mct is on PATH; this tool never uses npx.",
-            "source_project_modified": False, "automatic_install_performed": False, "runtime_status": "NOT RUN",
-        }
-    with tempfile.TemporaryDirectory(prefix="mbe-mct-validate-") as temporary:
-        temporary_root = Path(temporary)
-        staged_project = temporary_root / project_name
-        report_directory = temporary_root / "reports"
-        shutil.copytree(project, staged_project)
-        report_directory.mkdir()
-        command = [
-            executable, "validate", args["suite"],
-            "--input-folder", str(staged_project), "--output-folder", str(report_directory),
-            "--single", "--isolated", "--offline", "--json",
-        ]
-        result = _mct_command(command, staged_project, timeout=180)
-    return {
-        "status": "completed" if result.get("exit_code") == 0 else ("launch_failed" if result.get("launch_error") else "completed_with_findings"),
-        "project_directory": str(project), "suite": args["suite"], "source_tree": tree_info,
-        "source_project_modified": False, "command_result": result,
-        "network_note": "MCT runs on a temporary copy with --offline and --isolated. Its CLI documentation notes some checks may still use the network.",
-        "automatic_install_performed": False, "runtime_status": "NOT RUN", "mcp_server_version": SERVER_VERSION,
-    }
-
-
-def _create_entity_with_mct(args: dict[str, Any]) -> dict[str, Any]:
-    project_name, template_id, slug = args["project_directory"], args["template_id"], args["entity_slug"]
-    project, bp_root, rp_root = _resolve_mct_scaffold(project_name)
-    source_tree = _validate_mct_project_tree(project)
-    executable = shutil.which("mct")
-    if not executable:
-        return {
-            "status": "not_available", "project_directory": str(project),
-            "message": "MCT CLI is not installed. Install it explicitly and ensure mct is on PATH; this tool never uses npx.",
-            "automatic_install_performed": False, "writes_applied": False, "runtime_status": "NOT RUN",
-        }
-
-    catalog = _creator_tools_catalog()
-    payload = catalog.get("catalog") if isinstance(catalog, dict) else None
-    gallery_items = payload.get("galleryTemplates") if isinstance(payload, dict) else None
-    template = next((item for item in gallery_items if isinstance(item, dict) and item.get("id") == template_id), None) if isinstance(gallery_items, list) else None
-    template_type = str(template.get("type", "")).lower() if isinstance(template, dict) else ""
-    if catalog.get("status") != "completed":
-        return {"status": "catalog_unavailable", "catalog_status": catalog.get("status"), "writes_applied": False, "runtime_status": "NOT RUN"}
-    if template is None or template_type not in {"4", "entitytype", "entity_type", "entity"}:
-        return {
-            "status": "invalid_entity_template", "template_id": template_id,
-            "message": "Choose an entityType gallery template (MCT enum value 4) from creator_tools_catalog.",
-            "writes_applied": False, "runtime_status": "NOT RUN",
-        }
-
-    before = _mct_pack_snapshot(project, project_name)
-    with tempfile.TemporaryDirectory(prefix="mbe-mct-stage-") as temporary:
-        temp_root = Path(temporary)
-        staged_project = temp_root / project_name
-        baseline_archive, candidate_archive = temp_root / "before.mcaddon", temp_root / "after.mcaddon"
-        shutil.copytree(project, staged_project)
-        _validate_mct_project_tree(staged_project)
-        _create_mct_pack_archive(project, project_name, baseline_archive)
-        command = [
-            executable, "add", template_id, slug,
-            "--input-folder", str(staged_project), "--isolated", "--offline", "--yes", "--single", "--json",
-        ]
-        generation = _mct_command(command, staged_project, timeout=180)
-        if generation.get("exit_code") != 0:
-            return {
-                "status": "generation_failed", "command_result": generation, "writes_applied": False,
-                "automatic_install_performed": False, "runtime_status": "NOT RUN",
-                "note": "MCT did not exit successfully; the original project was not modified.",
-            }
-
-        _validate_mct_project_tree(staged_project)
-        after = _mct_pack_snapshot(staged_project, project_name)
-        added = sorted(set(after) - set(before))
-        modified = sorted(path for path in set(after) & set(before) if after[path] != before[path])
-        removed = sorted(set(before) - set(after))
-        if modified or removed:
-            return {
-                "status": "refused_existing_file_changes", "files_added_in_staging": added[:100],
-                "files_modified_in_staging": modified[:100], "files_removed_in_staging": removed[:100],
-                "writes_applied": False, "runtime_status": "NOT RUN",
-                "note": "MCT changed or deleted existing pack files in staging. Nothing was merged.",
-            }
-        if not added:
-            return {
-                "status": "no_new_pack_files", "command_result": generation, "writes_applied": False,
-                "runtime_status": "NOT RUN", "note": "MCT added no files inside the expected BP/RP roots.",
-            }
-
-        _create_mct_pack_archive(staged_project, project_name, candidate_archive)
-        try:
-            baseline_report = _run_audit(baseline_archive)
-            candidate_report = _run_audit(candidate_archive, baseline_archive)
-            diff = _summarize_pack_diff(candidate_report, baseline_report)
-        except (OSError, RuntimeError, TimeoutError, ValueError) as exc:
-            return {"status": "static_audit_failed", "message": str(exc), "files_added_in_staging": added[:100], "writes_applied": False, "runtime_status": "NOT RUN"}
-
-        new_findings = diff.get("finding_delta", {}).get("new", {}).get("items", [])
-        escalations = diff.get("finding_delta", {}).get("severity_escalations", {}).get("items", [])
-        critical_new = [item for item in new_findings if isinstance(item, dict) and str(item.get("severity", "")).upper() in {"HIGH", "BLOCKER"}]
-        critical_escalations = [item for item in escalations if isinstance(item, dict) and str(item.get("candidate", "")).upper() in {"HIGH", "BLOCKER"}]
-        audit_summary = {
-            "recommendation": diff.get("recommendation"),
-            "summary": diff.get("summary"),
-            "new_findings": new_findings[:30],
-            "new_unresolved_references": diff.get("reference_delta", {}).get("new_unresolved", {}).get("items", [])[:30],
-            "reference_regressions": diff.get("reference_delta", {}).get("resolved_to_unresolved", {}).get("items", [])[:30],
-        }
-        if critical_new or critical_escalations:
-            return {
-                "status": "refused_static_audit_hold", "files_added_in_staging": added[:100],
-                "audit": audit_summary, "writes_applied": False, "runtime_status": "NOT RUN",
-                "note": "The staged entity introduces new HIGH/BLOCKER findings or escalates a finding to that severity. Review before merging.",
-            }
-
-        additions: list[tuple[Path, bytes]] = []
-        planned_directories: set[Path] = set()
-        pack_roots = {
-            ("behavior_packs", f"{project_name}_BP"): bp_root,
-            ("resource_packs", f"{project_name}_RP"): rp_root,
-        }
-        for relative_text in added:
-            relative = Path(relative_text)
-            if len(relative.parts) < 3 or tuple(relative.parts[:2]) not in pack_roots:
-                return {"status": "refused_outside_pack", "path": relative_text, "writes_applied": False, "runtime_status": "NOT RUN"}
-            pack_root = pack_roots[tuple(relative.parts[:2])]
-            source_path, target_path = staged_project / relative, project / relative
-            if source_path.is_symlink() or not source_path.is_file() or source_path.stat().st_size > MAX_MEMBER_BYTES:
-                return {"status": "refused_unsafe_output", "path": relative_text, "writes_applied": False, "runtime_status": "NOT RUN"}
-            try:
-                source_path.resolve(strict=True).relative_to(staged_project.resolve(strict=True))
-                target_path.resolve(strict=False).relative_to(pack_root.resolve(strict=True))
-            except (OSError, ValueError) as exc:
-                return {"status": "refused_unsafe_output", "path": relative_text, "message": str(exc), "writes_applied": False, "runtime_status": "NOT RUN"}
-            if target_path.exists() or target_path.is_symlink():
-                return {"status": "refused_collision", "path": relative_text, "writes_applied": False, "runtime_status": "NOT RUN"}
-            parent = target_path.parent
-            while parent != pack_root:
-                if parent.exists():
-                    if parent.is_symlink() or not parent.is_dir():
-                        return {"status": "refused_unsafe_parent", "path": relative_text, "writes_applied": False, "runtime_status": "NOT RUN"}
-                else:
-                    planned_directories.add(parent)
-                parent = parent.parent
-            additions.append((target_path, source_path.read_bytes()))
-
-        created_directories: list[Path] = []
-        created_files: list[Path] = []
-        try:
-            for directory in sorted(planned_directories, key=lambda path: len(path.parts)):
-                if not directory.exists():
-                    directory.mkdir()
-                    created_directories.append(directory)
-                elif directory.is_symlink() or not directory.is_dir():
-                    raise ValueError("merge destination directory changed during preflight")
-            for destination, contents in additions:
-                with destination.open("xb") as stream:
-                    created_files.append(destination)
-                    stream.write(contents)
-                    stream.flush()
-                    os.fsync(stream.fileno())
-        except Exception:
-            for path in reversed(created_files):
-                try:
-                    if path.is_file() and not path.is_symlink():
-                        path.unlink()
-                except OSError:
-                    pass
-            for path in reversed(created_directories):
-                try:
-                    path.rmdir()
-                except OSError:
-                    pass
-            raise
-
-        return {
-            "status": "created", "project_directory": str(project), "template_id": template_id,
-            "entity_slug": slug, "files_created": [path.relative_to(project).as_posix() for path, _ in additions],
-            "audit": audit_summary, "mct_command_result": generation, "source_tree": source_tree,
-            "automatic_install_performed": False, "npx_used": False, "runtime_status": "NOT RUN",
-            "note": "Only new files from the bounded staging copy were merged. Review audit warnings and import into Minecraft for runtime verification.",
-        }
-
-
-
 def call_tool(name: str, raw_args: Any) -> dict[str, Any]:
     try:
         args = _validate_arguments(name, raw_args)
@@ -2680,16 +1891,6 @@ def call_tool(name: str, raw_args: Any) -> dict[str, Any]:
             return _create_addon_block(args)
         if name == "create_addon_recipe":
             return _create_addon_recipe(args)
-        if name == "create_addon_entity":
-            return _create_addon_entity(args)
-        if name == "creator_tools_status":
-            return _creator_tools_status()
-        if name == "creator_tools_catalog":
-            return _creator_tools_catalog()
-        if name == "validate_with_mct":
-            return _validate_with_mct(args)
-        if name == "create_entity_with_mct":
-            return _create_entity_with_mct(args)
         if name == "search_mojang_samples":
             return _search_mojang_samples(args)
         if name == "read_mojang_sample":
@@ -2756,7 +1957,7 @@ def handle_message(message: Any) -> dict[str, Any] | None:
         return {"jsonrpc": "2.0", "id": request_id, "result": {
             "protocolVersion": selected,
             "capabilities": {"tools": {"listChanged": False}},
-            "serverInfo": {"name": MCP_SERVER_NAME, "version": SERVER_VERSION},
+            "serverInfo": {"name": "minecraft-bedrock-engineer", "version": SERVER_VERSION},
             "instructions": WORKFLOW_INSTRUCTIONS,
         }}
     if method == "ping":

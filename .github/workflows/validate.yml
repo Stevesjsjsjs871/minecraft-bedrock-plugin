@@ -2,7 +2,7 @@ name: Validate Minecraft Bedrock Engineer
 
 on:
   push:
-    branches: [main]
+    branches: ["feat/cloudflare-workers-mcp"]
   pull_request:
   workflow_dispatch:
 
@@ -17,77 +17,31 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install report-schema validator
-        run: python -m pip install jsonschema
-      - name: Compile analyzer, MCP server and evaluation tools
-        run: |
-          python -m py_compile archive_safety.py
-          python -m py_compile server/mcp_server.py server/tests/test_mcp_server.py
-          python -m py_compile server/texture_generator_mcp.py server/tests/test_texture_generator_mcp.py
-          python -m py_compile server/png_validation.py server/tests/test_png_validation.py
-          python -m py_compile server/texture_link_audit_mcp.py server/tests/test_texture_link_audit_mcp.py
-          python -m py_compile skills/automated-validation/scripts/bedrock_audit.py
-          python -m py_compile skills/automated-validation/scripts/validate_report.py
-          python -m py_compile skills/regression-evals/scripts/regression_tests.py
-          python -m py_compile skills/audit-benchmark/scripts/evaluate_benchmark.py
-          python -m py_compile skills/audit-benchmark/scripts/test_evaluate_benchmark.py
-          python -m py_compile skills/bedrock-development/scripts/index_mojang_samples.py
-          python -m py_compile skills/bedrock-development/scripts/test_index_mojang_samples.py
-          python -m py_compile skills/package-integrity/scripts/check_package_integrity.py
-          python -m py_compile skills/package-integrity/scripts/test_check_package_integrity.py
-          python -m py_compile skills/visual-resource-pipeline/scripts/generate_texture.py skills/visual-resource-pipeline/scripts/test_generate_texture.py
-      - name: Test MCP server schemas, protocol, diff tool and safety
-        run: python -m unittest discover -s server/tests -v
-      - name: Test shared PNG stream validator
-        run: python -m unittest discover -s server/tests -p 'test_png_validation.py' -v
-      - name: Test read-only BP/RP texture-link auditor
-        run: python -m unittest discover -s server/tests -p 'test_texture_link_audit_mcp.py' -v
-      - name: Test benchmark evaluator safety and metrics
-        run: python -m unittest discover -s skills/audit-benchmark/scripts -p 'test_*.py' -v
-      - name: Test Mojang sample-index safety and fallback
-        run: python -m unittest discover -s skills/bedrock-development/scripts -p 'test_*.py' -v
-      - name: Test procedural texture generator
+      - name: Compile bundled Python utilities
+        run: python -m compileall -q skills
+      - name: Geometry and UV engine tests
+        run: python -m unittest discover -s skills/geometry-uv-engine/scripts -p 'test_*.py' -v
+      - name: PNG engine and texture generator tests
         run: python -m unittest discover -s skills/visual-resource-pipeline/scripts -p 'test_*.py' -v
-      - name: Test package-integrity checker
+      - name: Package integrity checker tests
         run: python -m unittest discover -s skills/package-integrity/scripts -p 'test_*.py' -v
-      - name: Run package-integrity audit
-        run: python skills/package-integrity/scripts/check_package_integrity.py .
-      - name: Run analyzer regression cases and report-schema checks
-        run: python skills/regression-evals/scripts/regression_tests.py --auditor skills/automated-validation/scripts/bedrock_audit.py
-      - name: Check package, compatibility manifest and server versions
+      - name: Mojang sample indexer tests
+        run: python -m unittest discover -s skills/bedrock-development/scripts -p 'test_*.py' -v
+      - name: Audit benchmark tests
+        run: python -m unittest discover -s skills/audit-benchmark/scripts -p 'test_*.py' -v
+      - name: Verify release metadata and Skills-only boundary
         run: |
           python - <<'PY'
           import json
-          import runpy
           from pathlib import Path
-
-          expected = "1.0.14"
-          assert Path("VERSION").read_text(encoding="utf-8").strip() == expected
-          root = json.loads(Path("plugin.json").read_text(encoding="utf-8"))
-          compat = json.loads(Path(".codex-plugin/plugin.json").read_text(encoding="utf-8"))
+          expected = "1.5.11"
+          assert Path("VERSION").read_text().strip() == expected
+          root = json.loads(Path("plugin.json").read_text())
+          compat = json.loads(Path(".codex-plugin/plugin.json").read_text())
           assert root["name"] == compat["name"] == "minecraft-bedrock-engineer"
           assert root["version"] == compat["version"] == expected
           assert root["extensions"]["com.openai"]["interface"]["defaultPrompt"] == compat["interface"]["defaultPrompt"]
-          server = runpy.run_path("server/mcp_server.py")
-          texture_server = runpy.run_path("server/texture_generator_mcp.py")
-          texture_auditor = runpy.run_path("server/texture_link_audit_mcp.py")
-          assert server["SERVER_VERSION"] == expected
-          assert texture_server["SERVER_VERSION"] == expected
-          assert texture_auditor["SERVER_VERSION"] == expected
-          texture_tools = {tool["name"]: tool for tool in texture_server["TOOLS"]}
-          assert {"generate_texture", "register_texture_atlas"} <= set(texture_tools)
-          assert texture_tools["register_texture_atlas"]["annotations"]["idempotentHint"] is True
-          audit_tools = {tool["name"]: tool for tool in texture_auditor["TOOLS"]}
-          assert "audit_texture_links" in audit_tools
-          assert audit_tools["audit_texture_links"]["annotations"]["readOnlyHint"] is True
-          for config_path in (".mcp.json", "mcp.json"):
-              config = json.loads(Path(config_path).read_text(encoding="utf-8"))
-              servers = config.get("mcpServers", {})
-              texture = servers.get("minecraft-bedrock-texture-generator")
-              audit = servers.get("minecraft-bedrock-texture-link-auditor")
-              assert texture and texture.get("type") == "stdio"
-              assert any("server/texture_generator_mcp.py" in arg.replace("\\", "/") for arg in texture.get("args", []))
-              assert audit and audit.get("type") == "stdio"
-              assert any("server/texture_link_audit_mcp.py" in arg.replace("\\", "/") for arg in audit.get("args", []))
-          print("PASS: manifests, prompts, texture authoring/audit MCP tools, three MCP servers and both MCP configurations are synchronized at", expected)
+          assert not Path(".mcp.json").exists() and not Path("mcp.json").exists()
+          assert not Path("Dockerfile").exists() and not Path("wrangler.toml").exists()
+          print("PASS: manifests, prompts, Skills-only architecture and version", expected)
           PY

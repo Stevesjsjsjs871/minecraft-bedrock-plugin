@@ -1,17 +1,19 @@
-# Minecraft Bedrock Engineer 1.4.0
+# Minecraft Bedrock Engineer 1.4.0 — UV Retarget Pipeline
 
-## Source and transport changes
-- Aligns VERSION, plugin.json and Codex plugin metadata at 1.4.0.
-- Registers the UV texture retarget MCP server in both MCP registries (16 server entries).
-- Marks the core Python MCP server as embeddable behind an HTTP gateway while preserving STDIO.
-- Adds Cloudflare Worker + Python Container deployment scaffolding under cloudflare/ and Dockerfile.
+## Delivered
 
-## Deployment gate
-This branch is not yet deployable: the current Git tree does not contain three source modules referenced by both the registries and the Cloudflare container:
-- server/entity_authoring_mcp.py
-- server/animation_controller_mcp.py
-- server/uv_texture_retarget_mcp.py
+`retarget_texture_to_entity` turns the multi-tool reference workflow into one guarded MCP operation: image analysis → explicit human-reviewed crop/face assignments → UV planning → PNG transfer → output integrity verification. Existing lower-level tools remain available for expert/manual control.
 
-Do not deploy until these exact 1.4.0 source files and their dependent tests/assets are synchronized from the complete release archive, then run the full suite and a container build.
+## Hard approval and safety gates
 
-No production Worker deployment or Minecraft runtime test is claimed by this source update.
+- The caller must supply each source crop and exact bone/cube/face selector.
+- Every assignment must include a semantic label and `approved: true`; the request must include `review_confirmed: true`.
+- Analyzer candidates are shape/area heuristics, never semantic recognition.
+- Input hashes are checked before/after planning and transfer. UV overlaps, unresolved planning conditions and output collisions stop the operation.
+- Output is a new PNG; the existing transfer engine validates and refuses overwrites. The wrapper verifies dimensions and SHA-256.
+
+## Evidence and limitations
+
+- New isolated orchestration/contract suite: **13/13 passed** with mocked existing-module boundaries.
+- New server and test files passed Python bytecode compilation.
+- Full-package regression, real project end-to-end texture rendering, Minecraft import/runtime and Blockbench interoperability were not run in this isolated environment. Reported runtime status remains **NOT RUN**.

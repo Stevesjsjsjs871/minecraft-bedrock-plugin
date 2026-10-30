@@ -1,85 +1,32 @@
 ---
 name: visual-resource-pipeline
-description: Use when creating or validating Minecraft Bedrock textures, geometry, animation, and connected Resource Pack assets.
+description: Use for Minecraft Bedrock entity/block visual assets, geometry, UVs, animations, textures and RP resource-link validation.
 ---
 
-# Visual Resource Pipeline
+# Visual resource pipeline
 
-Default target is Minecraft Bedrock 1.26.50. Prefer bundled version-matched Mojang samples and official Creator documentation. Keep the dependency chain coherent: BP definition -> RP client entity or atlas -> geometry/textures/controllers/animations -> localization and recipe/behavior references. Preserve existing assets and reject path traversal and unintended overwrites. Distinguish static validation from in-game tests; mark runtime NOT RUN.
+Default reference baseline is Bedrock 1.26.50 unless the project specifies another version. Start with `skills-first-execution`; this is a workflow, not a remote tool suite. Do not call historical MCP tool names. Use bundled scripts only when a real executor can access them and their documented inputs.
 
-## Procedural texture generator
+## 1. Inventory and source
+Inspect geometry, client entities, render controllers, materials, animations/controllers, atlas files, PNGs and localization. Record identifiers, texture dimensions and references. Use exact-version Mojang Samples and official Creator docs; record provenance. Do not execute scripts from third-party packs.
 
-`scripts/generate_texture.py` is the deterministic standard-library RGBA PNG writer. It supports `pixel_noise`, `checker`, `stripes`, `solid`, `vertical_gradient`, `horizontal_gradient`, `brick`, `stone_noise`, `ore_veins`, and `wood_grain`; width/height are capped at 1024 each and 1,048,576 total pixels.
+## 2. Geometry and UV
+- Run `python skills/geometry-uv-engine/scripts/geometry_engine.py <geometry.geo.json>` for a static parse of the selected geometry identifier, bones/cubes, declared texture canvas, classic/per-face UV bounds and overlaps. Also inspect format version, parent hierarchy and pivots; these broader checks are not all emitted by the current CLI.
+- Inspect classic box UV and supported per-face UV forms; check bounds, `uv_size`, rotations and intentional overlaps.
+- Run `skills/geometry-uv-engine/scripts/geometry_engine.py` for standalone static geometry/UV bounds and overlap analysis; follow `geometry-uv-template-authoring` only as guidance because template rendering is not yet a standalone executable. Their previous server implementations are dormant migration sources; automatic UV audit/template generation is `NOT RUN` until standalone CLIs are migrated and tested.
+- A generated UV guide is a separate reference image, never the entity production texture.
+- Unsupported mesh forms must be reported as outside audit scope, not silently passed.
 
-The separate `minecraft-bedrock-texture-generator` stdio MCP server exposes two tools:
+## 3. Texture authoring
+The bundled `scripts/png_engine.py` is a standalone PNG structural validator. Run `python skills/visual-resource-pipeline/scripts/png_engine.py <texture.png>` to check signature, chunk CRCs, IDAT decompression, scanline sizes/filters and dimensions. Its focused tests are in `test_png_engine.py`. The bundled `scripts/generate_texture.py` is a deterministic standard-library PNG generator, not AI image synthesis. Inspect its `--help` and tests before execution. It supports implemented procedural styles only; do not claim it creates a hand-painted or semantically accurate skin. Preserve the original texture and write a distinct output unless overwrite was explicitly authorized.
 
-- `generate_texture` creates a deterministic RGBA PNG inside an existing project's `resource_packs/<project>_RP/textures/` directory. It requires existing parent folders, refuses symlinked paths and existing destinations, validates style/color/dimensions, then fully validates the written PNG before reporting success. Results include the file hash.
-- `register_texture_atlas` registers an existing PNG in `textures/terrain_texture.json` (`texture_type: "blocks"`) or `textures/item_texture.json` (`texture_type: "items"`). It validates legal IHDR combinations, chunk bounds/order/CRCs, consecutive IDAT chunks, bounded zlib decompression, exact scanline lengths and filter bytes (including Adam7 interlace). It preserves unrelated atlas entries and rejects duplicate JSON keys and conflicting identifiers.
+For geometry-aware painting or reference transfer, follow `texture-painting-pipeline`, `uv-mapping-assistant`, `reference-mapping-review` and `reference-texture-transfer`. Use exact bone/cube/face selectors and explicit source crops. Require human review for semantic correspondence; geometric ranking is not semantic recognition. Validate source/output PNGs, dimensions, alpha, UV coverage and overlaps only where a real implementation is available; do not invoke retired server wrappers as tools.
 
-Atlas registration serializes this tool's read/modify/write cycles with a per-atlas exclusive lock. A lock already present causes an `ATLAS_BUSY` result. A possible stale lock is deliberately not removed automatically: inspect it and remove it only after confirming no texture-tool process is still running. Atlas JSON is atomically replaced after validation.
+## 4. Animation and render linkage
+Verify client-entity aliases, geometry/material/texture declarations, render-controller references, animation aliases, controller states, transitions, Molang expressions and animated bone names. A syntactically valid animation is not proof that it plays in-game.
 
-## Texture-link auditor
+## 5. Texture/resource references
+Inspect BP item/block definitions and RP atlases/localization. Resolve atlas keys to actual PNG paths and validate PNG decoding/dimensions. If the available auditor lacks a dedicated atlas mode, perform explicit file/reference checks; never claim a historical MCP texture-link auditor was called.
 
-The separate `minecraft-bedrock-texture-link-auditor` stdio MCP server exposes the read-only `audit_texture_links` tool. Pass one existing project directory directly under `MINECRAFT_BEDROCK_WORKSPACE` (the same project layout created by `create_addon_project`). It scans:
-
-- `behavior_packs/<project>_BP/blocks/**/*.json` for `minecraft:material_instances` texture keys.
-- `behavior_packs/<project>_BP/items/**/*.json` for `minecraft:icon` in string, `texture`, or `textures.default` form.
-- `resource_packs/<project>_RP/textures/terrain_texture.json` and `item_texture.json` for the corresponding atlas entries.
-- The PNG file paths referenced by each atlas entry, including project containment, chunk ordering/CRCs, legal IHDR/PLTE/tRNS metadata, consecutive IDAT chunks, bounded zlib decompression, exact scanline lengths/filter bytes and Adam7 passes.
-
-The auditor uses `server/png_validation.py` for full image-stream checks. It catches PNGs whose chunk CRCs are valid but whose compressed IDAT data is broken or decodes to an invalid scanline layout. Repeated PNG paths are checked once per audit; atlas entry count, unique PNG count and aggregate PNG bytes have explicit safety budgets. The report exposes `analysis_complete`, `atlas_keys_checked`, `unique_png_files_inspected` and `png_bytes_inspected`. A false `analysis_complete` means a safety budget or unsafe/missing scan directory prevented full coverage. Unused entries are warnings because content may be referenced dynamically or outside the scanned BP block/item folders. The scan is read-only and never edits, repairs or deletes project files.
-
-Example audit MCP arguments:
-
-```json
-{
-  "project_directory": "ruby-addon"
-}
-```
-
-The auditor follows the documented static link shapes; it cannot infer runtime-generated references or guarantee Minecraft rendering. It reports `runtime_status: "NOT RUN"`.
-
-## Example texture generation
-
-```json
-{
-  "project_directory": "ruby-addon",
-  "output_path": "resource_packs/ruby-addon_RP/textures/blocks/ruby_ore.png",
-  "width": 16,
-  "height": 16,
-  "style": "ore_veins",
-  "base_color": "#55545A",
-  "accent_color": "#9A5CDA",
-  "seed": 14
-}
-```
-
-## Geometry UV guide generation
-
-Before external texture painting, use `minecraft-bedrock-geometry-uv-auditor.audit_geometry_uvs` to check the model and any explicitly linked PNG. Then use `minecraft-bedrock-geometry-uv-template.generate_geometry_uv_template` to create a separate transparent face-labeled UV guide under `resource_packs/<project>_RP/textures/uv_templates/`. It expands classic box UVs, supports per-face UV rectangles and rotations, and marks possible UV intersections in magenta. Review intersections as possible intentional mirrored/shared texture regions, not automatic errors.
-
-The guide is not the entity texture and is not automatically bound to a client entity or registered in an atlas. Never replace the model texture with the guide. Review the returned face-region map to map each label back to its bone/cube. See `skills/geometry-uv-template-authoring/SKILL.md` for the full input contract and limitations.
-
-## Asset workflow
-
-1. Inventory existing geometry, animation, animation-controller, render-controller, material and texture files. Locate definitions and references rather than guessing.
-2. Search version-matched Mojang samples for relevant patterns and record source paths and compatibility evidence.
-3. Use supported Creator Tools capabilities only when actually exposed by the host; do not fabricate a successful delegation.
-4. Validate identifier/path consistency, geometry structure, bones, UVs, animation names and controller transitions with available static checks.
-5. Compare against the baseline and report the file list before and after, changed definitions, resource removals and severity changes.
-6. Run `audit_texture_links` after adding or changing item/block textures and atlas entries. Resolve errors before packaging; treat unused entries as review warnings, not automatic deletion candidates.
-7. For entity texture work, run `audit_geometry_uvs`, generate a separate UV guide, paint the actual PNG at the declared canvas size, then re-run the geometry and texture-link audits.
-8. Import into the target game when possible. Check missing textures, rendering, animation transitions and behavior; record the exact build/scenario.
-
-## Asset discipline
-
-- Follow user-provided references precisely; do not invent unrequested model or texture details.
-- Do not delete unrelated geometry, bones, animations, controllers, textures or atlas entries.
-- Distinguish generated assets, reference samples, existing assets and placeholders; preserve provenance/licensing boundaries.
-- Mark all unexecuted runtime checks `NOT RUN`.
-
-## Geometry-aware texture painting
-
-For entity textures, use `minecraft-bedrock-texture-painter` / `paint_geometry_texture` after UV audit and template review. The tool maps explicit bone/cube/face selectors to regions extracted from `.geo.json` and paints an existing or transparent canvas with fill, border, checker, stripes, gradient or seeded noise operations. It writes a distinct PNG, keeps a supplied source image's unpainted pixels/alpha, requires exact geometry texture dimensions and refuses out-of-bounds UVs. Overlaps require an explicit opt-in.
-
-This feature is deterministic 2D pixel painting, not AI texture synthesis or a 3D render preview. It does not simulate face sampling orientation, Molang/material lighting, or engine rendering. See `skills/texture-painting-pipeline/SKILL.md` for the full contract and example.
+## 6. Output and limits
+Report exact files/selectors, generated vs supplied assets, image hashes/dimensions, mapped/unmapped faces, overlap warnings, source provenance and tests. Deterministic pixel operations are 2D; they do not simulate 3D projection, renderer face orientation, lighting, mipmaps or seams. Minecraft import/rendering and Blockbench interoperability remain `NOT RUN` until tested.

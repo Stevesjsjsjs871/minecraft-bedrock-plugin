@@ -1,25 +1,26 @@
 ---
 name: release-readiness
-description: Use for a final candidate review that consolidates source preservation, tests, tool compatibility, artifact integrity, regression deltas and real Minecraft runtime status into an evidence-based recommendation.
+description: Use for a final review of a Minecraft Bedrock Engineer candidate covering source identity, Skills-only architecture, tests, compatibility, packaging, regression and runtime evidence.
 ---
 
-# Release Readiness
+# Release readiness
 
 ## Review categories
-1. **Source/identity**: current plugin ID/scope, manifests, version, prompts, MCP connection and full file inventory.
-2. **Functionality**: each writer or analyzer capability is present in source and accurately described.
-3. **Safety**: workspace/path confinement, symlink rejection, collision protection, bounded inputs, read-only integrity and safe tool annotations.
-4. **Tests**: complete unit suite, benchmark tests, sample-index tests, analyzer regressions, schemas and protocol checks.
-5. **Compatibility**: target Bedrock version, sample provenance, manifest dependency structure and API/version limitations.
-6. **Regression**: baseline comparison with all material changes explained.
-7. **Packaging**: archive opens, has expected layout/manifests, duplicate/path safety passes, hash recorded. Run `skills/package-integrity/scripts/check_package_integrity.py` on the actual full package and review warnings as well as failures.
-8. **Runtime**: only checked if the exact package was imported to the target Minecraft build. Keep separate from static results.
+1. **Source/identity:** plugin ID/scope, manifests, version, prompts, complete file inventory and release ID.
+2. **Architecture:** Skills-only manifests, no active MCP configuration or remote backend, no skill instructions invoking unavailable tools, and no obsolete deployment wrappers.
+3. **Functionality:** every advertised capability is supported by a real workflow/script or clearly labelled as guidance/planned work.
+4. **Safety:** path confinement, symlink rejection, collision protection, bounded inputs, read-only audits and no untrusted script execution.
+5. **Tests:** package checker, synthetic checker tests, focused script suites, sample-index tests, analyzer regressions and schemas where dependencies exist.
+6. **Compatibility:** target Bedrock version, sample provenance, manifest dependencies and API/version limitations.
+7. **Regression:** baseline comparison with all material changes explained.
+8. **Packaging:** archive opens, expected layout/manifests, no duplicate/unsafe paths, hash recorded. Run `check_skills_package.py` on the actual extracted package.
+9. **Runtime:** only claim tested when the exact package was imported into the exact Minecraft build and scenario.
 
 ## Decision thresholds
-- `HOLD`: required tests fail, package structure is invalid, write-safety regression, serious unexplained defect, or an existing core feature is broken.
-- `REVIEW`: tests or tools are blocked; meaningful findings remain heuristic; important runtime-sensitive behavior is untested.
-- `READY FOR USER TEST`: required static and contract checks passed, no serious unexplained regression remains, known limitations are explicit.
-- `RELEASE READY`: only if all release-required gates are proven, including any required engine/game testing specified for the deliverable. Never use this label merely because `VERSION` says 1.0.0.
+- `HOLD`: required test failure, invalid package, unsafe write, serious unexplained defect or broken core workflow.
+- `REVIEW`: blocked tests/tools, heuristic findings, incomplete coverage or untested runtime-sensitive behavior.
+- `READY FOR USER TEST`: required static checks passed, no serious unexplained regression remains and limitations are explicit.
+- `RELEASE READY`: only when all release-required gates, including required engine tests, are proven.
 
 ## Final report
-Include version/source identity, release candidate hash, per-gate status, exact test numbers and command, package-integrity JSON result, unexplained deltas, runtime status and the next action. Preserve raw failure evidence and do not hide a check to improve the aggregate result.
+Include version/source identity, candidate hash, per-gate status, exact commands and test counts, package-checker output, unexplained deltas, runtime status and next action. Preserve raw failure evidence.

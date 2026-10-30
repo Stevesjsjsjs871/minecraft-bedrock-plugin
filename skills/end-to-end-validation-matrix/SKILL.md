@@ -1,36 +1,29 @@
 ---
 name: end-to-end-validation-matrix
-description: Use after implementing or generating Minecraft Bedrock content to choose and report validation coverage across files, pack structure, reference graph, Creator Tools and game runtime.
+description: Use after Bedrock content changes to select and report artifact, manifest, resource-graph, regression, benchmark and runtime validation coverage.
 ---
 
-# End-to-End Validation Matrix
+# End-to-end validation matrix
 
-## Objective
-Select test layers based on what changed, run the feasible ones in a clear order, and report omissions without hiding them. No single green static report can guarantee that Minecraft will load and execute the add-on.
+Choose layers based on the files changed. No static report guarantees Minecraft will load or execute the add-on.
 
 ## Validation layers
-1. **Artifact safety** — archive readability/CRC, duplicate or unsafe paths, file bounds, SHA-256 and expected archive inventory.
-2. **Package structure** — JSON parse, BP/RP manifests, header/module UUIDs, dependency links, target version and expected folder layout.
-3. **Resource contract** — custom identifiers, icon/terrain atlases, localization keys, recipe ingredients/results, entity/client-entity pairing and all relevant file references.
-4. **Visual contract** — geometry IDs and bone hierarchy, textures/materials/render controllers, animation names and controller transitions, UI imports and literal localization references. Mark incomplete/heuristic domains explicitly.
-5. **Tool contract** — actual MCP registry, closed argument schemas, safety annotations, representative dispatch success/errors and file-write collision/path tests.
-6. **Regression contract** — audit baseline and candidate with the same analyzer version; compare file hashes, findings, severities and reference graph. Investigate new severe findings and unexplained removals.
-7. **Creator Tools contract** — only when actual MCT tools/CLI are available and their version/options verified. Record command/output and re-audit any tool-written files.
-8. **Benchmark contract** — only independently reviewed cases with verified artifact hashes. Report per-rule and aggregate precision/recall/F1, number of reviewed cases and severity mismatches separately. Never infer benchmark performance from fixtures.
-9. **Runtime contract** — import the exact output into the target game version, inspect pack loading, visuals and requested behavior. For multiplayer mechanics, test relevant multiplayer conditions. Record exact game build and scenario.
-10. **Release artifact** — package from a staged copy, reopen and validate the exact final archive, calculate its SHA-256 and preserve a report referencing that hash.
+1. **Artifact safety:** archive readability/CRC, duplicate or unsafe paths, bounded sizes, SHA-256 and expected inventory.
+2. **Package structure:** JSON parse, BP/RP manifests, UUID uniqueness, dependency links, target version and folder layout.
+3. **Resource contract:** identifiers, icon/terrain atlases, localization, recipes, entity/client-entity pairing and file references.
+4. **Visual contract:** geometry IDs/bones, UVs, textures/materials/render controllers, animation aliases/controllers/transitions, UI imports and literal localization references.
+5. **Execution contract:** only actual host file/code capabilities or an explicitly authorized local CLI. Skills do not expose tool registries or hidden dispatch APIs. For a text-only skill change, check package structure and skill discoverability; for code changes, run the relevant local script/unit tests.
+6. **Regression contract:** compare baseline and candidate with the same analyzer version/configuration; review file hashes, findings, severities and resource-graph deltas.
+7. **Creator Tools:** optional and only when an actual connected capability or authorized installed CLI is available. Record exact version/command and re-audit all files it changed.
+8. **Benchmark:** use independently reviewed cases with exact artifact hashes. Report precision/recall/F1, case count and severity mismatches. Synthetic fixtures are not real-pack evidence.
+9. **Runtime:** import the exact candidate into the target game version; inspect pack loading, visuals and requested behavior. Record exact build and scenario. Multiplayer behavior requires relevant multiplayer tests.
+10. **Release artifact:** package from a staged copy, reopen and validate the exact final archive, calculate SHA-256 and preserve a report referencing that hash.
 
-## Coverage selection
-Run at least the layers affected by the change and the package safety/manifest layers. For a text-only skill change, inspect manifest/schema/package and skill discoverability; don't claim the game runtime is relevant unless content is changed. For writer/MCP code changes, require tool schema tests and collision/path tests. For generated content, require resource contract and baseline checks. For visual or behavior changes, runtime testing remains necessary to confirm engine behavior.
+## Coverage and decision
+Run package safety/manifest checks plus every layer affected by the change. Required skips prevent an overall pass. Use `PASS`, `FAIL`, `BLOCKED`, `PARTIAL`, `NOT RUN`, `SKIPPED` or `INCONCLUSIVE` with named inputs and evidence.
+- `HOLD`: reproducible serious defect, invalid archive, unsafe write, broken critical dependency or failed mandatory test.
+- `REVIEW`: unresolved heuristic edges, blocked layers, unexplained changes or missing runtime evidence for runtime-sensitive behavior.
+- `READY FOR USER TEST`: required static checks actually passed and remaining runtime limitations are explicit.
 
-## Result states
-`PASSED`, `FAILED`, `BLOCKED`, `PARTIAL`, `NOT RUN`, `SKIPPED`, or `INCONCLUSIVE`. Attach each state to a named layer, inputs and exact evidence. Required skips prevent an overall pass.
-
-## Decision
-- `HOLD`: a reproducible serious defect, invalid archive, unsafe write, broken critical dependency or failed mandatory test.
-- `REVIEW`: unresolved/heuristic resource edges, blocked layers, unexplained changes or missing runtime evidence for runtime-sensitive behavior.
-- `READY FOR USER TEST`: required static/tool gates actually passed; unresolved limitations are listed for user/game testing.
-- Avoid `release-ready` if required engine/runtime checks haven't run.
-
-## Report template
-Candidate/hash/target version; layer table with status and evidence; changed/removed resources; baseline deltas; tool versions; benchmark metrics only if executed; runtime context; recommendation and remaining gates.
+## Report
+Candidate/hash/target version; layer status/evidence; changed and removed resources; baseline deltas; tool versions; benchmark metrics only if actually scored; runtime context; recommendation and remaining gates.

@@ -1,40 +1,42 @@
 ---
 name: geometry-uv-template-authoring
-description: Use when preparing a labeled UV guide from a Bedrock geometry file before painting, reviewing or revising its entity texture.
+description: Generate a labeled transparent PNG UV guide from supported Minecraft Bedrock cube geometry before painting or revising an entity texture.
 ---
 
 # Geometry UV template authoring
 
-Use `minecraft-bedrock-geometry-uv-template` and `generate_geometry_uv_template` for a separate UV guide image.
+Use the standalone `skills/geometry-uv-engine/scripts/uv_template_engine.py` renderer when a real Python executor can access the script and project files. It creates a separate transparent PNG guide and never edits geometry or the source texture.
 
-## Input contract
+```bash
+python skills/geometry-uv-engine/scripts/uv_template_engine.py path/to/entity.geo.json path/to/uv-guide.png --pixel-scale 4
+python skills/geometry-uv-engine/scripts/uv_template_engine.py path/to/entity.geo.json path/to/uv-guide.png --geometry-identifier geometry.example --pixel-scale 2 --max-pixels 16000000
+```
 
-- Select one `.geo.json` file inside `resource_packs/<project>_RP/models/entity/`.
-- If the file contains more than one `minecraft:geometry` entry, pass its exact `description.identifier` as `geometry_identifier`.
-- The selected geometry must declare integer `texture_width` and `texture_height` (1–4096).
-- Save the template only under `resource_packs/<project>_RP/textures/uv_templates/` with a new `.png` file name. Existing files are never overwritten.
-- `pixel_scale` is the number of output pixels per UV texel (1–8; default 4). Large canvases may require a smaller scale to stay within the pixel budget.
+## Input and safety
 
-## Mapping coverage
+- Select a `.geo.json`; pass exact `description.identifier` when several geometries exist.
+- The geometry description must declare positive integer `texture_width` and `texture_height`.
+- The output path must end in `.png`; the renderer refuses to overwrite an existing file and uses exclusive creation after ensuring its parent directory exists.
+- `pixel_scale` is an integer from 1 to 8. The default total pixel budget is 64 million pixels; tune `--max-pixels` explicitly if needed.
+- The report includes output dimensions, source texture-canvas dimensions, pixel scale, number of regions, out-of-bounds count and SHA-256.
 
-- Classic box UV (`uv: [u, v]`) is expanded into six labeled face regions using the Bedrock box-net arrangement. The DOWN face is shown as its occupied rectangle; the engine's V-flip is an orientation detail, not a different occupied area.
-- Per-face UV objects support `north`, `south`, `east`, `west`, `up` and `down`, including negative `uv_size` flips, omitted `uv_size` defaults from cube dimensions, and `uv_rotation` 0/90/180/270.
-- `poly_mesh` and `texture_meshes` are outside the template coverage and are reported rather than fabricated.
+## Supported UV formats
 
-## Reading the report
+- Classic box UV (`uv: [u, v]`) expands into six labeled face rectangles in the Bedrock box-net arrangement.
+- Per-face cube UV supports north/south/east/west/up/down, optional `uv_size` and 0/90/180/270 rotations.
+- Negative `uv_size` values are represented by their occupied positive rectangle; this static guide does not emulate face texture orientation or mirroring transform.
+- Mesh UV projection (`poly_mesh`, `texture_meshes`) is not implemented and must not be fabricated.
 
-- Out-of-bounds UVs are shown and reported; the tool clips drawing to the canvas but does not repair the source model.
-- Overlap intersections are highlighted in magenta. A shared region may be intentional mirroring or texture reuse, so overlaps are warnings for review, not automatic errors.
-- Fractional UV coordinates are noted; the PNG template rasterizes these at the selected pixel scale.
-- The image is a transparent guide, not a painted/usable entity texture. It is not automatically registered in an atlas or connected to a client entity.
-- Geometry and actual texture files are never edited. Minecraft sampling/orientation/render tests remain `NOT RUN` until imported into the target game.
+## Review and limitations
 
-## Recommended workflow
+- Inspect overlap regions carefully; mirrored/shared UVs may be intentional.
+- Out-of-bounds rectangles are highlighted, not repaired.
+- Labels are rasterized from a small built-in bitmap font and long bone names are truncated for legibility.
+- The guide is not the production texture and is not registered in atlases or client-entity bindings.
+- Minecraft renderer sampling, face orientation, lighting, mipmaps, seams and Blockbench import remain `NOT RUN` until tested.
 
-1. Run `audit_geometry_uvs` first to validate UV bounds and any explicitly associated PNG dimensions.
-2. Generate the UV template and review highlighted overlaps and out-of-bounds regions.
-3. Use the image as a guide. For explicit programmatic paint operations, use `paint_geometry_texture` with selectors for bone, cube index and/or face. Keep the output path separate from the source texture.
-4. Run `audit_geometry_uvs` again with the resulting PNG explicitly supplied.
-5. Run the texture-link auditor where block/item atlas links apply, then import the packs into the target Bedrock build for visual verification.
+Run renderer regression tests with:
+```bash
+python -m unittest skills.geometry_uv_engine.scripts.test_uv_template_engine -v
+```
 
-Official reference: [Bedrock geometry format 1.26.40](https://learn.microsoft.com/en-us/minecraft/creator/reference/content/visualreference/geometry.v1.26.40?view=minecraft-bedrock-stable) and [Entity Modeling and Animation](https://learn.microsoft.com/en-us/minecraft/creator/documents/entitymodelingandanimation?view=minecraft-bedrock-stable).

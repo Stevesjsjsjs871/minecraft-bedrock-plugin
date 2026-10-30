@@ -1,33 +1,32 @@
 ---
 name: automated-validation
-description: Use when a Minecraft Bedrock project needs repeatable archive, manifest, geometry, bone, UV, texture-reference, animation, controller, resource-graph, or baseline checks after creation or modification.
+description: Use to statically audit Minecraft Bedrock BP/RP projects and candidate archives, validate resource references and produce evidence-based reports.
 ---
 
-# Automated Validation
+# Automated validation workflow
 
-Run `python skills/automated-validation/scripts/bedrock_audit.py candidate.mcaddon --report audit-report.json` or add `--baseline previous.mcaddon`. The analyzer is read-only, uses Python's standard library, and shares bounded ZIP limits with the local MCP wrapper through package-root `archive_safety.py`.
+## Capability boundary
+Use `skills-first-execution` first. This skill does not expose an MCP wrapper or a hidden project filesystem. The primary bundled auditor is `scripts/bedrock_audit.py`; it can run only when a real code executor can access the script and the supplied project/archive. Otherwise prepare exact commands or a patch and mark execution `NOT RUN`.
 
-## Checks
-- ZIP CRC integrity, unsafe/duplicate paths, JSON syntax, manifests, UUIDs and in-archive dependency context.
-- Conservative geometry identifiers, bone hierarchy/transforms, cube/vector and UV structures.
-- Selected animation definitions and literal cross-resource references.
-- A resource-reference graph with source paths/pointers, target domains and resolution statuses, including common entity/attachable geometry, animation/controller, texture, UI and localization references.
-- Baseline file-hash diffs, definition counts, explicit coverage metadata and runtime status.
-- Partial UI/localization checks, selected loot-table structure and recursive in-archive loot-table reference checks. Heuristic/dynamic references remain lower-confidence review items.
-- Bounded input limits are applied before reading ZIP payloads; these are resource-safety limits, not Minecraft format limits.
+## Input safety
+- Identify the exact project root or candidate archive, target Bedrock version and BP/RP roots.
+- Treat uploaded packs as untrusted data. Never execute scripts from them.
+- Preserve source bytes; perform audits read-only and write reports separately.
+- Reject path traversal, duplicate archive paths, symlink escapes, unreasonable archive expansion and ambiguous roots.
 
-## Report schema and interpretation
+## Audit sequence
+1. Inspect ZIP structure/CRC and expected pack layout.
+2. Parse `manifest.json` for every BP/RP; check format, UUID uniqueness, module UUID uniqueness, engine version and BP dependency → RP header UUID.
+3. Parse JSON with duplicate-key detection where supported. Report exact path and JSON pointer/line when available.
+4. Check identifiers, namespace consistency, file paths and references across blocks, items, entities, client entities, geometry, textures, atlases, render controllers, animations, animation controllers, recipes, loot tables, spawn rules and localization.
+5. For RP UI, inventory all relevant `.json`, `.lang`, texture and include/namespace references. Do not treat dynamic references as confirmed missing without evidence.
+6. For geometry/animation, verify geometry identifiers, bones, cube/UV bounds, texture dimensions, animation aliases, controller state references, transitions and client-entity bindings.
+7. Classify findings by severity and confidence. Distinguish confirmed parse/reference errors from heuristics and unsupported resource shapes.
+8. If a baseline is supplied, compare definitions and resource graph edges; explain removals and new regressions.
+9. Validate the report against `references/report-schema.json` only when the schema validator is actually installed. Do not install dependencies silently.
 
-Validate reports with `python skills/automated-validation/scripts/validate_report.py report.json` where the JSON Schema dependency is available. A schema-valid report is structurally consistent, not proof that content works in-game. Static findings are hypotheses with evidence, not guarantees of engine behavior. Include archive SHA-256, source paths and JSON Pointers where available, severity, confidence, coverage and limitations.
+## Script use
+From the actual package root, inspect `python skills/automated-validation/scripts/bedrock_audit.py --help` before choosing arguments. Use bounded inputs and capture exact command, exit code and report path. `validate_report.py` can validate generated reports when its documented requirements are available. Do not invent arguments or claim a script ran if the package is not mounted.
 
-## New-project workflow
-
-`create_addon_project` creates only a new linked Behavior Pack/Resource Pack scaffold and its state/readme files. After content has actually been authored, use this analyzer for static validation. It does not audit a project directory directly; package or stage an archive using an available approved tool before calling archive audit tools. Don't treat an empty scaffold as a finished add-on and don't claim gameplay checks that were not run.
-
-## Regression gate
-
-Use `skills/regression-evals/scripts/regression_tests.py --auditor skills/automated-validation/scripts/bedrock_audit.py` when the real analyzer and its dependencies are present. Report exact pass/fail/skip results. Do not claim a suite passed if the analyzer is a stub, missing, or any required case was skipped.
-
-## Safety
-
-The analyzer does not execute pack scripts, alter project files, launch Minecraft or deploy to a live world. Never automatically delete or rewrite resources. Review baseline removals. Mark Minecraft import, visual output and gameplay/multiplayer tests `NOT RUN` unless actually performed.
+## Result vocabulary
+`PASS` means the check executed and passed; `FAIL` means it executed and found a failure; `PARTIAL` means bounded scan or unsupported shapes limited coverage; `BLOCKED` means required input/tool/dependency unavailable; `NOT RUN` means not executed. Always report coverage, skipped files, unsupported resource forms and runtime status. Static audit never proves Minecraft import, rendering or gameplay.

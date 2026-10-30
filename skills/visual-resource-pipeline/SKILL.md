@@ -25,9 +25,9 @@ The separate `minecraft-bedrock-texture-link-auditor` stdio MCP server exposes t
 - `behavior_packs/<project>_BP/blocks/**/*.json` for `minecraft:material_instances` texture keys.
 - `behavior_packs/<project>_BP/items/**/*.json` for `minecraft:icon` in string, `texture`, or `textures.default` form.
 - `resource_packs/<project>_RP/textures/terrain_texture.json` and `item_texture.json` for the corresponding atlas entries.
-- The PNG file paths referenced by each atlas entry, including existence, project containment, PNG signature, IHDR dimensions, chunk boundaries and CRCs.
+- The PNG file paths referenced by each atlas entry, including project containment, chunk ordering/CRCs, legal IHDR/PLTE/tRNS metadata, consecutive IDAT chunks, bounded zlib decompression, exact scanline lengths/filter bytes and Adam7 passes.
 
-The report identifies missing atlas keys, missing/corrupt PNG files, malformed or duplicate-key JSON, unsafe symlinks and unused atlas entries. Unused entries are warnings because content may be referenced dynamically or outside the scanned BP block/item folders. The scan is bounded and never edits, repairs or deletes any project files.
+The auditor uses `server/png_validation.py` for full image-stream checks. It catches PNGs whose chunk CRCs are valid but whose compressed IDAT data is broken or decodes to an invalid scanline layout. Repeated PNG paths are checked once per audit; atlas entry count, unique PNG count and aggregate PNG bytes have explicit safety budgets. The report exposes `analysis_complete`, `atlas_keys_checked`, `unique_png_files_inspected` and `png_bytes_inspected`. A false `analysis_complete` means a safety budget or unsafe/missing scan directory prevented full coverage. Unused entries are warnings because content may be referenced dynamically or outside the scanned BP block/item folders. The scan is read-only and never edits, repairs or deletes project files.
 
 Example audit MCP arguments:
 

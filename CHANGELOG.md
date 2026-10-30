@@ -1,5 +1,12 @@
 # Plugin package changelog
 
+## 1.0.14 — Full PNG stream validation and bounded texture audit
+- Adds shared `server/png_validation.py` to validate PNG chunks/CRCs, legal IHDR/PLTE/tRNS rules, consecutive IDAT chunks, bounded zlib decompression, exact scanline sizes/filter bytes and Adam7 passes.
+- Upgrades `audit_texture_links` from header/chunk checks to full decoded scanline validation, catching files with valid chunk CRCs but broken or inconsistent compressed image data.
+- Caches repeated PNG validation and applies per-audit limits for atlas entries, unique PNG files and aggregate bytes; reports `analysis_complete` and scan metrics so limited coverage is explicit.
+- Adds 18 new unit/integration cases around PNG stream corruption, color formats/interlace, scan budgets and cache reuse. Auditor remains read-only; runtime validation remains NOT RUN.
+
+
 ## 1.0.13 — Read-only BP/RP texture-link audit
 - Adds `audit_texture_links`, scanning BP block/item JSON through the matching RP terrain/item atlas to referenced PNG files.
 - Supports block `minecraft:material_instances` references and item `minecraft:icon` string/object variants.

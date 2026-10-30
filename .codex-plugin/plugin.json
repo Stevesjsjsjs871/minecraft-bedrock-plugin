@@ -17,7 +17,7 @@
     ]
   },
   "name": "minecraft-bedrock-engineer",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "description": "Minecraft Bedrock Engineer \u2014 safe BP/RP authoring, Creator Tools coordination, resource auditing, project continuity and reproducible validation.",
   "author": {
     "name": "Plugin owner"

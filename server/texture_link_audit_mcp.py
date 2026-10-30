@@ -9,11 +9,14 @@ from __future__ import annotations
 import json
 import os
 import re
-import struct
 import sys
-import zlib
 from pathlib import Path
 from typing import Any
+
+SERVER_DIR = Path(__file__).resolve().parent
+if str(SERVER_DIR) not in sys.path:
+    sys.path.insert(0, str(SERVER_DIR))
+from png_validation import validate_png_file  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 try:
@@ -29,6 +32,9 @@ MAX_PNG_BYTES = 16 * 1024 * 1024
 MAX_DIMENSION = 4096
 MAX_PIXELS = 16_777_216
 MAX_DEFINITION_FILES = 5000
+MAX_ATLAS_ENTRIES = 5000
+MAX_UNIQUE_PNG_FILES = 2000
+MAX_TOTAL_PNG_BYTES = 128 * 1024 * 1024
 
 
 class DuplicateJsonKey(ValueError):
@@ -50,9 +56,11 @@ def _tool() -> dict[str, Any]:
         "description": (
             "Read-only audit of a Minecraft Bedrock project's texture dependency chain. Scans the project's "
             "Behavior Pack block and item JSON, checks minecraft:material_instances and minecraft:icon "
-            "references against the matching Resource Pack terrain/item atlas, then checks that every atlas "
-            "path resolves to a contained, readable PNG. Reports missing atlas keys, missing/corrupt PNGs, "
-            "malformed JSON, duplicate keys, unsafe paths and unused atlas entries. It never writes files. "
+            "references against the matching Resource Pack terrain/item atlas, then validates the referenced PNG "
+            "image stream: chunk order/CRCs, legal IHDR metadata, bounded zlib decompression, exact scanline "
+            "lengths/filters and Adam7 layout. Reports missing atlas keys, malformed JSON, broken PNG streams, "
+            "unsafe paths and unused atlas entries. Caches repeated PNG paths and enforces atlas-entry, unique-file "
+            "and aggregate-byte budgets; the result states whether analysis was complete. It never writes files. "
             "Static analysis only; Minecraft runtime remains NOT RUN."
         ),
         "inputSchema": {
@@ -212,59 +220,13 @@ def _walk_json_files(root: Path, project: Path, findings: list[dict[str, str]]) 
 
 
 def _png_header(path: Path) -> tuple[int, int]:
-    """Check PNG signature, IHDR dimensions and all chunk CRC/bounds without decompression."""
-    if path.is_symlink() or not path.is_file():
-        raise ValueError("referenced PNG is missing or is not a regular file")
-    size = path.stat().st_size
-    if size < 45 or size > MAX_PNG_BYTES:
-        raise ValueError(f"PNG size must be between 45 bytes and {MAX_PNG_BYTES} bytes")
-    payload = path.read_bytes()
-    if not payload.startswith(PNG_SIGNATURE):
-        raise ValueError("file does not have a PNG signature")
-    offset = 8
-    width = height = 0
-    chunk_index = 0
-    seen_idat = False
-    seen_iend = False
-    while offset < len(payload):
-        if len(payload) - offset < 12:
-            raise ValueError("PNG has a truncated chunk header")
-        length = struct.unpack(">I", payload[offset:offset + 4])[0]
-        kind = payload[offset + 4:offset + 8]
-        end = offset + 12 + length
-        if end > len(payload):
-            raise ValueError("PNG has a truncated chunk body")
-        data = payload[offset + 8:offset + 8 + length]
-        expected_crc = struct.unpack(">I", payload[offset + 8 + length:end])[0]
-        if zlib.crc32(kind + data) & 0xFFFFFFFF != expected_crc:
-            raise ValueError("PNG chunk CRC mismatch")
-        if chunk_index == 0:
-            if kind != b"IHDR" or length != 13:
-                raise ValueError("PNG does not begin with a valid IHDR chunk")
-            width, height = struct.unpack(">II", data[:8])
-            if not (1 <= width <= MAX_DIMENSION and 1 <= height <= MAX_DIMENSION and width * height <= MAX_PIXELS):
-                raise ValueError("PNG dimensions exceed the auditor's configured limits")
-            bit_depth, color_type, compression, filtering, interlace = data[8:13]
-            legal_depths = {0: {1, 2, 4, 8, 16}, 2: {8, 16}, 3: {1, 2, 4, 8}, 4: {8, 16}, 6: {8, 16}}
-            if color_type not in legal_depths or bit_depth not in legal_depths[color_type]:
-                raise ValueError("PNG IHDR has an unsupported color type/bit depth combination")
-            if (compression, filtering, interlace) != (0, 0, interlace) or interlace not in {0, 1}:
-                raise ValueError("PNG IHDR has unsupported compression, filter or interlace methods")
-        elif kind == b"IHDR":
-            raise ValueError("PNG contains a duplicate IHDR chunk")
-        if kind == b"IDAT":
-            seen_idat = True
-        if kind == b"IEND":
-            if length != 0 or end != len(payload):
-                raise ValueError("PNG IEND chunk must be empty and terminate the file")
-            seen_iend = True
-            offset = end
-            break
-        offset = end
-        chunk_index += 1
-    if not (seen_idat and seen_iend):
-        raise ValueError("PNG is missing IDAT or IEND")
-    return width, height
+    """Fully validate the PNG image stream and return its dimensions."""
+    return validate_png_file(
+        path,
+        max_bytes=MAX_PNG_BYTES,
+        max_dimension=MAX_DIMENSION,
+        max_pixels=MAX_PIXELS,
+    )
 
 
 def _atlas_texture_values(value: Any) -> list[str]:
@@ -415,6 +377,19 @@ def audit_texture_links(raw_args: Any) -> dict[str, Any]:
         "blocks": textures_root / "terrain_texture.json",
         "items": textures_root / "item_texture.json",
     }
+    # A project can intentionally reuse one PNG from multiple atlas keys. Cache
+    # both successful and failed validations so repeated references do not
+    # multiply disk reads or decompression work.
+    png_validation_cache: dict[str, tuple[int, int] | str] = {}
+    png_bytes_inspected = 0
+    atlas_keys_checked = 0
+    incomplete_codes = {
+        "UNSAFE_DEFINITION_DIRECTORY", "UNSAFE_DEFINITION_FILE", "DEFINITION_SCAN_LIMIT",
+        "BLOCK_DEFINITION_FOLDER_MISSING", "ITEM_DEFINITION_FOLDER_MISSING", "UNSAFE_TEXTURES_DIRECTORY",
+        "INVALID_DEFINITION_JSON", "INVALID_ATLAS_JSON", "INVALID_ATLAS_SHAPE", "INVALID_ATLAS_ENTRY", "ATLAS_MISSING",
+    }
+    analysis_complete = not any(item["code"] in incomplete_codes for item in findings)
+    validated_atlas_keys: dict[str, set[str]] = {"blocks": set(), "items": set()}
     if textures_root.is_symlink() or not textures_root.is_dir():
         findings.append({
             "severity": "error", "code": "UNSAFE_TEXTURES_DIRECTORY",
@@ -443,20 +418,58 @@ def audit_texture_links(raw_args: Any) -> dict[str, Any]:
             continue
         atlas_entries[kind] = atlas["texture_data"]
         atlas_data[kind] = atlas
-        for key, entry in atlas_entries[kind].items():
+        all_entries = sorted(atlas_entries[kind].items(), key=lambda item: item[0])
+        if len(all_entries) > MAX_ATLAS_ENTRIES:
+            analysis_complete = False
+            findings.append({
+                "severity": "error", "code": "ATLAS_ENTRY_SCAN_LIMIT", "path": relative,
+                "message": f"atlas has {len(all_entries)} entries; only the first {MAX_ATLAS_ENTRIES} are deeply validated",
+            })
+        entries_to_check = all_entries[:MAX_ATLAS_ENTRIES]
+        for key, entry in entries_to_check:
+            atlas_keys_checked += 1
             try:
                 values = _atlas_texture_values(entry)
             except ValueError as exc:
                 findings.append({"severity": "error", "code": "INVALID_ATLAS_ENTRY", "path": relative, "message": f"texture_data[{key!r}]: {exc}"})
                 continue
+            key_is_valid = True
             for value in values:
                 try:
                     png_path = _resolve_atlas_texture(rp_root, value)
-                    width, height = _png_header(png_path)
+                    cache_key = str(png_path)
+                    cached = png_validation_cache.get(cache_key)
+                    if cached is None:
+                        cache_result = True
+                        if len(png_validation_cache) >= MAX_UNIQUE_PNG_FILES:
+                            analysis_complete = False
+                            cached = f"unique PNG inspection limit ({MAX_UNIQUE_PNG_FILES}) reached"
+                            cache_result = False
+                        else:
+                            file_size = png_path.stat().st_size
+                            if png_bytes_inspected + file_size > MAX_TOTAL_PNG_BYTES:
+                                analysis_complete = False
+                                cached = f"aggregate PNG byte inspection limit ({MAX_TOTAL_PNG_BYTES}) reached"
+                            else:
+                                png_bytes_inspected += file_size
+                                try:
+                                    cached = _png_header(png_path)
+                                except (OSError, ValueError) as exc:
+                                    cached = str(exc)
+                        if cache_result:
+                            png_validation_cache[cache_key] = cached
+                    if isinstance(cached, str):
+                        key_is_valid = False
+                        findings.append({"severity": "error", "code": "BROKEN_ATLAS_TEXTURE", "path": relative, "message": f"texture_data[{key!r}] -> {value!r}: {cached}"})
+                        continue
+                    width, height = cached
                 except (OSError, ValueError) as exc:
+                    key_is_valid = False
                     findings.append({"severity": "error", "code": "BROKEN_ATLAS_TEXTURE", "path": relative, "message": f"texture_data[{key!r}] -> {value!r}: {exc}"})
                     continue
                 findings.append({"severity": "info", "code": "ATLAS_TEXTURE_OK", "path": _relative(png_path, project), "message": f"atlas key {key!r} resolves to a PNG ({width}x{height})"})
+            if key_is_valid:
+                validated_atlas_keys[kind].add(key)
 
     used_keys: dict[str, set[str]] = {"blocks": set(), "items": set()}
     for ref in references:
@@ -469,10 +482,15 @@ def audit_texture_links(raw_args: Any) -> dict[str, Any]:
             findings.append({"severity": "error", "code": "MISSING_ATLAS_KEY", "path": ref["definition"], "message": f"{kind} definition {ref['identifier']!r} references {key!r}, but {atlas_path} has no matching texture_data key"})
         else:
             used_keys[kind].add(key)
-            findings.append({"severity": "info", "code": "TEXTURE_LINK_OK", "path": ref["definition"], "message": f"{kind} definition {ref['identifier']!r} references atlas key {key!r}"})
+            if key in validated_atlas_keys[kind]:
+                findings.append({"severity": "info", "code": "TEXTURE_LINK_OK", "path": ref["definition"], "message": f"{kind} definition {ref['identifier']!r} references validated atlas key {key!r}"})
+            else:
+                analysis_complete = False
+                findings.append({"severity": "warning", "code": "ATLAS_KEY_NOT_VALIDATED", "path": ref["definition"], "message": f"{kind} definition {ref['identifier']!r} references atlas key {key!r}, but its PNG entry was not fully validated because of an atlas/PNG inspection limit or an invalid atlas entry"})
 
     for kind in ("blocks", "items"):
-        for key in sorted(atlas_entries[kind]):
+        keys_for_unused_check = sorted(atlas_entries[kind])[:MAX_ATLAS_ENTRIES]
+        for key in keys_for_unused_check:
             if key not in used_keys[kind]:
                 findings.append({
                     "severity": "warning", "code": "UNUSED_ATLAS_ENTRY",
@@ -497,13 +515,17 @@ def audit_texture_links(raw_args: Any) -> dict[str, Any]:
             "item_texture_references": len(item_refs),
             "terrain_atlas_entries": len(atlas_entries["blocks"]),
             "item_atlas_entries": len(atlas_entries["items"]),
+            "atlas_keys_checked": atlas_keys_checked,
+            "unique_png_files_inspected": len(png_validation_cache),
+            "png_bytes_inspected": png_bytes_inspected,
+            "analysis_complete": analysis_complete,
             "errors": errors,
             "warnings": warnings,
             "informational_findings": info,
         },
         "references": references,
         "findings": findings,
-        "scope_note": "Audits BP block/item material and icon links to the matching RP atlas and checks atlas-to-PNG files. It does not infer runtime-only texture usage or validate rendering in Minecraft.",
+        "scope_note": "Audits BP block/item material and icon links to matching RP atlases and deeply validates PNG image streams. analysis_complete=false means a safety scan budget or an unsafe/missing scan directory prevented full coverage. It does not infer runtime-only texture usage or validate rendering in Minecraft.",
     }
 
 

@@ -16,13 +16,14 @@ if str(SERVER_DIR) not in sys.path:
 import texture_link_audit_mcp as audit_mcp
 
 
-def png_bytes(width: int = 16, height: int = 16) -> bytes:
+def png_bytes(width: int = 16, height: int = 16, *, idat_payload: bytes | None = None) -> bytes:
     def chunk(kind: bytes, data: bytes) -> bytes:
         body = kind + data
         return struct.pack(">I", len(data)) + body + struct.pack(">I", zlib.crc32(body) & 0xFFFFFFFF)
     ihdr = struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)
     rows = b"".join(b"\x00" + bytes([96, 128, 160, 255]) * width for _ in range(height))
-    return audit_mcp.PNG_SIGNATURE + chunk(b"IHDR", ihdr) + chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b"")
+    compressed = zlib.compress(rows) if idat_payload is None else idat_payload
+    return audit_mcp.PNG_SIGNATURE + chunk(b"IHDR", ihdr) + chunk(b"IDAT", compressed) + chunk(b"IEND", b"")
 
 
 class TextureLinkAuditTests(unittest.TestCase):
@@ -106,6 +107,8 @@ class TextureLinkAuditTests(unittest.TestCase):
         self.assertEqual(result["summary"]["item_texture_references"], 1)
         self.assertEqual(result["summary"]["terrain_atlas_entries"], 1)
         self.assertEqual(result["summary"]["item_atlas_entries"], 1)
+        self.assertTrue(result["summary"]["analysis_complete"])
+        self.assertEqual(result["summary"]["unique_png_files_inspected"], 2)
         self.assertEqual(result["runtime_status"], "NOT RUN")
         self.assertTrue(any(x["code"] == "TEXTURE_LINK_OK" for x in result["findings"]))
 
@@ -135,10 +138,25 @@ class TextureLinkAuditTests(unittest.TestCase):
     def test_detects_corrupt_png_crc(self):
         path = self.rp / "textures" / "blocks" / "ruby_ore.png"
         payload = bytearray(path.read_bytes())
-        payload[-5] ^= 0x01
+        offset = len(audit_mcp.PNG_SIGNATURE)
+        while offset < len(payload):
+            length = struct.unpack(">I", payload[offset:offset + 4])[0]
+            kind = bytes(payload[offset + 4:offset + 8])
+            if kind == b"IDAT" and length:
+                payload[offset + 8] ^= 0x01  # leave the stored CRC unchanged
+                break
+            offset += length + 12
         path.write_bytes(payload)
         result = self._payload()
         self.assertTrue(any(x["code"] == "BROKEN_ATLAS_TEXTURE" and "CRC" in x["message"] for x in result["findings"]))
+
+    def test_detects_valid_crc_with_corrupt_png_image_stream(self):
+        path = self.rp / "textures" / "blocks" / "ruby_ore.png"
+        path.write_bytes(png_bytes(idat_payload=b"not a zlib stream"))
+        result = self._payload()
+        finding = next(x for x in result["findings"] if x["code"] == "BROKEN_ATLAS_TEXTURE" and "ruby_ore" in x["message"])
+        self.assertIn("compression stream", finding["message"])
+        self.assertEqual(result["status"], "issues_found")
 
     def test_detects_duplicate_json_keys_in_atlas(self):
         atlas = self.rp / "textures" / "terrain_texture.json"
@@ -163,6 +181,30 @@ class TextureLinkAuditTests(unittest.TestCase):
         (self.rp / "textures" / "terrain_texture.json").write_text(json.dumps(self.terrain), encoding="utf-8")
         result = self._payload()
         self.assertTrue(any(x["code"] == "UNUSED_ATLAS_ENTRY" and "unused_texture" in x["message"] for x in result["findings"]))
+
+    def test_reuses_png_validation_for_multiple_atlas_keys(self):
+        self.terrain["texture_data"]["ruby_ore_alias"] = {"textures": "textures/blocks/ruby_ore"}
+        (self.rp / "textures" / "terrain_texture.json").write_text(json.dumps(self.terrain), encoding="utf-8")
+        result = self._payload()
+        self.assertEqual(result["summary"]["unique_png_files_inspected"], 2)
+        self.assertEqual(result["summary"]["png_bytes_inspected"], sum(
+            (self.rp / "textures" / category / name).stat().st_size
+            for category, name in (("blocks", "ruby_ore.png"), ("items", "ruby_gem.png"))
+        ))
+
+    def test_reports_incomplete_analysis_when_png_budget_is_exhausted(self):
+        with patch.object(audit_mcp, "MAX_TOTAL_PNG_BYTES", 1):
+            result = self._payload()
+        self.assertFalse(result["summary"]["analysis_complete"])
+        self.assertTrue(any(x["code"] == "ATLAS_KEY_NOT_VALIDATED" for x in result["findings"]))
+
+    def test_reports_incomplete_analysis_when_atlas_entry_limit_is_exceeded(self):
+        self.terrain["texture_data"]["zzz_extra"] = {"textures": "textures/blocks/ruby_ore"}
+        (self.rp / "textures" / "terrain_texture.json").write_text(json.dumps(self.terrain), encoding="utf-8")
+        with patch.object(audit_mcp, "MAX_ATLAS_ENTRIES", 1):
+            result = self._payload()
+        self.assertFalse(result["summary"]["analysis_complete"])
+        self.assertTrue(any(x["code"] == "ATLAS_ENTRY_SCAN_LIMIT" for x in result["findings"]))
 
     def test_rejects_symlinked_project(self):
         linked = self.workspace / "linked-addon"

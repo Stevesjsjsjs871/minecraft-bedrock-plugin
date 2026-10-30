@@ -1,4 +1,12 @@
-# Minecraft Bedrock Engineer — 1.0.13
+# Minecraft Bedrock Engineer — 1.0.14
+
+## 1.0.14: full PNG stream audit and bounded scan budgets
+
+- The read-only `audit_texture_links` tool now validates the decompressed PNG scanline stream, not only chunk CRCs and IHDR metadata. It checks legal color/depth combinations, PLTE/tRNS placement, consecutive IDAT chunks, bounded zlib output, exact scanline sizes, filter bytes and Adam7 passes.
+- Adds a reusable `server/png_validation.py` validator shared by the texture audit implementation, with explicit file/byte/dimension/pixel limits and symlink-safe file reads.
+- Caches validation for repeated PNG paths and caps atlas entries, unique PNG files and aggregate PNG bytes per audit. Results include `analysis_complete`, atlas keys checked, unique PNGs inspected and bytes inspected.
+- Adds regression cases for valid-CRC but corrupt zlib streams, scanline/filter errors, indexed/Adam7 PNGs, cache reuse and incomplete budgeted scans. The audit remains read-only; Minecraft runtime remains `NOT RUN`.
+
 
 ## 1.0.13: read-only BP/RP texture-link audit
 

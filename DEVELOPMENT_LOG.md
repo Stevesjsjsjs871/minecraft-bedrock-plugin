@@ -285,3 +285,13 @@ Build a separate `1.26.60.30-preview` metadata-only corpus only after verifying 
 - Updated MCP schema description, Bedrock skill and README to document the exact-digest requirement.
 - Added one more test to the prior six source-version tests. Expected full-suite count is now 155 (MCP/server 109, benchmark 12, sample index 6, texture 12, package integrity 16).
 - CI for the new head is pending at the time of this log entry; do not treat these changes as verified until the final run completes.
+
+
+### Final CI verification — run #136
+- GitHub Actions run #136 (`41004083790`) completed with **success** on the source-archive-binding changes.
+- Unit tests: **155/155** — MCP/server 109/109 (including the new archive-digest mismatch case), benchmark evaluator 12/12, sample indexer 6/6, texture generator 12/12, package integrity 16/16.
+- Python compilation passed.
+- Deep package-integrity audit: **17 PASS, 0 WARN, 0 FAIL**.
+- Analyzer regression cases: **18/18 passed**; report-schema, package/version, manifest, three-prompt and MCP configuration checks passed.
+- All workflow steps completed successfully. Runtime Minecraft import/rendering, real Creator Tools CLI, macOS, network-filesystem, lint and dedicated type-check remain `NOT RUN`.
+- Current source-version branch remains Draft PR #3, stacked on PR #2; neither PR is merged. `main` and Plugin Creator are unchanged.

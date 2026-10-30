@@ -72,3 +72,10 @@ A separate source audit found:
 - the current GitHub source branch still retains the MCP distribution profile, while Plugin Creator 1.5.11 is Skills-only.
 
 No Plugin Creator files were changed and no release was created by this run. The UV template renderer requires a separate hardening audit before it is treated as release-grade.
+
+
+## Final-head CI confirmation
+
+- After the documentation-only report update, GitHub Actions run 41075774511 also completed SUCCESS on the final branch HEAD.
+- The same test groups were re-run: server 359/359; PNG 15/15; texture-link 20/20; benchmark 12/12; Mojang indexer 6/6; procedural textures 12/12; package integrity 11/11; geometry analyzer 28/28; MCP capability contract 4/4.
+- No executable files changed after the code-tested commit; the final run confirms the documentation update did not disturb CI.

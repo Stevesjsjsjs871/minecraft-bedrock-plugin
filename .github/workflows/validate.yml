@@ -81,8 +81,11 @@ jobs:
           assert entity_server["SERVER_VERSION"] == expected
           assert animation_server["SERVER_VERSION"] == expected
           entity_tools = {tool["name"]: tool for tool in entity_server["TOOLS"]}
-          assert "create_addon_entity" in entity_tools
-          assert entity_tools["create_addon_entity"]["annotations"]["readOnlyHint"] is False
+          assert "create_addon_entity_with_geometry" in entity_tools
+          assert entity_tools["create_addon_entity_with_geometry"]["annotations"]["readOnlyHint"] is False
+          core_tools = {tool["name"]: tool for tool in server["TOOLS"]}
+          assert "create_addon_entity" in core_tools
+          assert {"creator_tools_status", "creator_tools_catalog", "validate_with_mct", "create_entity_with_mct"} <= set(core_tools)
           animation_tools = {tool["name"]: tool for tool in animation_server["TOOLS"]}
           assert {"create_animation_controller", "validate_animation_controller"} <= set(animation_tools)
           assert animation_tools["validate_animation_controller"]["annotations"]["readOnlyHint"] is True

@@ -38,7 +38,18 @@ def _pairs_no_duplicates(pairs):
 
 
 def _safe_path(value: str) -> bool:
-    return isinstance(value, str) and bool(value) and "\\" not in value and "\x00" not in value and not re.match(r"^[A-Za-z]:", value) and not Path(value).is_absolute() and all(part not in ("", ".", "..") for part in value.split("/"))
+    if not isinstance(value, str) or not value or "\\" in value or "\x00" in value:
+        return False
+    parts = value.split("/")
+    if any(part in ("", ".", "..") for part in parts) or value.startswith("/") or re.match(r"^[A-Za-z]:", value):
+        return False
+    reserved = {"CON", "PRN", "AUX", "NUL"} | {f"COM{i}" for i in range(1, 10)} | {f"LPT{i}" for i in range(1, 10)}
+    for part in parts:
+        if ":" in part or part.endswith((".", " ")):
+            return False
+        if part.split(".", 1)[0].upper() in reserved:
+            return False
+    return not Path(value).is_absolute()
 
 
 def _hash_file(path: Path, before: os.stat_result) -> str:
@@ -74,8 +85,16 @@ def scan_package(root: Path, exclude: set[str] | None = None) -> tuple[list[dict
     while stack:
         directory, prefix = stack.pop()
         try:
+            entries = []
             with os.scandir(directory) as iterator:
-                entries = sorted(list(iterator), key=lambda item: item.name)
+                for entry in iterator:
+                    entries_seen += 1
+                    if entries_seen > MAX_FILES * 2:
+                        errors.append(f"package exceeds {MAX_FILES} file/entry safety budget")
+                        stack.clear()
+                        break
+                    entries.append(entry)
+            entries.sort(key=lambda item: item.name)
         except OSError as exc:
             errors.append(f"cannot scan {prefix or '.'}: {type(exc).__name__}")
             continue
@@ -83,11 +102,6 @@ def scan_package(root: Path, exclude: set[str] | None = None) -> tuple[list[dict
             rel = f"{prefix}/{entry.name}" if prefix else entry.name
             if rel in excluded or any(rel.startswith(item.rstrip("/") + "/") for item in excluded):
                 continue
-            entries_seen += 1
-            if entries_seen > MAX_FILES * 2:
-                errors.append(f"package exceeds {MAX_FILES} file/entry safety budget")
-                stack.clear()
-                break
             try:
                 info = entry.stat(follow_symlinks=False)
             except OSError as exc:
@@ -205,11 +219,13 @@ def validate_provenance(provenance: Any, records: list[dict[str, Any]], expected
     actual = sorted((item for item in records if item["path"] != PROVENANCE_FILE), key=lambda item: item["path"])
     if normalized != actual:
         return False, "provenance inventory or per-file SHA-256 does not match the package"
-    if isinstance(provenance["payload_file_count"], bool) or provenance["payload_file_count"] != len(actual):
-        return False, "provenance payload_file_count mismatch"
+    if type(provenance["payload_file_count"]) is not int or provenance["payload_file_count"] != len(actual):
+        return False, "provenance payload_file_count must be an integer matching the package"
     total = sum(item["size_bytes"] for item in actual)
-    if isinstance(provenance["payload_total_bytes"], bool) or provenance["payload_total_bytes"] != total:
-        return False, "provenance payload_total_bytes mismatch"
+    if type(provenance["payload_total_bytes"]) is not int or provenance["payload_total_bytes"] != total:
+        return False, "provenance payload_total_bytes must be an integer matching the package"
+    if "source_ref" in provenance and (not isinstance(provenance["source_ref"], str) or not provenance["source_ref"] or len(provenance["source_ref"]) > 1024):
+        return False, "invalid provenance source_ref"
     digest = provenance["payload_sha256"]
     if not isinstance(digest, str) or not SHA256_RE.fullmatch(digest) or digest != payload_sha256(actual):
         return False, "provenance payload_sha256 mismatch"
@@ -222,7 +238,19 @@ def verify_provenance(root: Path, records: list[dict[str, Any]], expected_versio
         info = path.lstat()
         if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode) or info.st_size > MAX_PROVENANCE_BYTES:
             return False, "BUILD_PROVENANCE.json must be a small regular non-symlink file"
-        provenance = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=_pairs_no_duplicates)
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0))
+        try:
+            opened = os.fstat(fd)
+            identity = lambda value: (value.st_dev, value.st_ino, value.st_size, value.st_mtime_ns)
+            if not stat.S_ISREG(opened.st_mode) or identity(opened) != identity(info):
+                return False, "BUILD_PROVENANCE.json changed while opening"
+            with os.fdopen(fd, "rb", closefd=False) as stream:
+                raw = stream.read(MAX_PROVENANCE_BYTES + 1)
+            if len(raw) != opened.st_size or len(raw) > MAX_PROVENANCE_BYTES or identity(os.fstat(fd)) != identity(opened):
+                return False, "BUILD_PROVENANCE.json changed or exceeded its read limit"
+            provenance = json.loads(raw.decode("utf-8"), object_pairs_hook=_pairs_no_duplicates)
+        finally:
+            os.close(fd)
     except FileNotFoundError:
         return False, "BUILD_PROVENANCE.json is missing; release candidates require provenance"
     except Exception as exc:
@@ -231,11 +259,24 @@ def verify_provenance(root: Path, records: list[dict[str, Any]], expected_versio
 
 
 def _hash_path(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        while chunk := stream.read(1024 * 1024):
-            digest.update(chunk)
-    return digest.hexdigest()
+    info = path.lstat()
+    if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode):
+        raise PackageSafetyError(f"expected a regular non-symlink file: {path}")
+    fd = os.open(path, os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0))
+    try:
+        opened = os.fstat(fd)
+        identity = lambda value: (value.st_dev, value.st_ino, value.st_size, value.st_mtime_ns)
+        if identity(opened) != identity(info):
+            raise PackageSafetyError(f"file changed while opening: {path}")
+        digest = hashlib.sha256()
+        with os.fdopen(fd, "rb", closefd=False) as stream:
+            while chunk := stream.read(1024 * 1024):
+                digest.update(chunk)
+        if identity(os.fstat(fd)) != identity(opened):
+            raise PackageSafetyError(f"file changed while hashing: {path}")
+        return digest.hexdigest()
+    finally:
+        os.close(fd)
 
 
 def verify_archive(archive: Path, sidecar: Path) -> dict[str, Any]:
@@ -334,8 +375,17 @@ def build_archive(root: Path, output: Path, source_commit: str, source_date_epoc
                             import io
                             tar.addfile(member, io.BytesIO(data))
                         else:
-                            with source.open("rb") as stream:
-                                tar.addfile(member, stream)
+                            fd = os.open(source, os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0))
+                            try:
+                                opened = os.fstat(fd)
+                                if not stat.S_ISREG(opened.st_mode) or opened.st_size != member.size:
+                                    raise PackageSafetyError(f"source file changed or is not regular: {name}")
+                                with os.fdopen(fd, "rb", closefd=False) as stream:
+                                    tar.addfile(member, stream)
+                                if (os.fstat(fd).st_dev, os.fstat(fd).st_ino, os.fstat(fd).st_size, os.fstat(fd).st_mtime_ns) != (opened.st_dev, opened.st_ino, opened.st_size, opened.st_mtime_ns):
+                                    raise PackageSafetyError(f"source file changed while archiving: {name}")
+                            finally:
+                                os.close(fd)
             raw.flush()
             os.fsync(raw.fileno())
         archive_hash = _hash_path(output)

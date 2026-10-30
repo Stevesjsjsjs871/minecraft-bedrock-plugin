@@ -93,7 +93,7 @@ class PluginSourceParityTests(unittest.TestCase):
         result = auditor.compare_roots(self.reference, self.candidate)
         self.assertEqual(result["status"], "PASS", result)
         self.assertTrue(result["metadata"]["parity"]["original_first_three_prompts_match"])
-        self.assertEqual(result["summary"]["identical_files"], 6)
+        self.assertEqual(result["summary"]["identical_files"], 7)
 
     def test_changed_file_is_reported_with_both_hashes(self):
         (self.candidate / "payload.txt").write_text("changed\n", encoding="utf-8")

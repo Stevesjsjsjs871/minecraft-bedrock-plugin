@@ -75,6 +75,20 @@ class SkillsPackageTests(unittest.TestCase):
         (self.root / "VERSION").write_text("1.5.9", encoding="utf-8")
         self.assertEqual(self.by_id(checker.check(self.root), "version-parity")["status"], "FAIL")
 
+    def test_non_string_version_type_fails_cleanly(self):
+        path = self.root / "plugin.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["version"] = {"unexpected": "object"}
+        path.write_text(json.dumps(data), encoding="utf-8")
+        self.assertEqual(self.by_id(checker.check(self.root), "version-parity")["status"], "FAIL")
+
+    def test_malformed_extensions_fail_cleanly(self):
+        path = self.root / "plugin.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["extensions"] = None
+        path.write_text(json.dumps(data), encoding="utf-8")
+        self.assertEqual(self.by_id(checker.check(self.root), "default-prompt-parity")["status"], "FAIL")
+
     def test_prompt_mismatch_fails(self):
         path = self.root / ".codex-plugin/plugin.json"
         data = json.loads(path.read_text(encoding="utf-8"))

@@ -11,8 +11,8 @@ description: Use when creating a new Minecraft Bedrock custom entity bundle, inc
 - Distinguish `STATICALLY VERIFIED` from `RUNTIME TESTED`. JSON parsing and reference checks do not prove the entity imports, spawns, animates, or renders in Minecraft.
 - Do not claim a texture or animation exists unless its file is present and its identifier/path resolves.
 
-## `create_addon_entity_with_geometry_with_geometry`
-Use the dedicated `create_addon_entity_with_geometry_with_geometry` MCP tool only on an existing project created by `create_addon_project`. It creates four coordinated files:
+## `create_addon_entity_with_geometry`
+Use the dedicated `create_addon_entity_with_geometry` MCP tool only on an existing project created by `create_addon_project`. It creates four coordinated files:
 1. `behavior_packs/<project>_BP/entities/<slug>.json`
 2. `resource_packs/<project>_RP/entity/<slug>.entity.json`
 3. `resource_packs/<project>_RP/models/entity/<slug>.geo.json`
@@ -44,4 +44,4 @@ An example input is included at `references/basic-geometry.example.json`.
 
 
 ## Backward compatibility
-The existing core MCP tool `create_addon_entity_with_geometry` remains available for its original input contract. Use `create_addon_entity_with_geometry_with_geometry` when supplying an explicit bone/cube geometry definition.
+The existing core MCP tool `create_addon_entity_with_geometry` remains available for its original input contract. Use `create_addon_entity_with_geometry` when supplying an explicit bone/cube geometry definition.

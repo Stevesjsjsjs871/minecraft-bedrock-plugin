@@ -9,6 +9,7 @@ import os
 import re
 import stat
 import tarfile
+import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +20,19 @@ MAX_FILE_BYTES = 128 * 1024 * 1024
 MAX_TOTAL_BYTES = 512 * 1024 * 1024
 MAX_PROVENANCE_BYTES = 2 * 1024 * 1024
 MAX_ARCHIVE_BYTES = 256 * 1024 * 1024
+MAX_TAR_METADATA_BYTES = 64 * 1024
+MAX_TAR_METADATA_TOTAL_BYTES = 4 * 1024 * 1024
+MAX_ARCHIVE_TRAILING_BYTES = 1024 * 1024
+MAX_ARCHIVE_HEADERS = 2 * (MAX_FILES + 1)
+MAX_ARCHIVE_STREAM_BYTES = (
+    MAX_TOTAL_BYTES
+    + MAX_PROVENANCE_BYTES
+    + 3 * (MAX_FILES + 1) * tarfile.BLOCKSIZE
+    + MAX_TAR_METADATA_TOTAL_BYTES
+    + MAX_ARCHIVE_TRAILING_BYTES
+)
+ARCHIVE_READ_CHUNK_BYTES = 1024 * 1024
+MAX_SIDECAR_BYTES = 256
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 GIT_SHA_RE = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
 SEMVER_RE = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$")
@@ -279,53 +293,322 @@ def _hash_path(path: Path) -> str:
         os.close(fd)
 
 
-def verify_archive(archive: Path, sidecar: Path) -> dict[str, Any]:
-    if archive.is_symlink() or not archive.is_file() or archive.stat().st_size > MAX_ARCHIVE_BYTES:
-        raise PackageSafetyError("archive must be a regular file within the size limit")
-    digest = _hash_path(archive)
-    expected = f"{digest}  {archive.name}\n"
-    if sidecar.is_symlink() or not sidecar.is_file() or sidecar.read_text(encoding="ascii") != expected:
-        raise PackageSafetyError("archive SHA-256 sidecar is missing or incorrect")
-    records, provenance, seen, total = [], None, set(), 0
-    try:
-        with tarfile.open(archive, "r:gz") as tar:
-            members = tar.getmembers()
-            if len(members) > MAX_FILES + 1:
-                raise PackageSafetyError("archive file count exceeds safety limit")
-            for member in members:
-                name = member.name
-                if not _safe_path(name) or name in seen or not member.isfile() or member.issym() or member.islnk() or member.isdev():
-                    raise PackageSafetyError(f"unsafe, duplicate or non-regular archive member: {name!r}")
-                seen.add(name)
-                total += member.size
-                if member.size < 0 or member.size > MAX_FILE_BYTES + MAX_PROVENANCE_BYTES or total > MAX_TOTAL_BYTES + MAX_PROVENANCE_BYTES:
-                    raise PackageSafetyError("archive uncompressed size exceeds safety limit")
-                stream = tar.extractfile(member)
-                if stream is None:
-                    raise PackageSafetyError(f"cannot read archive member: {name}")
-                if name == PROVENANCE_FILE:
-                    raw = stream.read(MAX_PROVENANCE_BYTES + 1)
-                    if len(raw) != member.size or len(raw) > MAX_PROVENANCE_BYTES:
-                        raise PackageSafetyError("invalid provenance member size")
-                    provenance = json.loads(raw.decode("utf-8"), object_pairs_hook=_pairs_no_duplicates)
-                else:
-                    hasher, size = hashlib.sha256(), 0
-                    while chunk := stream.read(1024 * 1024):
-                        size += len(chunk)
-                        hasher.update(chunk)
-                    if size != member.size:
-                        raise PackageSafetyError(f"archive member size mismatch: {name}")
-                    records.append({"path": name, "size_bytes": size, "sha256": hasher.hexdigest()})
-    except (tarfile.TarError, OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise PackageSafetyError(f"archive verification failed: {type(exc).__name__}: {exc}") from exc
-    if provenance is None:
-        raise PackageSafetyError("archive is missing BUILD_PROVENANCE.json")
-    records.sort(key=lambda item: item["path"])
-    ok, message = validate_provenance(provenance, records)
-    if not ok:
-        raise PackageSafetyError(message)
-    return {"archive": str(archive), "archive_sha256": digest, "payload_file_count": len(records), "payload_total_bytes": sum(item["size_bytes"] for item in records), "provenance": provenance}
+def _file_identity(info: os.stat_result) -> tuple[int, int, int, int, int]:
+    return (
+        info.st_dev,
+        info.st_ino,
+        info.st_size,
+        info.st_mtime_ns,
+        getattr(info, "st_ctime_ns", 0),
+    )
 
+
+def _open_path_without_symlinks(path: Path, flags: int) -> int:
+    """Open a path without following any POSIX path-component symlinks."""
+    absolute = Path(os.path.abspath(os.fspath(path)))
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    directory = getattr(os, "O_DIRECTORY", 0)
+    if (
+        os.name == "posix"
+        and nofollow
+        and directory
+        and os.open in getattr(os, "supports_dir_fd", set())
+    ):
+        parts = absolute.parts
+        if not absolute.anchor or len(parts) < 2:
+            raise PackageSafetyError("archive path must name a file below a filesystem root")
+        current = os.open(absolute.anchor, os.O_RDONLY | directory)
+        try:
+            for component in parts[1:-1]:
+                next_fd = os.open(
+                    component,
+                    os.O_RDONLY | directory | nofollow,
+                    dir_fd=current,
+                )
+                os.close(current)
+                current = next_fd
+            return os.open(parts[-1], flags | nofollow, dir_fd=current)
+        finally:
+            os.close(current)
+    return os.open(absolute, flags | nofollow)
+
+
+def _open_regular_file(path: Path, label: str) -> tuple[int, os.stat_result]:
+    absolute = Path(os.path.abspath(os.fspath(path)))
+    try:
+        before = absolute.lstat()
+    except OSError as exc:
+        raise PackageSafetyError(f"{label} is unavailable: {type(exc).__name__}") from exc
+    if stat.S_ISLNK(before.st_mode) or not stat.S_ISREG(before.st_mode):
+        raise PackageSafetyError(f"{label} must be a regular non-symlink file")
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)
+    try:
+        fd = _open_path_without_symlinks(absolute, flags)
+    except OSError as exc:
+        raise PackageSafetyError(f"cannot safely open {label}: {type(exc).__name__}: {exc}") from exc
+    try:
+        opened = os.fstat(fd)
+        if not stat.S_ISREG(opened.st_mode) or _file_identity(opened) != _file_identity(before):
+            raise PackageSafetyError(f"{label} changed while opening or is not regular")
+        return fd, opened
+    except Exception:
+        os.close(fd)
+        raise
+
+
+def _hash_open_file(fd: int, snapshot: os.stat_result, label: str) -> str:
+    os.lseek(fd, 0, os.SEEK_SET)
+    digest = hashlib.sha256()
+    while chunk := os.read(fd, ARCHIVE_READ_CHUNK_BYTES):
+        digest.update(chunk)
+    if _file_identity(os.fstat(fd)) != _file_identity(snapshot):
+        raise PackageSafetyError(f"{label} changed while hashing")
+    os.lseek(fd, 0, os.SEEK_SET)
+    return digest.hexdigest()
+
+
+def _read_open_file_limited(fd: int, snapshot: os.stat_result, limit: int, label: str) -> bytes:
+    os.lseek(fd, 0, os.SEEK_SET)
+    chunks = []
+    total = 0
+    while True:
+        chunk = os.read(fd, min(64 * 1024, limit - total + 1))
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > limit:
+            raise PackageSafetyError(f"{label} exceeds its {limit}-byte read limit")
+        chunks.append(chunk)
+    if _file_identity(os.fstat(fd)) != _file_identity(snapshot):
+        raise PackageSafetyError(f"{label} changed while reading")
+    return b"".join(chunks)
+
+
+class _BoundedArchiveReader:
+    """Cap bytes returned by the decompressor; never allow read-all requests."""
+
+    def __init__(self, source, limit: int):
+        self.source = source
+        self.limit = limit
+        self.bytes_read = 0
+
+    def read(self, size: int = -1) -> bytes:
+        if not isinstance(size, int) or size < 0:
+            raise PackageSafetyError("archive verifier forbids unbounded stream reads")
+        if size == 0:
+            return b""
+        remaining = self.limit - self.bytes_read
+        chunk = self.source.read(min(size, remaining + 1))
+        self.bytes_read += len(chunk)
+        if self.bytes_read > self.limit:
+            raise PackageSafetyError(
+                f"decompressed archive stream exceeds {self.limit} bytes"
+            )
+        return chunk
+
+
+def verify_archive(archive: Path, sidecar: Path) -> dict[str, Any]:
+    """Verify a tar.gz archive in one bounded streaming pass without extraction.
+
+    The archive is hashed and parsed through the same no-follow file descriptor.
+    gzip.GzipFile supplies bounded decompression and validates the gzip trailer;
+    tarfile's stream mode avoids getmembers() and random-access member caching.
+    Local PAX headers are allowed only within strict per-header and aggregate
+    budgets. Global PAX, GNU long-name/link and sparse extensions are rejected.
+    """
+    archive_path = Path(os.path.abspath(os.fspath(archive)))
+    sidecar_path = Path(os.path.abspath(os.fspath(sidecar)))
+    archive_fd, archive_snapshot = _open_regular_file(archive_path, "archive")
+    try:
+        if archive_snapshot.st_size > MAX_ARCHIVE_BYTES:
+            raise PackageSafetyError(
+                f"archive exceeds the {MAX_ARCHIVE_BYTES}-byte compressed size limit"
+            )
+        digest = _hash_open_file(archive_fd, archive_snapshot, "archive")
+        sidecar_fd, sidecar_snapshot = _open_regular_file(sidecar_path, "archive SHA-256 sidecar")
+        try:
+            sidecar_data = _read_open_file_limited(
+                sidecar_fd, sidecar_snapshot, MAX_SIDECAR_BYTES, "archive SHA-256 sidecar"
+            )
+        finally:
+            os.close(sidecar_fd)
+        expected = f"{digest}  {archive_path.name}\n".encode("ascii")
+        if sidecar_data != expected:
+            raise PackageSafetyError("archive SHA-256 sidecar is missing or incorrect")
+
+        records: list[dict[str, Any]] = []
+        provenance = None
+        seen: set[str] = set()
+        total = 0
+        member_count = 0
+
+        class BoundedTarInfo(tarfile.TarInfo):
+            metadata_total = 0
+            header_count = 0
+
+            def _proc_gnusparse_01(self, next_member, pax_headers):
+                raise PackageSafetyError("GNU sparse PAX maps are not supported in release archives")
+
+            def _proc_gnusparse_00(self, next_member, raw_headers):
+                raise PackageSafetyError("GNU sparse PAX headers are not supported in release archives")
+
+            def _proc_gnusparse_10(self, next_member, pax_headers, tarfile_object):
+                raise PackageSafetyError("GNU sparse PAX maps are not supported in release archives")
+
+            def _proc_member(self, tarfile_object):
+                type(self).header_count += 1
+                if type(self).header_count > MAX_ARCHIVE_HEADERS:
+                    raise PackageSafetyError(
+                        f"archive header count exceeds {MAX_ARCHIVE_HEADERS}"
+                    )
+                if self.type == tarfile.XHDTYPE:
+                    if self.size < 0 or self.size > MAX_TAR_METADATA_BYTES:
+                        raise PackageSafetyError(
+                            f"PAX header exceeds the {MAX_TAR_METADATA_BYTES}-byte limit"
+                        )
+                    type(self).metadata_total += self.size
+                    if type(self).metadata_total > MAX_TAR_METADATA_TOTAL_BYTES:
+                        raise PackageSafetyError(
+                            "aggregate PAX metadata exceeds its safety limit"
+                        )
+                elif self.type in {
+                    tarfile.XGLTYPE,
+                    getattr(tarfile, "SOLARIS_XHDTYPE", b"X"),
+                    tarfile.GNUTYPE_LONGNAME,
+                    tarfile.GNUTYPE_LONGLINK,
+                    tarfile.GNUTYPE_SPARSE,
+                }:
+                    raise PackageSafetyError(
+                        f"unsupported tar extension type: {self.type!r}"
+                    )
+                return super()._proc_member(tarfile_object)
+
+        with os.fdopen(os.dup(archive_fd), "rb") as raw:
+            raw.seek(0)
+            with gzip.GzipFile(fileobj=raw, mode="rb") as decompressed:
+                bounded = _BoundedArchiveReader(decompressed, MAX_ARCHIVE_STREAM_BYTES)
+                try:
+                    with tarfile.open(
+                        fileobj=bounded,
+                        mode="r|",
+                        tarinfo=BoundedTarInfo,
+                        errorlevel=2,
+                    ) as tar:
+                        for member in tar:
+                            member_count += 1
+                            if member_count > MAX_FILES + 1:
+                                raise PackageSafetyError(
+                                    f"archive file count exceeds {MAX_FILES} payload files"
+                                )
+                            name = member.name
+                            if (
+                                not isinstance(name, str)
+                                or not _safe_path(name)
+                                or member.type not in (tarfile.REGTYPE, tarfile.AREGTYPE)
+                                or not member.isfile()
+                                or member.linkname
+                                or member.issparse()
+                            ):
+                                raise PackageSafetyError(
+                                    f"unsafe, duplicate or non-regular archive member: {name!r}"
+                                )
+                            portable_name = unicodedata.normalize("NFC", name).casefold()
+                            if portable_name in seen:
+                                raise PackageSafetyError(
+                                    f"duplicate or case-colliding archive member: {name!r}"
+                                )
+                            seen.add(portable_name)
+                            if (
+                                member.mode < 0
+                                or member.mode & 0o7022
+                                or member.size < 0
+                            ):
+                                raise PackageSafetyError(
+                                    f"unsafe mode or size on archive member: {name!r}"
+                                )
+                            member_limit = (
+                                MAX_PROVENANCE_BYTES if name == PROVENANCE_FILE else MAX_FILE_BYTES
+                            )
+                            if member.size > member_limit:
+                                raise PackageSafetyError(
+                                    f"archive member {name!r} exceeds its {member_limit}-byte limit"
+                                )
+                            total += member.size
+                            if total > MAX_TOTAL_BYTES + MAX_PROVENANCE_BYTES:
+                                raise PackageSafetyError(
+                                    "archive uncompressed file data exceeds safety limit"
+                                )
+                            stream = tar.extractfile(member)
+                            if stream is None:
+                                raise PackageSafetyError(f"cannot read archive member: {name}")
+                            with stream:
+                                if name == PROVENANCE_FILE:
+                                    raw_provenance = stream.read(MAX_PROVENANCE_BYTES + 1)
+                                    if len(raw_provenance) != member.size or len(raw_provenance) > MAX_PROVENANCE_BYTES:
+                                        raise PackageSafetyError("invalid provenance member size")
+                                    if stream.read(1):
+                                        raise PackageSafetyError("provenance member exceeds its declared size")
+                                    provenance = json.loads(
+                                        raw_provenance.decode("utf-8"),
+                                        object_pairs_hook=_pairs_no_duplicates,
+                                    )
+                                else:
+                                    hasher = hashlib.sha256()
+                                    size = 0
+                                    while chunk := stream.read(ARCHIVE_READ_CHUNK_BYTES):
+                                        size += len(chunk)
+                                        if size > member.size or size > MAX_FILE_BYTES:
+                                            raise PackageSafetyError(
+                                                f"archive member exceeds its declared or allowed size: {name}"
+                                            )
+                                        hasher.update(chunk)
+                                    if size != member.size:
+                                        raise PackageSafetyError(
+                                            f"archive member size mismatch: {name}"
+                                        )
+                                    records.append(
+                                        {"path": name, "size_bytes": size, "sha256": hasher.hexdigest()}
+                                    )
+
+                        trailing_bytes = 0
+                        while chunk := tar.fileobj.read(64 * 1024):
+                            trailing_bytes += len(chunk)
+                            if trailing_bytes > MAX_ARCHIVE_TRAILING_BYTES:
+                                raise PackageSafetyError(
+                                    "tar archive has excessive trailing padding"
+                                )
+                            if any(chunk):
+                                raise PackageSafetyError(
+                                    "tar archive contains non-zero data after its end marker"
+                                )
+                        if trailing_bytes < 1024:
+                            raise PackageSafetyError(
+                                "tar archive is missing its two zero end-of-archive blocks"
+                            )
+                except PackageSafetyError:
+                    raise
+                except Exception as exc:
+                    raise PackageSafetyError(
+                        f"archive stream is invalid: {type(exc).__name__}: {exc}"
+                    ) from exc
+
+        if _file_identity(os.fstat(archive_fd)) != _file_identity(archive_snapshot):
+            raise PackageSafetyError("archive changed during verification")
+        if provenance is None:
+            raise PackageSafetyError("archive is missing BUILD_PROVENANCE.json")
+        records.sort(key=lambda item: item["path"])
+        ok, message = validate_provenance(provenance, records)
+        if not ok:
+            raise PackageSafetyError(message)
+        return {
+            "archive": str(archive_path),
+            "archive_sha256": digest,
+            "payload_file_count": len(records),
+            "payload_total_bytes": sum(item["size_bytes"] for item in records),
+            "provenance": provenance,
+        }
+    finally:
+        os.close(archive_fd)
 
 def build_archive(root: Path, output: Path, source_commit: str, source_date_epoch: int, source_ref: str | None = None, exclude: set[str] | None = None) -> dict[str, Any]:
     root, output = Path(root).absolute(), Path(output).absolute()

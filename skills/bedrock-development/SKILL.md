@@ -42,13 +42,17 @@ Treat these as separate projects; don't mix files or constraints between them wi
 ## Response
 For complex tasks use: A) concise analysis, B) implementation/files changed, C) actual checks/results, D) unverified risks/runtime limitations, E) artifact link if created, F) next step. For simple questions, be concise. Answer in Russian unless the user switches language; preserve API/file names.
 
-## Mojang sample corpus (1.26.50.4)
-- Prefer `search_mojang_samples` to find version-labelled examples by path, resource domain and selected literal identifiers. Use `read_mojang_sample` for curated excerpts or for an indexed text file only when the original full ZIP is present inside the configured workspace.
-- The GitHub source includes `mojang-samples-index.json.gz`, a metadata-only index of 22,252 entries (paths, categories, sizes, eligible content hashes and selected literal identifiers). It is reproducibly generated from Mojang's official `v1.26.50.4` **full** release asset by `.github/workflows/build-mojang-samples-index.yml`; the workflow pins the asset SHA-256 and size, checks every ZIP member CRC, validates archive/category counts, records the generated index SHA-256/size and runs the package audit before committing.
-- The full source ZIP and its binary textures/sounds are **not** bundled. The index can find binary asset paths and metadata, but it does not contain their bytes. To read a non-curated text file, place the original full ZIP in the configured workspace; the MCP server does not download samples at runtime. If the generated index is absent and no digest is pinned, the server reports `index_mode: curated_fallback`; this smaller fallback is not equivalent to the full index. A corrupt present index fails closed rather than silently falling back.
-- Samples are references, not mod-ready files. Create custom namespaces/UUIDs, remove vanilla-only internal fields unless documented for custom packs, and verify formats against exact target-version documentation. Do not automatically redistribute vanilla textures, sounds or models.
-- The sample release label is `1.26.50.4`; the default game target remains `1.26.50`. Do not infer compatibility between the patch-labelled source archive and every 1.26.50 runtime without version-matched documentation or runtime evidence.
+## Versioned Mojang sample sources
 
+- `sample_version` selects the **source corpus**, not the add-on's `target_game_version`. Omit it to retain the backward-compatible stable default `1.26.50.4`; the default game target remains `1.26.50`.
+- The bundled stable corpus is Mojang `v1.26.50.4`: a metadata-only index of 22,252 entries (paths, categories, sizes, eligible hashes and selected identifiers). The original full ZIP and binary texture/sound bytes are not bundled.
+- The official Mojang Releases page currently lists `v1.26.50.4` as the latest stable release and `v1.26.60.30-preview` as a separate preview release. The preview tag resolves to commit `4d30ae63750467771b6eccda105f732c6cb77ff7` and was published on 2026-10-26. It is catalogued but **not yet indexed**.
+- Selecting `1.26.60.30-preview` currently returns `SAMPLE_VERSION_NOT_INDEXED` with its release URL and commit; the server never silently searches the stable corpus instead. Do not treat preview samples as stable.
+- The previously proposed stable source `v1.26.60.5` could not be verified in the official release list and must not be used as a pinned source. The verified stable corpus remains `1.26.50.4` until Mojang publishes another stable tag.
+- Prefer `search_mojang_samples` for version-labelled path/category/identifier search and `read_mojang_sample` for curated excerpts or indexed text files from a user-provided source ZIP inside the configured workspace. The source ZIP must correspond to the selected `sample_version`.
+- `.github/workflows/build-mojang-samples-index.yml` pins the stable full-release asset, verifies SHA-256, size, ZIP CRCs and corpus statistics, then generates the metadata-only index without extracting or executing archive members. The MCP server does not download samples at runtime.
+- A curated fallback is available only for the default stable corpus when the generated index is absent. It is not equivalent to the full index. A corrupt present index fails closed.
+- Sample release labels do not prove compatibility with every game runtime. Verify exact target-version documentation and runtime behavior. Do not automatically redistribute Mojang textures, sounds or models.
 
 ## 0.9.3 — optional MCT CLI orchestration
 

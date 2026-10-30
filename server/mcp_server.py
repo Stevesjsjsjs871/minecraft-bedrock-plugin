@@ -101,6 +101,30 @@ _BUNDLED_SAMPLE_FILES = {
     "documentation/Animations.html": "documentation/Animations.html",
     "documentation/Schemas.html": "documentation/Schemas.html",
 }
+
+DEFAULT_MOJANG_SAMPLE_VERSION = "1.26.50.4"
+MOJANG_SAMPLE_SOURCE_CATALOG = {
+    "1.26.50.4": {
+        "channel": "stable",
+        "release_url": "https://github.com/Mojang/bedrock-samples/releases/tag/v1.26.50.4",
+        "source_commit": "46ba6ea985fb5a92d79a9419198f10dda14c199d",
+        "indexed": True,
+    },
+    "1.26.60.30-preview": {
+        "channel": "preview",
+        "release_url": "https://github.com/Mojang/bedrock-samples/releases/tag/v1.26.60.30-preview",
+        "source_commit": "4d30ae63750467771b6eccda105f732c6cb77ff7",
+        "indexed": False,
+    },
+}
+MOJANG_SAMPLE_CORPORA = {
+    DEFAULT_MOJANG_SAMPLE_VERSION: {
+        "channel": "stable",
+        "index_path": MOJANG_SAMPLE_INDEX,
+        "reference_root": MOJANG_SAMPLE_REFERENCE_ROOT,
+        "bundled_files": _BUNDLED_SAMPLE_FILES,
+    },
+}
 TOOLS = [
     _tool(
         "create_addon_project",
@@ -224,9 +248,10 @@ TOOLS = [
     _tool("inspect_archive", "List archive metadata and unsafe/duplicate path indicators without extracting files or reading file payloads.", {"archive_path": _PATH}, ["archive_path"]),
     _tool(
         "search_mojang_samples",
-        "Search the bundled path/hash/identifier index built from the user-provided Mojang bedrock-samples 1.26.50.4 ZIP. Returns version-labelled example paths and identifiers; does not make network calls or extract the source archive.",
+        "Search a selected version-labelled Mojang Bedrock Samples corpus by path, category and indexed identifiers. sample_version selects the source corpus, not the add-on target game version; omitted means stable 1.26.50.4. Known but not yet indexed sources return an explicit error and are never silently mapped to another version. Offline only; no network calls or extraction.",
         {
             "query": {"type": "string", "minLength": 1, "maxLength": 160, "description": "Search resource paths, categories and indexed identifiers; examples: geometry goat, minecraft:apple, recipe emerald."},
+            "sample_version": {"type": "string", "enum": ["1.26.50.4", "1.26.60.30-preview"], "default": "1.26.50.4", "description": "Source corpus version, distinct from target_game_version. Stable 1.26.50.4 is indexed; preview 1.26.60.30-preview is known but not indexed yet."},
             "category": {"type": "string", "enum": _SAMPLE_CATEGORIES, "description": "Optional resource type filter; defaults to all."},
             "limit": {"type": "integer", "minimum": 1, "maximum": 20, "description": "Maximum number of matches to return; defaults to 10."},
         },
@@ -234,10 +259,11 @@ TOOLS = [
     ),
     _tool(
         "read_mojang_sample",
-        "Read a curated bundled Mojang sample/documentation file, or an indexed text file from a user-supplied sample ZIP located inside the configured workspace. Output is capped and read-only; no files are extracted.",
+        "Read a curated bundled Mojang sample/documentation file, or an indexed text file from a user-supplied ZIP located inside the configured workspace. sample_version selects the source corpus, not the target game version. Known but unindexed sources fail explicitly; no cross-version fallback occurs. Output is capped and read-only; no files are extracted.",
         {
             "sample_path": _SAMPLE_PATH,
-            "archive_path": {"type": "string", "minLength": 1, "maxLength": 4096, "description": "Optional path to the original source ZIP inside the configured workspace. If omitted, only curated bundled examples can be read."},
+            "sample_version": {"type": "string", "enum": ["1.26.50.4", "1.26.60.30-preview"], "default": "1.26.50.4", "description": "Source corpus version, distinct from target_game_version. Stable 1.26.50.4 is indexed; preview 1.26.60.30-preview is known but not indexed yet."},
+            "archive_path": {"type": "string", "minLength": 1, "maxLength": 4096, "description": "Optional path to the original source ZIP inside the configured workspace. It must correspond to the selected sample_version. If omitted, only curated bundled examples can be read."},
         },
         ["sample_path"],
     ),
@@ -340,6 +366,8 @@ def _validate_arguments(name: str, args: Any) -> dict[str, Any]:
         normalized[key] = value
     if name == "get_resource_graph" and "domain" not in normalized:
         normalized["domain"] = "all"
+    if name in {"search_mojang_samples", "read_mojang_sample"}:
+        normalized.setdefault("sample_version", DEFAULT_MOJANG_SAMPLE_VERSION)
     if name == "search_mojang_samples":
         normalized.setdefault("category", "all")
         normalized.setdefault("limit", 10)
@@ -569,6 +597,8 @@ def _build_curated_mojang_sample_index() -> dict[str, Any]:
         raise ValueError("no readable curated Mojang sample examples are available")
     return {
         "target_version": metadata["target_version"],
+        "sample_version": DEFAULT_MOJANG_SAMPLE_VERSION,
+        "source_channel": "stable",
         "source": "mojang_bedrock_samples_curated_fallback",
         "archive_sha256": metadata.get("zip_sha256"),
         "archive_stats": {
@@ -582,23 +612,53 @@ def _build_curated_mojang_sample_index() -> dict[str, Any]:
     }
 
 
-def _load_mojang_sample_index() -> dict[str, Any]:
-    """Load the full offline index, or fall back to packaged curated examples."""
-    if not MOJANG_SAMPLE_INDEX.is_file():
-        return _build_curated_mojang_sample_index()
+def _load_mojang_sample_index(sample_version: str = DEFAULT_MOJANG_SAMPLE_VERSION) -> dict[str, Any] | None:
+    """Load only the explicitly selected corpus; never substitute another version."""
+    corpus = MOJANG_SAMPLE_CORPORA.get(sample_version)
+    if corpus is None:
+        return None
+    index_path = MOJANG_SAMPLE_INDEX if sample_version == DEFAULT_MOJANG_SAMPLE_VERSION else corpus["index_path"]
+    if not index_path.is_file():
+        if sample_version == DEFAULT_MOJANG_SAMPLE_VERSION:
+            return _build_curated_mojang_sample_index()
+        return None
     try:
-        with gzip.open(MOJANG_SAMPLE_INDEX, "rt", encoding="utf-8") as stream:
+        with gzip.open(index_path, "rt", encoding="utf-8") as stream:
             payload = json.load(stream)
     except (OSError, EOFError, json.JSONDecodeError) as exc:
-        raise ValueError(f"bundled Mojang sample index is unavailable or invalid: {exc}") from exc
+        raise ValueError(f"bundled Mojang sample index for {sample_version} is unavailable or invalid: {exc}") from exc
     if not isinstance(payload, dict) or not isinstance(payload.get("entries"), list):
-        raise ValueError("bundled Mojang sample index has an invalid shape")
+        raise ValueError(f"bundled Mojang sample index for {sample_version} has an invalid shape")
     payload.setdefault("index_mode", "full_index")
+    payload.setdefault("sample_version", sample_version)
+    payload.setdefault("source_channel", corpus["channel"])
     return payload
 
 
+def _sample_version_not_indexed(sample_version: str) -> dict[str, Any]:
+    source = MOJANG_SAMPLE_SOURCE_CATALOG.get(sample_version, {})
+    indexed_versions = sorted(MOJANG_SAMPLE_CORPORA)
+    return _error(
+        "SAMPLE_VERSION_NOT_INDEXED",
+        f"Mojang sample source {sample_version!r} is known but has no verified bundled index; no other version was searched.",
+        {
+            "requested_version": sample_version,
+            "source_channel": source.get("channel"),
+            "source_release_url": source.get("release_url"),
+            "source_commit": source.get("source_commit"),
+            "indexed_versions": indexed_versions,
+        },
+    )
+
+
 def _search_mojang_samples(args: dict[str, Any]) -> dict[str, Any]:
-    payload = _load_mojang_sample_index()
+    sample_version = args["sample_version"]
+    corpus = MOJANG_SAMPLE_CORPORA.get(sample_version)
+    if corpus is None:
+        return _sample_version_not_indexed(sample_version)
+    payload = _load_mojang_sample_index(sample_version)
+    if payload is None:
+        return _sample_version_not_indexed(sample_version)
     query = " ".join(args["query"].strip().lower().split())
     tokens = re.findall(r"[a-z0-9_.:-]+", query)
     if not tokens:
@@ -656,7 +716,7 @@ def _search_mojang_samples(args: dict[str, Any]) -> dict[str, Any]:
         if matched == len(tokens):
             score += 6
         sample_path = entry["path"]
-        bundled_rel = _BUNDLED_SAMPLE_FILES.get(sample_path)
+        bundled_rel = corpus["bundled_files"].get(sample_path)
         matches.append((score, {
             "path": sample_path,
             "category": entry.get("category", "other"),
@@ -664,7 +724,7 @@ def _search_mojang_samples(args: dict[str, Any]) -> dict[str, Any]:
             "sha256": entry.get("sha256") or None,
             "identifiers": [v for v in ids if isinstance(v, str)][:20],
             "json_parsed": entry.get("json_parsed") is True,
-            "bundled_reference": str((MOJANG_SAMPLE_REFERENCE_ROOT / bundled_rel).relative_to(ROOT)) if bundled_rel else None,
+            "bundled_reference": str((corpus["reference_root"] / bundled_rel).relative_to(ROOT)) if bundled_rel else None,
         }))
     matches.sort(key=lambda item: (-item[0], item[1]["path"]))
     total = len(matches)
@@ -672,6 +732,8 @@ def _search_mojang_samples(args: dict[str, Any]) -> dict[str, Any]:
         "status": "completed",
         "query": args["query"].strip(),
         "category": category,
+        "sample_version": sample_version,
+        "source_channel": corpus["channel"],
         "target_version": payload.get("target_version"),
         "source": payload.get("source"),
         "source_archive_sha256": payload.get("archive_sha256"),
@@ -683,7 +745,7 @@ def _search_mojang_samples(args: dict[str, Any]) -> dict[str, Any]:
         "limitations": [
             "This is an index of paths, hashes and selected literal identifiers, not a complete schema validator.",
             "A bundled_reference means a small curated example is packaged. Other sample contents require the user's original ZIP to be available to read_mojang_sample inside the configured workspace.",
-            "The sample set is labelled 1.26.50.4; it does not itself prove every format is compatible with every 1.26.50 runtime.",
+            f"The selected source corpus is labelled {sample_version}; this does not prove every format is compatible with every target game runtime.",
         ],
         "mcp_server_version": SERVER_VERSION,
         "runtime_status": "NOT RUN",
@@ -691,7 +753,13 @@ def _search_mojang_samples(args: dict[str, Any]) -> dict[str, Any]:
 
 
 def _read_mojang_sample(args: dict[str, Any]) -> dict[str, Any]:
-    payload = _load_mojang_sample_index()
+    sample_version = args["sample_version"]
+    corpus = MOJANG_SAMPLE_CORPORA.get(sample_version)
+    if corpus is None:
+        return _sample_version_not_indexed(sample_version)
+    payload = _load_mojang_sample_index(sample_version)
+    if payload is None:
+        return _sample_version_not_indexed(sample_version)
     sample_path = args["sample_path"]
     if not _safe_indexed_sample_path(sample_path):
         raise ValueError("sample_path must be a canonical relative POSIX path from the bundled Mojang sample index")
@@ -719,7 +787,7 @@ def _read_mojang_sample(args: dict[str, Any]) -> dict[str, Any]:
             raise ValueError(f"unable to read sample file: {exc}") from exc
         source = "user_supplied_archive"
     else:
-        bundled = _BUNDLED_SAMPLE_FILES.get(sample_path)
+        bundled = corpus["bundled_files"].get(sample_path)
         if not bundled:
             return {
                 "status": "not_bundled",
@@ -727,12 +795,15 @@ def _read_mojang_sample(args: dict[str, Any]) -> dict[str, Any]:
                 "category": indexed.get("category"),
                 "sha256": indexed.get("sha256") or None,
                 "target_version": payload.get("target_version"),
+                "sample_version": sample_version,
+                "source_channel": corpus["channel"],
                 "message": "This path is indexed but its content is not bundled. Put the original sample ZIP inside the configured workspace and pass its archive_path to read_mojang_sample.",
                 "runtime_status": "NOT RUN",
             }
-        file_path = (MOJANG_SAMPLE_REFERENCE_ROOT / bundled).resolve(strict=True)
+        reference_root = corpus["reference_root"]
+        file_path = (reference_root / bundled).resolve(strict=True)
         try:
-            file_path.relative_to(MOJANG_SAMPLE_REFERENCE_ROOT.resolve(strict=True))
+            file_path.relative_to(reference_root.resolve(strict=True))
         except ValueError as exc:
             raise ValueError("bundled sample reference resolves outside its reference directory") from exc
         if not file_path.is_file() or file_path.stat().st_size > MAX_SAMPLE_READ_BYTES:
@@ -752,6 +823,8 @@ def _read_mojang_sample(args: dict[str, Any]) -> dict[str, Any]:
         "sample_path": sample_path,
         "category": indexed.get("category"),
         "target_version": payload.get("target_version"),
+        "sample_version": sample_version,
+        "source_channel": corpus["channel"],
         "source_archive_sha256": payload.get("archive_sha256"),
         "index_mode": payload.get("index_mode", "full_index"),
         "content_sha256": digest,

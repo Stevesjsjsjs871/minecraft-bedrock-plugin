@@ -1,0 +1,18 @@
+name = "minecraft-bedrock-engineer"
+main = "cloudflare/src/index.ts"
+compatibility_date = "2026-10-30"
+compatibility_flags = ["nodejs_compat"]
+upload_source_maps = true
+
+[[containers]]
+class_name = "BedrockMcpContainer"
+image = "./Dockerfile"
+max_instances = 1
+
+[[durable_objects.bindings]]
+name = "BEDROCK_MCP"
+class_name = "BedrockMcpContainer"
+
+[exports.BedrockMcpContainer]
+type = "durable-object"
+storage = "sqlite"

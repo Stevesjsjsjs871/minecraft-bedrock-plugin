@@ -27,6 +27,10 @@ The GitHub source intentionally excludes retired server wrappers and their obsol
 6. Re-open changed files and validate manifests, UUIDs, identifiers, resource references, PNG/UV/animation relationships as applicable.
 7. Report exact commands, exit codes, test counts, limitations and runtime status. Static checks do not prove Minecraft import/render/gameplay.
 
+## Capability boundaries
+
+See [the Skills-first capability matrix](skills/skills-first-execution/references/capability-matrix.md) for the exact distinction between bundled local scripts, instruction-only authoring workflows, optional external applications and retained legacy migration sources. Do not infer a callable tool from a Skill name or historical server source.
+
 ## Maintenance and validation
 
 Use skills/skills-only-maintenance/SKILL.md for plugin maintenance. First run the package-integrity regression tests:

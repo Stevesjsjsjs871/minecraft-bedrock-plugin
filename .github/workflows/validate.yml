@@ -35,7 +35,7 @@ jobs:
           python -m py_compile skills/bedrock-development/scripts/test_index_mojang_samples.py
           python -m py_compile skills/package-integrity/scripts/check_package_integrity.py
           python -m py_compile skills/package-integrity/scripts/test_check_package_integrity.py
-          python -m py_compile skills/visual-resource-pipeline/scripts/generate_texture.py skills/visual-resource-pipeline/scripts/test_generate_texture.py
+          python -m py_compile skills/visual-resource-pipeline/scripts/generate_texture.py skills/visual-resource-pipeline/scripts/test_generate_texture.py cloudflare/tests/test_capability_contract.py
       - name: Test MCP server schemas, protocol, diff tool and safety
         run: python -m unittest discover -s server/tests -v
       - name: Test shared PNG stream validator
@@ -50,6 +50,8 @@ jobs:
         run: python -m unittest discover -s skills/visual-resource-pipeline/scripts -p 'test_*.py' -v
       - name: Test package-integrity checker
         run: python -m unittest discover -s skills/package-integrity/scripts -p 'test_*.py' -v
+      - name: Test local and remote MCP capability profiles
+        run: python -m unittest discover -s cloudflare/tests -p 'test_*.py' -v
       - name: Run package-integrity audit
         run: python skills/package-integrity/scripts/check_package_integrity.py .
       - name: Run analyzer regression cases and report-schema checks
@@ -61,8 +63,8 @@ jobs:
           import runpy
           from pathlib import Path
 
-          expected = "1.0.14"
-          assert Path("VERSION").read_text(encoding="utf-8").strip() == expected
+          expected = Path("VERSION").read_text(encoding="utf-8").strip()
+          assert expected
           root = json.loads(Path("plugin.json").read_text(encoding="utf-8"))
           compat = json.loads(Path(".codex-plugin/plugin.json").read_text(encoding="utf-8"))
           assert root["name"] == compat["name"] == "minecraft-bedrock-engineer"

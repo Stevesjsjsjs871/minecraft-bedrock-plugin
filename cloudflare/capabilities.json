@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "profile_id": "cloudflare-workers-free",
+  "source_ref": "feat/cloudflare-workers-mcp",
+  "remote": {
+    "transport": "streamable-http",
+    "endpoint_template": "https://<worker-subdomain>.workers.dev/mcp",
+    "tool_names": [
+      "bedrock_generate_manifest",
+      "bedrock_validate_manifest",
+      "bedrock_read_plugin_source",
+      "bedrock_plugin_capabilities"
+    ],
+    "tool_count": 4,
+    "executes_local_python_mcp": false,
+    "writes_project_files": false,
+    "invokes_creator_tools_cli": false,
+    "limitations": [
+      "No local filesystem access or project file writes",
+      "No execution of bundled Python MCP handlers",
+      "No texture, geometry, animation or archive authoring handlers",
+      "No Minecraft Creator Tools CLI bridge"
+    ]
+  },
+  "local": {
+    "transport": "stdio",
+    "config_files": [
+      "mcp.json",
+      ".mcp.json"
+    ],
+    "server_count": 16,
+    "module_names": [
+      "mcp_server",
+      "texture_generator_mcp",
+      "texture_link_audit_mcp",
+      "entity_authoring_mcp",
+      "animation_controller_mcp",
+      "animation_clip_mcp",
+      "animation_pipeline_audit_mcp",
+      "animated_entity_bundle_mcp",
+      "geometry_uv_audit_mcp",
+      "geometry_uv_template_mcp",
+      "texture_painting_mcp",
+      "reference_texture_transfer_mcp",
+      "uv_mapping_assistant_mcp",
+      "visual_reference_analyzer_mcp",
+      "reference_mapping_review_mcp",
+      "uv_texture_retarget_mcp"
+    ]
+  }
+}

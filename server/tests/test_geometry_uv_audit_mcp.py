@@ -14,26 +14,24 @@ from unittest.mock import patch
 # The released base package already supplies server/png_validation.py. The
 # isolated overlay test environment injects a tiny IHDR reader so this new
 # auditor can be tested without copying or forking that shared validator.
-if "png_validation" not in sys.modules:
-    png_stub = types.ModuleType("png_validation")
+png_stub = types.ModuleType("png_validation")
 
-    class PngValidationError(ValueError):
-        pass
+class PngValidationError(ValueError):
+    pass
 
-    def validate_png_file(path, **_limits):
-        data = path.read_bytes()
-        if len(data) < 24 or not data.startswith(b"\x89PNG\r\n\x1a\n") or data[12:16] != b"IHDR":
-            raise PngValidationError("invalid PNG signature or IHDR")
-        width, height = struct.unpack(">II", data[16:24])
-        if width < 1 or height < 1:
-            raise PngValidationError("invalid PNG dimensions")
-        return width, height
+def validate_png_file(path, **_limits):
+    data = path.read_bytes()
+    if len(data) < 24 or not data.startswith(b"\x89PNG\r\n\x1a\n") or data[12:16] != b"IHDR":
+        raise PngValidationError("invalid PNG signature or IHDR")
+    width, height = struct.unpack(">II", data[16:24])
+    if width < 1 or height < 1:
+        raise PngValidationError("invalid PNG dimensions")
+    return width, height
 
-    png_stub.PngValidationError = PngValidationError
-    png_stub.validate_png_file = validate_png_file
-    sys.modules["png_validation"] = png_stub
-
-import geometry_uv_audit_mcp as auditor
+png_stub.PngValidationError = PngValidationError
+png_stub.validate_png_file = validate_png_file
+with patch.dict(sys.modules, {"png_validation": png_stub}):
+    import geometry_uv_audit_mcp as auditor
 
 
 def _chunk(kind: bytes, data: bytes) -> bytes:

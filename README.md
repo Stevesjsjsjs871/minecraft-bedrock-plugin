@@ -1,6 +1,6 @@
 # Minecraft Bedrock Engineer — 1.4.0
 
-## Release overview
+## 1.4.0: Release overview
 
 Version 1.4.0 adds an optional authenticated Cloudflare Workers HTTP MCP gateway backed by a Python container. The original local STDIO MCP configuration remains supported. See `cloudflare/README.md` for deployment instructions.
 
@@ -50,7 +50,7 @@ The reference workflow is human-in-the-loop. Component detection and geometric r
 - RC10 overlay regression suite: **221/221 tests passed** across 10 local overlay test modules.
 - New human-reviewed reference mapping suite: **28/28 tests passed**.
 - The end-to-end synthetic demo completed: reference analysis → human mapping review → UV mapping plan → reference texture transfer. Six of 24 UV faces were mapped intentionally; the resulting test texture was 64×64 PNG.
-- Python compileall, JSON manifests, JSON Schema validation, 15-server MCP registry parity, stdio initialize/tools/list/call smoke tests and ZIP integrity checks passed.
+- Python compileall, JSON manifests, JSON Schema validation, 16-server MCP registry parity, stdio initialize/tools/list/call smoke tests and ZIP integrity checks passed.
 - The local overlay test harness uses a test-local bounded PNG validator shim because the shared full PNG validator is provided by the installed base package and is not duplicated in this overlay. The historical full base-package test suite was not rerun from this overlay checkout.
 - Synthetic demonstration assets are not production creature textures. Minecraft runtime/import/render tests and Blockbench interoperability tests are **NOT RUN**.
 

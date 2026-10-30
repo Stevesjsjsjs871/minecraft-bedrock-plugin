@@ -19,9 +19,9 @@ The GitHub source intentionally excludes retired server wrappers and their obsol
 
 ## Execution contract
 
-1. Start with `skills/skills-first-execution/SKILL.md` and select only relevant specialist skills.
+1. Start with skills/skills-first-execution/SKILL.md and select only relevant specialist skills.
 2. Inspect supplied files or an actually connected workspace. Establish project root, target version and baseline before editing.
-3. Use native file/code capabilities only when actually available. Otherwise provide a complete patch or exact reproducible commands and mark work `NOT APPLIED` / `NOT RUN`.
+3. Use native file/code capabilities only when actually available. Otherwise provide a complete patch or exact reproducible commands and mark work NOT APPLIED / NOT RUN.
 4. Preserve existing mechanics, UUIDs, identifiers, assets and unrelated files. No silent overwrite or deletion.
 5. Prefer exact-version official docs and Mojang samples; cite provenance.
 6. Re-open changed files and validate manifests, UUIDs, identifiers, resource references, PNG/UV/animation relationships as applicable.
@@ -29,11 +29,25 @@ The GitHub source intentionally excludes retired server wrappers and their obsol
 
 ## Maintenance and validation
 
-Use `skills/skills-only-maintenance/SKILL.md` for plugin maintenance. Run the active Skills-only package checker and its tests from the actual extracted package root:
+Use skills/skills-only-maintenance/SKILL.md for plugin maintenance. First run the package-integrity regression tests:
 
 ```bash
-python skills/package-integrity/scripts/check_skills_package.py .
-python skills/package-integrity/scripts/test_check_skills_package.py -v
+python -m unittest discover -s skills/package-integrity/scripts -p 'test_*.py' -v
 ```
 
-Run only current standalone utilities and their corresponding tests. Historical changelog entries may mention retired architecture; they are retained as release history, not as active implementation. Runtime, multiplayer and Blockbench checks must be reported as `NOT RUN` unless actually performed.
+Build a deterministic candidate outside the source tree, extract it into a fresh directory, and run the strict release gate:
+
+```bash
+mkdir -p dist
+python skills/package-integrity/scripts/build_skills_package.py . dist/minecraft-bedrock-engineer.tar.gz
+tmp_dir="$(mktemp -d)"
+tar -xzf dist/minecraft-bedrock-engineer.tar.gz -C "$tmp_dir"
+python skills/package-integrity/scripts/check_skills_package.py "$tmp_dir"
+sha256sum -c dist/minecraft-bedrock-engineer.tar.gz.sha256
+```
+
+The checker requires BUILD_PROVENANCE.json and rejects symlinks, special files, Python bytecode/cache directories, mismatched metadata, changed default prompts and altered payload hashes. A failed check blocks packaging; do not bypass it.
+
+The current GitHub mirror is missing the exact binary Mojang Samples index included in Plugin Creator 1.5.12. Until that pinned file is restored, the extracted-package release gate is expected to fail and no release candidate may be published. Do not fabricate or partially regenerate the index.
+
+Run only current standalone utilities and their corresponding tests. Historical changelog entries may mention retired architecture; they are retained as release history, not as active implementation. Runtime, multiplayer and Blockbench checks must be reported as NOT RUN unless actually performed.

@@ -117,6 +117,34 @@ TOOLS = [
             report = checker.audit_package(root)
             self.assertEqual(self.check_by_id(report, "default-prompts")["status"], "FAIL")
 
+    def test_eleven_unique_default_prompts_are_allowed(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "package"
+            self.make_package(root)
+            prompts = [f"Workflow prompt {i}" for i in range(11)]
+            root_manifest = json.loads((root / "plugin.json").read_text(encoding="utf-8"))
+            compat = json.loads((root / ".codex-plugin/plugin.json").read_text(encoding="utf-8"))
+            root_manifest["extensions"]["com.openai"]["interface"]["defaultPrompt"] = prompts
+            compat["interface"]["defaultPrompt"] = prompts
+            (root / "plugin.json").write_text(json.dumps(root_manifest), encoding="utf-8")
+            (root / ".codex-plugin/plugin.json").write_text(json.dumps(compat), encoding="utf-8")
+            report = checker.audit_package(root)
+            self.assertEqual(self.check_by_id(report, "default-prompts")["status"], "PASS")
+
+    def test_duplicate_default_prompts_fail(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "package"
+            self.make_package(root)
+            prompts = ["Duplicate prompt", "Duplicate prompt"]
+            root_manifest = json.loads((root / "plugin.json").read_text(encoding="utf-8"))
+            compat = json.loads((root / ".codex-plugin/plugin.json").read_text(encoding="utf-8"))
+            root_manifest["extensions"]["com.openai"]["interface"]["defaultPrompt"] = prompts
+            compat["interface"]["defaultPrompt"] = prompts
+            (root / "plugin.json").write_text(json.dumps(root_manifest), encoding="utf-8")
+            (root / ".codex-plugin/plugin.json").write_text(json.dumps(compat), encoding="utf-8")
+            report = checker.audit_package(root)
+            self.assertEqual(self.check_by_id(report, "default-prompts")["status"], "FAIL")
+
     def test_duplicate_tool_name_fails_registry_audit(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td) / "package"

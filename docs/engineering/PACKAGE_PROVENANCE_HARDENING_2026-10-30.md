@@ -36,6 +36,7 @@ Make package integrity a fail-closed release gate and add a deterministic Skills
   - bounds decompression of the pinned Mojang Samples index to 64 MiB.
 - Added test_build_skills_package.py and expanded test_check_skills_package.py.
 - Updated package-integrity skill instructions, README maintenance workflow, CI step label and GITHUB_SYNC_NOTES.md.
+- Documented building from a clean git archive snapshot with explicit source commit/epoch, avoiding test-generated cache contamination without deleting user files.
 
 ## Validation
 

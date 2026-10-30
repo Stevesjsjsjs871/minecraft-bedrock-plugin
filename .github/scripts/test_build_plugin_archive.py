@@ -38,9 +38,11 @@ def make_repo(root: Path) -> Path:
     write(repo, ".codex-plugin/plugin.json", json.dumps(compat_manifest))
     server = {"minecraft-bedrock-engineer": {"type": "stdio", "command": "python3",
               "args": ["$" + "{PLUGIN_ROOT}/server/mcp_server.py"]}}
-    write(repo, ".mcp.json", json.dumps({"mcpServers": server}))
+    codex_server = {"minecraft-bedrock-engineer": {**server["minecraft-bedrock-engineer"], "env": {}}}
+    write(repo, ".mcp.json", json.dumps({"mcpServers": codex_server}))
     write(repo, "mcp.json", json.dumps({"mcpServers": server}))
-    for path, body in {"CHANGELOG.md": "# Changelog\n", "README.md": "# Readme\n",
+    for path, body in {"CHANGELOG.md": "# Plugin package changelog\n\n## 1.2.3 — Fixture release\n",
+                       "README.md": "# Minecraft Bedrock Engineer — 1.2.3\n",
                        "archive_safety.py": "# safety\n", "server/mcp_server.py": "print('ok')\n",
                        "skills/example/SKILL.md": "# Skill\n"}.items():
         write(repo, path, body)
@@ -122,7 +124,7 @@ class BuildPluginArchiveTests(unittest.TestCase):
             write(repo, "README.md", "uncommitted\n"); output = root / "out.tar.gz"
             self.run_builder(repo, output)
             with tarfile.open(output, "r:gz") as tar:
-                self.assertEqual(tar.extractfile("README.md").read(), b"# Readme\n")
+                self.assertEqual(tar.extractfile("README.md").read(), "# Minecraft Bedrock Engineer — 1.2.3\n".encode("utf-8"))
 
     def test_mcp_config_mismatch_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -130,6 +132,38 @@ class BuildPluginArchiveTests(unittest.TestCase):
             write(repo, "mcp.json", json.dumps({"mcpServers": {"other": {"type": "stdio", "command": "python3",
                   "args": ["$" + "{PLUGIN_ROOT}/server/mcp_server.py"]}}}))
             git(repo, "add", "mcp.json"); git(repo, "commit", "-qm", "mcp mismatch")
+            self.run_builder(repo, root / "out.tar.gz", 1)
+
+    def test_readme_version_mismatch_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); repo = make_repo(root)
+            write(repo, "README.md", "# Minecraft Bedrock Engineer — 9.9.9\n")
+            git(repo, "add", "README.md"); git(repo, "commit", "-qm", "bad README version")
+            self.run_builder(repo, root / "out.tar.gz", 1)
+
+    def test_changelog_version_mismatch_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); repo = make_repo(root)
+            write(repo, "CHANGELOG.md", "# Plugin package changelog\n\n## 9.9.9 — Wrong release\n")
+            git(repo, "add", "CHANGELOG.md"); git(repo, "commit", "-qm", "bad changelog version")
+            self.run_builder(repo, root / "out.tar.gz", 1)
+
+    def test_mcp_env_mismatch_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); repo = make_repo(root)
+            config = json.loads((repo / "mcp.json").read_text())
+            config["mcpServers"]["minecraft-bedrock-engineer"]["env"] = {"MODE": "different"}
+            write(repo, "mcp.json", json.dumps(config))
+            git(repo, "add", "mcp.json"); git(repo, "commit", "-qm", "MCP env mismatch")
+            self.run_builder(repo, root / "out.tar.gz", 1)
+
+    def test_mcp_extra_field_mismatch_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); repo = make_repo(root)
+            config = json.loads((repo / "mcp.json").read_text())
+            config["mcpServers"]["minecraft-bedrock-engineer"]["cwd"] = "$" + "{PLUGIN_ROOT}"
+            write(repo, "mcp.json", json.dumps(config))
+            git(repo, "add", "mcp.json"); git(repo, "commit", "-qm", "MCP cwd mismatch")
             self.run_builder(repo, root / "out.tar.gz", 1)
 
     def test_output_symlink_is_rejected(self):

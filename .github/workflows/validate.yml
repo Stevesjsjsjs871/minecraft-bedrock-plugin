@@ -18,7 +18,17 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.12.16"
+      - name: Assert exact Python runtime
+        run: |
+          python - <<'PY'
+          import sys
+          expected = (3, 12, 16)
+          actual = sys.version_info[:3]
+          if actual != expected:
+              raise SystemExit(f"Expected Python {expected}, got {actual}")
+          print(f"PASS: Python {sys.version.split()[0]}")
+          PY
       - name: Compile bundled Python utilities
         run: python -m compileall -q skills
       - name: Geometry and UV engine tests
@@ -84,3 +94,27 @@ jobs:
           tar -xzf "$candidate" -C "$extract_dir"
           python "$extract_dir/skills/package-integrity/scripts/check_skills_package.py" "$extract_dir"
           (cd "$RUNNER_TEMP" && sha256sum --check "$(basename "$candidate").sha256")
+
+      - name: Rebuild from an independent clean snapshot and compare archive bytes
+        run: |
+          set -euo pipefail
+          version="$(cat VERSION)"
+          first="$RUNNER_TEMP/minecraft-bedrock-engineer-$version.tar.gz"
+          repro_source="$RUNNER_TEMP/mbe-source-repro"
+          repro_output="$RUNNER_TEMP/mbe-output-repro"
+          second="$repro_output/minecraft-bedrock-engineer-$version.tar.gz"
+          rm -rf "$repro_source" "$repro_output"
+          mkdir -p "$repro_source" "$repro_output"
+          git archive "$GITHUB_SHA" | tar -x -C "$repro_source"
+          cp "$RUNNER_TEMP/mojang-samples-index.json.gz" \
+            "$repro_source/skills/bedrock-development/references/mojang-samples-1.26.50.4/mojang-samples-index.json.gz"
+          epoch="$(git show -s --format=%ct "$GITHUB_SHA")"
+          python "$repro_source/skills/package-integrity/scripts/build_skills_package.py" \
+            "$repro_source" "$second" \
+            --source-commit "$GITHUB_SHA" \
+            --source-date-epoch "$epoch" \
+            --source-ref "$GITHUB_REF"
+          cmp --silent "$first" "$second"
+          cmp --silent "$first.sha256" "$second.sha256"
+          sha256sum "$first" "$second"
+          echo "PASS: independent clean snapshots produced byte-identical tar.gz archives and SHA-256 sidecars"

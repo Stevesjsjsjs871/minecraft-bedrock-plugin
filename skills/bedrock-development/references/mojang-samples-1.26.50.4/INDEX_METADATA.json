@@ -37,5 +37,9 @@
   "source_asset_id": 567172887,
   "source_asset_size_bytes": 169385576,
   "source_asset_sha256": "c0b6151f5f9a0c31ebe3c909dfc82d97f12473ed2c6e039aa7e22d667042026c",
-  "index_file": "mojang-samples-index.json.gz"
+  "index_file": "mojang-samples-index.json.gz",
+  "index_sha256": "48429d64391157553e6760b7f568e5e6d5d05fa6517427b5a1156c8bc18e61fc",
+  "index_size_bytes": 1128406,
+  "index_generator": "skills/bedrock-development/scripts/index_mojang_samples.py",
+  "index_generation_python": "3.12.10"
 }

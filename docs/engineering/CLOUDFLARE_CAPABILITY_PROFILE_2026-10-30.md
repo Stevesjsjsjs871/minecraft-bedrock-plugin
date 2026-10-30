@@ -64,4 +64,32 @@ Corrections committed to the PR branch:
 - Package Integrity now accepts 1–32 unique non-empty default prompts and has regression tests for 11 prompts and duplicates.
 - README validation evidence now correctly says 16-server MCP registry parity.
 
-The initial failure is recorded, not hidden. The corrected code has **NOT YET BEEN RE-TESTED** by a subsequent GitHub Actions run; the latest CI result remains failure #41062741228 until a new run passes.
+The initial failure is recorded, not hidden. The corrected code was re-tested successfully in GitHub Actions runs #41063133534 and #41063171785 on head `baadf1650e671ab2296750dc9e515d6ebbcedd44`. Both runs completed with `success`.
+
+
+## Final CI evidence
+
+The corrected PR head `baadf1650e671ab2296750dc9e515d6ebbcedd44` passed two GitHub Actions runs:
+
+- [Run #41063133534](https://github.com/Stevesjsjsjs871/minecraft-bedrock-plugin/actions/runs/41063133534) — Success.
+- [Run #41063171785](https://github.com/Stevesjsjsjs871/minecraft-bedrock-plugin/actions/runs/41063171785) — Success.
+
+Observed test results in the completed job:
+
+| Check | Result |
+|---|---:|
+| Main server regression suite | 359/359 |
+| Shared PNG validator | 15/15 |
+| Texture-link auditor | 20/20 |
+| Benchmark evaluator | 12/12 |
+| Mojang sample indexer | 6/6 |
+| Procedural texture generator | 12/12 |
+| Package Integrity unit tests | 11/11 |
+| Local/remote capability contract | 4/4 |
+| Analyzer regression cases | 18/18 |
+| Python compilation | PASS |
+| Manifest/version/MCP checks | PASS |
+
+Package Integrity audit completed with **WARN** (14 PASS, 1 WARN, 0 FAIL): the full generated gzip Mojang index is absent, while 14 curated source files remain available for fallback search. Runtime/Minecraft checks remain NOT RUN.
+
+The first failed run #41062741228 remains part of the history; the failures were corrected and the two subsequent runs passed.

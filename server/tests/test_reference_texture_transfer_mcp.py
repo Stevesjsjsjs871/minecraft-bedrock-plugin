@@ -52,10 +52,13 @@ def _validate_png_bytes(payload, *, max_bytes=16 * 1024 * 1024, max_dimension=40
 
 validation.PngValidationError = PngValidationError
 validation.validate_png_bytes = _validate_png_bytes
-sys.modules["png_validation"] = validation
+SERVER_DIR = Path(__file__).resolve().parents[1]
+if str(SERVER_DIR) not in sys.path:
+    sys.path.insert(0, str(SERVER_DIR))
 
-import texture_painting_mcp as painter
-import reference_texture_transfer_mcp as transfer
+with patch.dict(sys.modules, {"png_validation": validation}):
+    import texture_painting_mcp as painter
+    import reference_texture_transfer_mcp as transfer
 
 
 class ReferenceTextureTransferTests(unittest.TestCase):

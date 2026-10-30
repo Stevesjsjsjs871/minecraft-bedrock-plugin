@@ -74,7 +74,7 @@ After the prompt validator fix, all test suites and the package-integrity audit 
 
 ## Final verification
 
-- Latest branch commit: `1abef321ed69e9a5f37668c7d6f3fcafddfa4c17`.
+- Latest executable-code commit: `3b77fc87b3fa648f9f46e08c43159abb0bf93d19`; subsequent report-only commits were also validated by CI run `41042035869`.
 - Final GitHub Actions run: [41041952864](https://github.com/Stevesjsjsjs871/minecraft-bedrock-plugin/actions/runs/41041952864) — **Success** on Ubuntu 24.04 / Python 3.12.15.
 - Server suite: 359/359.
 - PNG validator suite: 15/15.
@@ -88,3 +88,16 @@ After the prompt validator fix, all test suites and the package-integrity audit 
 - Python compilation: PASS.
 
 Local test execution, Minecraft runtime/import, Creator Tools CLI, Windows and macOS: NOT RUN.
+
+
+## Cross-source release observation for the next stage
+
+A fresh read after CI completion shows Plugin Creator is now at 1.4.0 (`pluginrel_6ae46dc1108081919af9b64db0daf321`, created 2026-10-30 10:13:21 UTC), while GitHub `main` is 1.3.0 at `45e44ac18ea68c0841d44b480ef43c27dcdd7ff2` (2026-10-30 09:44:33 UTC).
+
+- Plugin Creator inventory: 100 files, 2,690,379 declared bytes.
+- Plugin Creator: 16 MCP servers, 12 prompts; both MCP configs agree, all 16 referenced server scripts exist, and the original three prompts remain the unchanged prefix.
+- GitHub main: 15 MCP servers, 11 prompts; both original manifests agree.
+- Primary `mcp_server.py`: Plugin Creator 111,558 bytes / 14 registered tool names; GitHub main 156,721 bytes / 19 registered tool names. Four Creator Tools bridge registrations are absent from the Plugin Creator primary server: `creator_tools_status`, `creator_tools_catalog`, `validate_with_mct`, and `create_entity_with_mct`.
+- No `BUILD_PROVENANCE.json` is present in the Plugin Creator inventory.
+
+This is a source-provenance/parity issue for the next stage, not a regression caused by this CI repair. This run did not change Plugin Creator or create a release.

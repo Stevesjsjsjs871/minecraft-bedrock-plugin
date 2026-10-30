@@ -69,3 +69,14 @@ Acceptance:
 - The expression is not parsed; syntactically invalid but printable Molang may pass this static validator.
 - State variables, nested animation-controller aliases and full animation clip authoring remain outside this tool's current scope.
 - Plugin Creator 1.1.1 is not synchronized with this follow-up branch. Do not update it without a separate explicit user confirmation and an expected-current-release guard.
+
+
+### Verification result — GitHub Actions PR run #156
+- Run: https://github.com/Stevesjsjsjs871/minecraft-bedrock-plugin/actions/runs/41020703015 — completed successfully on commit 0d624079fa1d4641b8d3b9bf31ca1d16baa7cf7c.
+- Main Python validation job: 177 server tests passed; targeted suites also passed: PNG validator 14, texture-link auditor 20, benchmark evaluator 12, Mojang indexer 6, procedural texture generator 12 and package-integrity tests 9. Total: 250 test executions, with the targeted PNG and texture-auditor cases already included in server discovery; 216 distinct cases across these suites.
+- Portability matrix: Ubuntu and Windows each passed 13 entity-authoring tests, 24 animation-controller tests and 3 MCP-registry tests (40/40 per OS).
+- Python compilation, MCP registration, five stdio-server configuration checks, three default-prompt equality, analyzer regression 18/18 and report-schema checks passed.
+- Package-integrity audit completed with 14 PASS, 1 WARN, 0 FAIL. The warning is the known missing full generated Stable Mojang gzip index in this PR stack; only 14 curated fallback files are available because PR #2–#4 are not merged. This warning is unrelated to the animation blend change and is not hidden.
+- Non-failing workflow warnings: GitHub Actions Node.js 20 deprecation and Python dependency punycode deprecation.
+- The journal-only commit that follows does not change executable code or tests; the tested code remains 0d624079fa1d4641b8d3b9bf31ca1d16baa7cf7c.
+- Minecraft import, Molang parsing/evaluation, in-game animation blend behavior and Creator Tools CLI remain NOT RUN.

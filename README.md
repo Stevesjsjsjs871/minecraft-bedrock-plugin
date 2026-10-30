@@ -29,8 +29,14 @@
 - Adds nine synthetic positive/negative regression tests for package structure, schema closure, tool dispatch, version drift, unsafe sample paths and conservative README heading repair.
 - Adds release-engineering, validation-runbook, readiness, MCP contract, tool-registry and resource-integrity workflows.
 - Preserves the existing GitHub MCP server implementation, including the optional Minecraft Creator Tools CLI staging workflow. Package-level checks do not replace the full MCP/analyzer suite.
-- This GitHub checkout uses curated Mojang sample fallback when the generated compressed full index is absent; the checker reports that as a warning rather than a full-index pass.
+- The source tree now carries the metadata-only 1.26.50.4 full index, regenerated from Mojang's pinned official full release asset by CI. The original 169 MB ZIP and binary asset bytes are not committed; the checker verifies the compressed index digest and corpus statistics.
 - Minecraft runtime/import/rendering and multiplayer tests remain `NOT RUN` unless actually executed in-game.
+
+## Mojang sample index pipeline
+
+- `skills/bedrock-development/references/mojang-samples-1.26.50.4/mojang-samples-index.json.gz` is a metadata-only index of 22,252 entries from Mojang's official `v1.26.50.4` full release asset.
+- `.github/workflows/build-mojang-samples-index.yml` pins the official asset ID, SHA-256 and size; verifies the full ZIP CRC table and archive statistics; runs the existing no-extraction indexer; checks category counts; records the generated index digest/size; runs the full test suite and package-integrity audit; then commits only the generated index and its metadata. Automatic push-triggered generation is limited to this candidate branch; after merge, an owner can manually dispatch the workflow on `main` to revalidate/rebuild this pinned corpus.
+- The original full ZIP and binary texture/sound contents are not committed. The index supports offline path/category/identifier search, but reading a non-curated text file still requires the original ZIP in the configured workspace. Minecraft import/rendering remains `NOT RUN`.
 
 
 ## 0.9.3: optional Minecraft Creator Tools integration
@@ -236,6 +242,8 @@ Minecraft Bedrock creation, version-matched example search, and verification too
 
 The analyzer and MCP server use Python's standard library. Schema validation and regression tests require `jsonschema`:
 
+The package-integrity gate also checks shared metadata/interface parity between the root and compatibility manifests, exact default-prompt parity, the latest versioned changelog entry, MCP configuration/registry consistency, and Mojang sample-index provenance.
+
 ```bash
 python -m pip install jsonschema
 python -m py_compile archive_safety.py server/mcp_server.py server/tests/test_mcp_server.py
@@ -243,6 +251,8 @@ python -m unittest discover -s server/tests -v
 python -m py_compile skills/automated-validation/scripts/bedrock_audit.py skills/automated-validation/scripts/validate_report.py skills/regression-evals/scripts/regression_tests.py
 python skills/regression-evals/scripts/regression_tests.py --auditor skills/automated-validation/scripts/bedrock_audit.py
 python -m unittest discover -s skills/audit-benchmark/scripts -p 'test_*.py' -v
+python -m unittest discover -s skills/package-integrity/scripts -p 'test_*.py' -v
+python skills/package-integrity/scripts/check_package_integrity.py .
 ```
 
 ## 0.6.8: task-directed MCP workflow instructions

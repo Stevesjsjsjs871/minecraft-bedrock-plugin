@@ -7,15 +7,19 @@ server, and makes no network requests or subprocess calls.
 """
 from __future__ import annotations
 
+import errno
 import hashlib
 import importlib.util
 import json
 import os
 import re
+import stat
+import time
 import struct
 import sys
 import tempfile
 import zlib
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -35,6 +39,8 @@ MAX_DIMENSION = 1024
 MAX_PIXELS = 1_048_576
 MAX_PNG_BYTES = 16 * 1024 * 1024
 MAX_ATLAS_BYTES = 8 * 1024 * 1024
+ATLAS_LOCK_TIMEOUT_SECONDS = 10.0
+ATLAS_LOCK_POLL_INTERVAL_SECONDS = 0.05
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 PROJECT_NAME_RE = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?")
 
@@ -351,20 +357,32 @@ def _resolve_project_directory(project_name: str) -> tuple[Path, Path]:
 
 
 def _read_valid_png(path: Path) -> tuple[int, int]:
-    """Validate PNG signature, chunk bounds/CRCs, IHDR, IDAT and IEND."""
+    """Validate PNG chunks, compressed image data, scanline sizes and filters."""
     try:
-        size = path.stat().st_size
+        with path.open("rb") as stream:
+            payload = stream.read(MAX_PNG_BYTES + 1)
     except OSError as exc:
         raise AtlasToolError("TEXTURE_UNAVAILABLE", f"texture file is unavailable: {exc}") from exc
-    if size < 45 or size > MAX_PNG_BYTES:
+    if len(payload) < 45 or len(payload) > MAX_PNG_BYTES:
         raise AtlasToolError("INVALID_PNG", f"texture PNG must be between 45 bytes and {MAX_PNG_BYTES} bytes")
-    payload = path.read_bytes()
     if not payload.startswith(PNG_SIGNATURE):
         raise AtlasToolError("INVALID_PNG", "texture file does not have a PNG signature")
+
+    allowed_depths = {
+        0: {1, 2, 4, 8, 16},
+        2: {8, 16},
+        3: {1, 2, 4, 8},
+        4: {8, 16},
+        6: {8, 16},
+    }
+    channel_counts = {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}
+    width = height = bit_depth = color_type = interlace_method = 0
+    seen_ihdr = seen_plte = seen_idat = seen_iend = False
+    idat_ended = False
+    idat_chunks: list[bytes] = []
     offset = len(PNG_SIGNATURE)
-    width = height = 0
-    seen_ihdr = seen_idat = seen_iend = False
-    chunks = 0
+    chunk_count = 0
+
     while offset < len(payload):
         if len(payload) - offset < 12:
             raise AtlasToolError("INVALID_PNG", "PNG contains a truncated chunk header")
@@ -373,38 +391,291 @@ def _read_valid_png(path: Path) -> tuple[int, int]:
         end = offset + 12 + length
         if end > len(payload):
             raise AtlasToolError("INVALID_PNG", "PNG contains a truncated chunk body")
+        if not all(65 <= byte <= 90 or 97 <= byte <= 122 for byte in kind):
+            raise AtlasToolError("INVALID_PNG", "PNG contains an invalid chunk type")
+        if not 65 <= kind[2] <= 90:
+            raise AtlasToolError("INVALID_PNG", "PNG chunk type uses the reserved lowercase third-letter bit")
         data = payload[offset + 8:offset + 8 + length]
         expected_crc = struct.unpack(">I", payload[offset + 8 + length:end])[0]
         if zlib.crc32(kind + data) & 0xFFFFFFFF != expected_crc:
             raise AtlasToolError("INVALID_PNG", "PNG chunk checksum failed")
-        if chunks == 0:
+
+        if chunk_count == 0:
             if kind != b"IHDR" or length != 13:
                 raise AtlasToolError("INVALID_PNG", "PNG must begin with a 13-byte IHDR chunk")
             width, height = struct.unpack(">II", data[:8])
+            bit_depth, color_type, compression_method, filter_method, interlace_method = data[8:13]
             if width < 1 or height < 1 or width > MAX_DIMENSION or height > MAX_DIMENSION or width * height > MAX_PIXELS:
                 raise AtlasToolError("INVALID_PNG", "PNG dimensions are outside the supported texture limits")
+            if color_type not in allowed_depths or bit_depth not in allowed_depths[color_type]:
+                raise AtlasToolError("INVALID_PNG", "PNG uses an invalid color type and bit-depth combination")
+            if compression_method != 0 or filter_method != 0 or interlace_method not in {0, 1}:
+                raise AtlasToolError("INVALID_PNG", "PNG uses an unsupported compression, filter or interlace method")
             seen_ihdr = True
         elif kind == b"IHDR":
             raise AtlasToolError("INVALID_PNG", "PNG contains a duplicate IHDR chunk")
-        if kind == b"IDAT":
+
+        if kind == b"PLTE":
+            if seen_plte or seen_idat or color_type in {0, 4}:
+                raise AtlasToolError("INVALID_PNG", "PNG palette is duplicated, misplaced or forbidden for its color type")
+            if length < 3 or length > 768 or length % 3:
+                raise AtlasToolError("INVALID_PNG", "PNG palette length must contain between 1 and 256 RGB entries")
+            if color_type == 3 and length // 3 > (1 << bit_depth):
+                raise AtlasToolError("INVALID_PNG", "PNG palette contains more entries than its bit depth permits")
+            seen_plte = True
+        elif kind == b"IDAT":
+            if idat_ended:
+                raise AtlasToolError("INVALID_PNG", "PNG IDAT chunks must be consecutive")
             seen_idat = True
-        if kind == b"IEND":
+            idat_chunks.append(data)
+        elif kind == b"IEND":
             if length != 0 or end != len(payload):
                 raise AtlasToolError("INVALID_PNG", "PNG IEND must be empty and terminate the file")
+            if not seen_idat:
+                raise AtlasToolError("INVALID_PNG", "PNG must contain image data before IEND")
             seen_iend = True
             offset = end
+            chunk_count += 1
             break
+        else:
+            if seen_idat:
+                idat_ended = True
+            if kind not in {b"IHDR", b"PLTE"} and not (kind[0] & 0x20):
+                raise AtlasToolError("INVALID_PNG", f"PNG contains an unknown critical chunk {kind.decode('ascii')}")
+
         offset = end
-        chunks += 1
+        chunk_count += 1
+        if chunk_count > 4096:
+            raise AtlasToolError("INVALID_PNG", "PNG contains too many chunks")
+
     if not (seen_ihdr and seen_idat and seen_iend):
         raise AtlasToolError("INVALID_PNG", "PNG must contain IHDR, IDAT and IEND chunks")
+    if color_type == 3 and not seen_plte:
+        raise AtlasToolError("INVALID_PNG", "indexed-color PNG must contain a PLTE palette")
+
+    channels = channel_counts[color_type]
+    if interlace_method == 0:
+        passes = [(width, height)]
+    else:
+        pass_specs = (
+            (0, 0, 8, 8), (4, 0, 8, 8), (0, 4, 4, 8),
+            (2, 0, 4, 4), (0, 2, 2, 4), (1, 0, 2, 2), (0, 1, 1, 2),
+        )
+        passes = []
+        for x_start, y_start, x_step, y_step in pass_specs:
+            pass_width = 0 if width <= x_start else (width - x_start + x_step - 1) // x_step
+            pass_height = 0 if height <= y_start else (height - y_start + y_step - 1) // y_step
+            if pass_width and pass_height:
+                passes.append((pass_width, pass_height))
+
+    row_sizes = [
+        (pass_width * channels * bit_depth + 7) // 8
+        for pass_width, _pass_height in passes
+    ]
+    expected_size = sum((row_size + 1) * pass_height for row_size, (_pass_width, pass_height) in zip(row_sizes, passes))
+    compressed = b"".join(idat_chunks)
+    try:
+        decoder = zlib.decompressobj()
+        decoded = decoder.decompress(compressed, expected_size + 1)
+        if len(decoded) > expected_size or decoder.unconsumed_tail:
+            raise AtlasToolError("INVALID_PNG", "PNG image data expands beyond the dimensions declared in IHDR")
+        decoded += decoder.flush()
+    except zlib.error as exc:
+        raise AtlasToolError("INVALID_PNG", "PNG IDAT data is not a valid zlib stream") from exc
+
+    # PNG permits unused trailing bytes in the final IDAT chunk; decoders must ignore them.
+    if not decoder.eof or len(decoded) != expected_size:
+        raise AtlasToolError("INVALID_PNG", "PNG decompressed image data does not match the dimensions declared in IHDR")
+
+    decoded_offset = 0
+    for row_size, (_pass_width, pass_height) in zip(row_sizes, passes):
+        for _ in range(pass_height):
+            if decoded_offset >= len(decoded) or decoded[decoded_offset] > 4:
+                raise AtlasToolError("INVALID_PNG", "PNG scanline contains an invalid filter byte")
+            decoded_offset += row_size + 1
+    if decoded_offset != len(decoded):
+        raise AtlasToolError("INVALID_PNG", "PNG scanline data has an inconsistent length")
+
     return width, height
 
+def _atlas_lock_directory() -> Path:
+    """Return a private per-user directory for persistent advisory lock files."""
+    try:
+        home = Path.home().resolve(strict=False)
+        temp_root = Path(tempfile.gettempdir()).resolve(strict=True)
+        user_key = hashlib.sha256(os.fsencode(os.path.normcase(str(home)))).hexdigest()[:16]
+        lock_directory = temp_root / f"minecraft-bedrock-engineer-atlas-locks-{user_key}"
+        try:
+            lock_directory.mkdir(mode=0o700)
+        except FileExistsError:
+            pass
+        if lock_directory.is_symlink() or not lock_directory.is_dir():
+            raise AtlasToolError("ATLAS_LOCK_UNAVAILABLE", "atlas lock directory is not a real directory")
+        if os.name != "nt":
+            uid = os.getuid()
+            directory_stat = lock_directory.stat()
+            if directory_stat.st_uid != uid:
+                raise AtlasToolError("ATLAS_LOCK_UNAVAILABLE", "atlas lock directory is owned by another user")
+            if stat.S_IMODE(directory_stat.st_mode) & 0o077:
+                os.chmod(lock_directory, 0o700)
+                directory_stat = lock_directory.stat()
+            if directory_stat.st_uid != uid or stat.S_IMODE(directory_stat.st_mode) & 0o077:
+                raise AtlasToolError("ATLAS_LOCK_UNAVAILABLE", "atlas lock directory permissions are not private")
+        return lock_directory.resolve(strict=True)
+    except AtlasToolError:
+        raise
+    except (OSError, RuntimeError) as exc:
+        raise AtlasToolError("ATLAS_LOCK_UNAVAILABLE", f"could not prepare the atlas lock directory: {exc}") from exc
 
-def _atomic_update_json(path: Path, encoded: bytes, original_sha256: str | None) -> None:
+
+def _atlas_lock_path(path: Path) -> Path:
+    canonical_path = os.path.normcase(os.path.abspath(os.fspath(path)))
+    key = hashlib.sha256(os.fsencode(canonical_path)).hexdigest()
+    return _atlas_lock_directory() / f"{key}.lock"
+
+
+@contextmanager
+def _atlas_update_lock(path: Path, *, timeout_seconds: float = ATLAS_LOCK_TIMEOUT_SECONDS):
+    """Serialize this tool's atlas read/merge/write transaction across processes.
+
+    Lock files intentionally remain in the per-user temporary directory: unlinking a
+    lock file after release can let waiters and new processes lock different inodes.
+    The operating system releases the advisory lock automatically when a process exits.
+    """
+    try:
+        lock_path = _atlas_lock_path(path)
+        flags = os.O_CREAT | os.O_RDWR
+        if hasattr(os, "O_BINARY"):
+            flags |= os.O_BINARY
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        fd = os.open(lock_path, flags, 0o600)
+    except AtlasToolError:
+        raise
+    except OSError as exc:
+        raise AtlasToolError("ATLAS_LOCK_UNAVAILABLE", f"could not open the atlas lock file: {exc}") from exc
+
+    acquired = False
+    backend = None
+    try:
+        opened_stat = os.fstat(fd)
+        if not stat.S_ISREG(opened_stat.st_mode) or getattr(opened_stat, "st_nlink", 1) != 1:
+            raise AtlasToolError("ATLAS_LOCK_UNAVAILABLE", "atlas lock path must be a regular, unlinked lock file")
+        if os.name != "nt":
+            uid = os.getuid()
+            if opened_stat.st_uid != uid:
+                raise AtlasToolError("ATLAS_LOCK_UNAVAILABLE", "atlas lock file is owned by another user")
+            if stat.S_IMODE(opened_stat.st_mode) & 0o077:
+                os.fchmod(fd, 0o600)
+                opened_stat = os.fstat(fd)
+            if stat.S_IMODE(opened_stat.st_mode) & 0o077:
+                raise AtlasToolError("ATLAS_LOCK_UNAVAILABLE", "atlas lock file permissions are not private")
+
+        path_stat = os.lstat(lock_path)
+        if stat.S_ISLNK(path_stat.st_mode) or (
+            opened_stat.st_ino and path_stat.st_ino
+            and (opened_stat.st_dev, opened_stat.st_ino) != (path_stat.st_dev, path_stat.st_ino)
+        ):
+            raise AtlasToolError("ATLAS_LOCK_UNAVAILABLE", "atlas lock path changed while opening it")
+
+        deadline = time.monotonic() + max(0.0, float(timeout_seconds))
+        if os.name == "nt":
+            import msvcrt
+
+            if os.fstat(fd).st_size == 0:
+                os.lseek(fd, 0, os.SEEK_SET)
+                os.write(fd, b"\0")
+            while True:
+                os.lseek(fd, 0, os.SEEK_SET)
+                try:
+                    msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+                    acquired = True
+                    backend = "windows"
+                    break
+                except OSError as exc:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise AtlasToolError(
+                            "ATLAS_LOCK_TIMEOUT",
+                            "another texture-atlas update is in progress; retry after it completes",
+                        ) from exc
+                    time.sleep(min(ATLAS_LOCK_POLL_INTERVAL_SECONDS, remaining))
+        else:
+            import fcntl
+
+            while True:
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    acquired = True
+                    backend = "posix"
+                    break
+                except OSError as exc:
+                    if exc.errno not in {errno.EACCES, errno.EAGAIN, errno.EWOULDBLOCK}:
+                        raise
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise AtlasToolError(
+                            "ATLAS_LOCK_TIMEOUT",
+                            "another texture-atlas update is in progress; retry after it completes",
+                        ) from exc
+                    time.sleep(min(ATLAS_LOCK_POLL_INTERVAL_SECONDS, remaining))
+
+        opened_stat = os.fstat(fd)
+        path_stat = os.lstat(lock_path)
+        if stat.S_ISLNK(path_stat.st_mode) or (
+            opened_stat.st_ino and path_stat.st_ino
+            and (opened_stat.st_dev, opened_stat.st_ino) != (path_stat.st_dev, path_stat.st_ino)
+        ):
+            raise AtlasToolError("ATLAS_LOCK_UNAVAILABLE", "atlas lock path changed while acquiring it")
+        yield
+    except AtlasToolError:
+        raise
+    except (ImportError, OSError, ValueError) as exc:
+        raise AtlasToolError("ATLAS_LOCK_UNAVAILABLE", f"could not acquire the atlas update lock: {exc}") from exc
+    finally:
+        if acquired:
+            try:
+                if backend == "windows":
+                    os.lseek(fd, 0, os.SEEK_SET)
+                    msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+                else:
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+            except OSError:
+                pass
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+
+
+def _verify_atlas_parent(path: Path, expected_identity: tuple[int, int] | None) -> None:
     parent = path.parent
-    if parent.is_symlink() or not parent.is_dir():
-        raise AtlasToolError("UNSAFE_ATLAS_PATH", "atlas parent directory is missing or symlinked")
+    if parent.is_symlink():
+        raise AtlasToolError("UNSAFE_ATLAS_PATH", "atlas parent directory became a symlink")
+    try:
+        parent_stat = parent.stat()
+    except OSError as exc:
+        raise AtlasToolError("UNSAFE_ATLAS_PATH", "atlas parent directory is unavailable") from exc
+    if not stat.S_ISDIR(parent_stat.st_mode):
+        raise AtlasToolError("UNSAFE_ATLAS_PATH", "atlas parent path is not a directory")
+    if (
+        expected_identity is not None
+        and expected_identity[1]
+        and parent_stat.st_ino
+        and (parent_stat.st_dev, parent_stat.st_ino) != expected_identity
+    ):
+        raise AtlasToolError("UNSAFE_ATLAS_PATH", "atlas parent directory changed during registration")
+
+
+def _atomic_update_json(
+    path: Path,
+    encoded: bytes,
+    original_sha256: str | None,
+    expected_parent_identity: tuple[int, int] | None = None,
+) -> None:
+    """Atomically replace atlas bytes while the caller holds _atlas_update_lock."""
+    _verify_atlas_parent(path, expected_parent_identity)
+    parent = path.parent
     if path.is_symlink():
         raise AtlasToolError("UNSAFE_ATLAS_PATH", "refusing to update a symlinked atlas file")
     temp_path: Path | None = None
@@ -416,7 +687,8 @@ def _atomic_update_json(path: Path, encoded: bytes, original_sha256: str | None)
             stream.flush()
             os.fsync(stream.fileno())
         if original_sha256 is None:
-            # Atomic no-overwrite creation if another process creates the atlas concurrently.
+            # Atomic no-overwrite creation if a non-cooperating writer creates the atlas.
+            _verify_atlas_parent(path, expected_parent_identity)
             os.link(temp_path, path)
             temp_path.unlink()
         else:
@@ -427,6 +699,7 @@ def _atomic_update_json(path: Path, encoded: bytes, original_sha256: str | None)
                 raise AtlasToolError("ATLAS_CHANGED", "atlas file changed during registration; retry after inspecting its current contents")
             if path.is_symlink():
                 raise AtlasToolError("UNSAFE_ATLAS_PATH", "refusing to update a symlinked atlas file")
+            _verify_atlas_parent(path, expected_parent_identity)
             os.replace(temp_path, path)
         temp_path = None
     except FileExistsError as exc:
@@ -481,70 +754,77 @@ def register_texture_atlas(raw_args: Any) -> dict[str, Any]:
     atlas_path = resolved_textures / atlas_filename
     atlas_relpath = f"resource_packs/{project_name}_RP/textures/{atlas_filename}"
     expected_atlas_name = "atlas.terrain" if args["texture_type"] == "blocks" else "atlas.items"
-    original_sha: str | None = None
-    if atlas_path.is_symlink():
-        raise AtlasToolError("UNSAFE_ATLAS_PATH", "refusing to update a symlinked atlas file")
-    if atlas_path.exists():
-        if not atlas_path.is_file():
-            raise AtlasToolError("INVALID_ATLAS", "atlas path exists but is not a regular file")
-        try:
-            if atlas_path.stat().st_size > MAX_ATLAS_BYTES:
-                raise AtlasToolError("INVALID_ATLAS", f"existing atlas exceeds the {MAX_ATLAS_BYTES}-byte safety limit")
-            original_bytes = atlas_path.read_bytes()
-            original_sha = hashlib.sha256(original_bytes).hexdigest()
-            atlas_data = json.loads(original_bytes.decode("utf-8"))
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise AtlasToolError("INVALID_ATLAS", f"existing atlas is not valid UTF-8 JSON: {exc}") from exc
-        if not isinstance(atlas_data, dict):
-            raise AtlasToolError("INVALID_ATLAS", "existing atlas root must be a JSON object")
-        if atlas_data.get("texture_name") != expected_atlas_name:
-            raise AtlasToolError("INVALID_ATLAS", f"existing atlas texture_name must be {expected_atlas_name!r}")
-        if not isinstance(atlas_data.get("texture_data"), dict):
-            raise AtlasToolError("INVALID_ATLAS", "existing atlas must contain an object-valued texture_data map")
-        texture_data = atlas_data["texture_data"]
-    else:
-        atlas_data = {
-            "resource_pack_name": project_name,
-            "texture_name": expected_atlas_name,
-            "texture_data": {},
-        }
-        if args["texture_type"] == "blocks":
-            atlas_data["padding"] = 8
-            atlas_data["num_mip_levels"] = 4
-        texture_data = atlas_data["texture_data"]
-
-    identifier = args["texture_identifier"]
-    if identifier in texture_data:
-        existing = texture_data[identifier]
-        if isinstance(existing, dict) and existing.get("textures") == texture_ref:
-            return {
-                "status": "already_registered",
-                "atlas_path": atlas_relpath,
-                "texture_type": args["texture_type"],
-                "texture_identifier": identifier,
-                "texture_reference": texture_ref,
-                "sha256": hashlib.sha256(atlas_path.read_bytes()).hexdigest() if atlas_path.is_file() else None,
-                "mcp_server_version": SERVER_VERSION,
-                "runtime_status": "NOT RUN",
+    try:
+        parent_stat = atlas_path.parent.stat()
+    except OSError as exc:
+        raise AtlasToolError("UNSAFE_ATLAS_PATH", "atlas parent directory is unavailable") from exc
+    expected_parent_identity = (parent_stat.st_dev, parent_stat.st_ino)
+    with _atlas_update_lock(atlas_path):
+        _verify_atlas_parent(atlas_path, expected_parent_identity)
+        original_sha: str | None = None
+        if atlas_path.is_symlink():
+            raise AtlasToolError("UNSAFE_ATLAS_PATH", "refusing to update a symlinked atlas file")
+        if atlas_path.exists():
+            if not atlas_path.is_file():
+                raise AtlasToolError("INVALID_ATLAS", "atlas path exists but is not a regular file")
+            try:
+                if atlas_path.stat().st_size > MAX_ATLAS_BYTES:
+                    raise AtlasToolError("INVALID_ATLAS", f"existing atlas exceeds the {MAX_ATLAS_BYTES}-byte safety limit")
+                original_bytes = atlas_path.read_bytes()
+                original_sha = hashlib.sha256(original_bytes).hexdigest()
+                atlas_data = json.loads(original_bytes.decode("utf-8"))
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise AtlasToolError("INVALID_ATLAS", f"existing atlas is not valid UTF-8 JSON: {exc}") from exc
+            if not isinstance(atlas_data, dict):
+                raise AtlasToolError("INVALID_ATLAS", "existing atlas root must be a JSON object")
+            if atlas_data.get("texture_name") != expected_atlas_name:
+                raise AtlasToolError("INVALID_ATLAS", f"existing atlas texture_name must be {expected_atlas_name!r}")
+            if not isinstance(atlas_data.get("texture_data"), dict):
+                raise AtlasToolError("INVALID_ATLAS", "existing atlas must contain an object-valued texture_data map")
+            texture_data = atlas_data["texture_data"]
+        else:
+            atlas_data = {
+                "resource_pack_name": project_name,
+                "texture_name": expected_atlas_name,
+                "texture_data": {},
             }
-        raise AtlasToolError("IDENTIFIER_CONFLICT", f"texture identifier {identifier!r} already points to a different atlas entry; nothing was overwritten")
+            if args["texture_type"] == "blocks":
+                atlas_data["padding"] = 8
+                atlas_data["num_mip_levels"] = 4
+            texture_data = atlas_data["texture_data"]
 
-    texture_data[identifier] = {"textures": texture_ref}
-    encoded = (json.dumps(atlas_data, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
-    _atomic_update_json(atlas_path, encoded, original_sha)
-    return {
-        "status": "registered",
-        "atlas_path": atlas_relpath,
-        "texture_type": args["texture_type"],
-        "texture_identifier": identifier,
-        "texture_reference": texture_ref,
-        "width": width,
-        "height": height,
-        "sha256": hashlib.sha256(encoded).hexdigest(),
-        "mcp_server_version": SERVER_VERSION,
-        "runtime_status": "NOT RUN",
-        "note": "Atlas registration preserves unrelated entries but does not edit BP/RP item or block definitions. Minecraft import/rendering remains NOT RUN.",
-    }
+        identifier = args["texture_identifier"]
+        if identifier in texture_data:
+            existing = texture_data[identifier]
+            if isinstance(existing, dict) and existing.get("textures") == texture_ref:
+                return {
+                    "status": "already_registered",
+                    "atlas_path": atlas_relpath,
+                    "texture_type": args["texture_type"],
+                    "texture_identifier": identifier,
+                    "texture_reference": texture_ref,
+                    "sha256": hashlib.sha256(atlas_path.read_bytes()).hexdigest() if atlas_path.is_file() else None,
+                    "mcp_server_version": SERVER_VERSION,
+                    "runtime_status": "NOT RUN",
+                }
+            raise AtlasToolError("IDENTIFIER_CONFLICT", f"texture identifier {identifier!r} already points to a different atlas entry; nothing was overwritten")
+
+        texture_data[identifier] = {"textures": texture_ref}
+        encoded = (json.dumps(atlas_data, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+        _atomic_update_json(atlas_path, encoded, original_sha, expected_parent_identity)
+        return {
+            "status": "registered",
+            "atlas_path": atlas_relpath,
+            "texture_type": args["texture_type"],
+            "texture_identifier": identifier,
+            "texture_reference": texture_ref,
+            "width": width,
+            "height": height,
+            "sha256": hashlib.sha256(encoded).hexdigest(),
+            "mcp_server_version": SERVER_VERSION,
+            "runtime_status": "NOT RUN",
+            "note": "Atlas registration preserves unrelated entries but does not edit BP/RP item or block definitions. Minecraft import/rendering remains NOT RUN.",
+        }
 
 def _tool_result(request_id: Any, payload: dict[str, Any]) -> dict[str, Any]:
     return {

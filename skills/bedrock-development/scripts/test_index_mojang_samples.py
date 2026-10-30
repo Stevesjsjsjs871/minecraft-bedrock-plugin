@@ -86,11 +86,12 @@ class IndexMojangSamplesTests(unittest.TestCase):
 
 
 
-    def test_indexer_writes_gzip_index_when_requested(self):
+    def test_indexer_writes_deterministic_gzip_index_when_requested(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             archive = root / "samples.zip"
             output = root / "index.json.gz"
+            second_output = root / "index-second.json.gz"
             with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as z:
                 z.writestr("behavior_pack/items/example.json", json.dumps({
                     "minecraft:item": {"description": {"identifier": "demo:example"}}
@@ -99,8 +100,11 @@ class IndexMojangSamplesTests(unittest.TestCase):
             try:
                 __import__("sys").argv = [str(SCRIPT), str(archive), "--output", str(output)]
                 self.assertEqual(mod.main(), 0)
+                __import__("sys").argv = [str(SCRIPT), str(archive), "--output", str(second_output)]
+                self.assertEqual(mod.main(), 0)
             finally:
                 __import__("sys").argv = old_argv
+            self.assertEqual(output.read_bytes(), second_output.read_bytes())
             with gzip.open(output, "rt", encoding="utf-8") as stream:
                 data = json.load(stream)
             self.assertEqual(data["archive_stats"]["indexed_count"], 1)

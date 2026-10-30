@@ -1,5 +1,5 @@
 {
-  "source_archive": "bedrock-samples-v1.26.50.4-full(1).zip",
+  "source_archive": "bedrock-samples-v1.26.50.4-full.zip",
   "source_url": "https://github.com/Mojang/bedrock-samples",
   "target_version": "1.26.50.4",
   "zip_sha256": "c0b6151f5f9a0c31ebe3c909dfc82d97f12473ed2c6e039aa7e22d667042026c",
@@ -29,5 +29,17 @@
     "other": 24
   },
   "license_notice": "(c) Mojang AB. All rights reserved. By downloading the files in this repository, you agree to the Minecraft End User License Agreement and that these files are subject to its terms.",
-  "method": "Archive CRC check and a no-extraction path/hash/identifier index. Strict JSON is parsed only where applicable. Runtime correctness was not tested."
+  "method": "CI verifies the pinned official full-release asset SHA-256 and size, performs a full ZIP CRC test, then builds a metadata-only no-extraction/no-execution index; eligible JSON files are parsed strictly and selected identifiers are harvested.",
+  "source_release_tag": "v1.26.50.4",
+  "source_release_url": "https://github.com/Mojang/bedrock-samples/releases/tag/v1.26.50.4",
+  "source_release_published_at": "2026-09-16T04:29:08Z",
+  "source_release_commit": "46ba6ea985fb5a92d79a9419198f10dda14c199d",
+  "source_asset_id": 567172887,
+  "source_asset_size_bytes": 169385576,
+  "source_asset_sha256": "c0b6151f5f9a0c31ebe3c909dfc82d97f12473ed2c6e039aa7e22d667042026c",
+  "index_file": "mojang-samples-index.json.gz",
+  "index_sha256": "48429d64391157553e6760b7f568e5e6d5d05fa6517427b5a1156c8bc18e61fc",
+  "index_size_bytes": 1128406,
+  "index_generator": "skills/bedrock-development/scripts/index_mojang_samples.py",
+  "index_generation_python": "3.12.10"
 }

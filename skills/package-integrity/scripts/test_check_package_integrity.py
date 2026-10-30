@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import gzip
+import hashlib
 import importlib.util
 import json
 import tempfile
@@ -25,24 +26,39 @@ class PackageIntegrityTests(unittest.TestCase):
             p.parent.mkdir(parents=True, exist_ok=True)
             if not p.exists():
                 p.write_text("{}\n", encoding="utf-8")
-        prompt = ["Create a feature.", "Audit an add-on."]
+        prompt = ["Create a feature.", "Audit an add-on.", "Research a versioned feature."]
+        shared_metadata = {
+            "name": checker.EXPECTED_PLUGIN_NAME,
+            "version": "1.0.5",
+            "description": "A test package for Bedrock add-on development.",
+            "author": {"name": "Test author"},
+            "keywords": ["minecraft", "bedrock", "addons"],
+        }
+        interface = {
+            "displayName": "Minecraft Bedrock Engineer",
+            "shortDescription": "Create & audit Bedrock add-ons",
+            "longDescription": "A sufficiently detailed test interface description.",
+            "developerName": "Test project",
+            "category": "Developer tools",
+            "capabilities": ["Code", "Research"],
+            "defaultPrompt": prompt,
+        }
         root_manifest = {
             "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
-            "name": checker.EXPECTED_PLUGIN_NAME,
-            "version": "1.0.5",
-            "extensions": {"com.openai": {"interface": {"defaultPrompt": prompt}}},
+            **shared_metadata,
+            "extensions": {"com.openai": {"interface": interface}},
         }
         compatibility_manifest = {
-            "name": checker.EXPECTED_PLUGIN_NAME,
-            "version": "1.0.5",
+            **shared_metadata,
             "skills": "./skills",
             "mcpServers": "./.mcp.json",
-            "interface": {"defaultPrompt": prompt},
+            "interface": interface,
         }
         (root / "plugin.json").write_text(json.dumps(root_manifest), encoding="utf-8")
         (root / ".codex-plugin/plugin.json").write_text(json.dumps(compatibility_manifest), encoding="utf-8")
         (root / "VERSION").write_text("1.0.5\n", encoding="utf-8")
         (root / "README.md").write_text("# Minecraft Bedrock Engineer — 1.0.5\n\nPreserved history.\n", encoding="utf-8")
+        (root / "CHANGELOG.md").write_text("# Changelog\n\n## 1.0.5 — Synthetic fixture\n- Test entry.\n", encoding="utf-8")
         config = {"mcpServers": {checker.EXPECTED_PLUGIN_NAME: {"type": "stdio", "command": "python3", "args": ["${PLUGIN_ROOT}/server/mcp_server.py"]}}}
         (root / ".mcp.json").write_text(json.dumps(config), encoding="utf-8")
         (root / "mcp.json").write_text(json.dumps({"$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json", **config}), encoding="utf-8")
@@ -70,20 +86,34 @@ class PackageIntegrityTests(unittest.TestCase):
 TOOLS = [
 """ + ",\n".join(entries) + "\n]\n\ndef call_tool(name, args):\n" + "\n".join(handlers) + "\n    return {'status': 'error'}\n"
         (root / "server/mcp_server.py").write_text(server, encoding="utf-8")
-        (root / "skills/bedrock-development/references/mojang-samples-1.26.50.4/INDEX_METADATA.json").write_text(
-            json.dumps({"target_version": "1.26.50.4", "zip_sha256": "a" * 64, "entry_count": 1, "indexed_count": 1}),
-            encoding="utf-8",
-        )
+        sample_root = root / "skills/bedrock-development/references/mojang-samples-1.26.50.4"
+        index_path = sample_root / "mojang-samples-index.json.gz"
+        metadata_path = sample_root / "INDEX_METADATA.json"
         index = {
             "schema_version": 1,
             "dataset_id": "mojang-bedrock-samples",
             "target_version": "1.26.50.4",
+            "archive_file_name": "samples.zip",
             "archive_sha256": "a" * 64,
-            "archive_stats": {"entry_count": 1, "indexed_count": 1},
+            "index_policy": {"no_extraction": True, "no_execution": True, "no_network": True},
+            "archive_stats": {"entry_count": 1, "indexed_count": 1, "declared_uncompressed_bytes": 12},
             "entries": [{"path": "behavior_pack/items/test.json", "category": "item", "size_bytes": 12, "sha256": "b" * 64, "identifiers": [], "json_parsed": True}],
         }
-        with gzip.open(root / "skills/bedrock-development/references/mojang-samples-1.26.50.4/mojang-samples-index.json.gz", "wt", encoding="utf-8") as stream:
+        with gzip.open(index_path, "wt", encoding="utf-8") as stream:
             json.dump(index, stream)
+        metadata = {
+            "source_archive": "samples.zip",
+            "target_version": "1.26.50.4",
+            "zip_sha256": "a" * 64,
+            "entry_count": 1,
+            "indexed_count": 1,
+            "declared_uncompressed_bytes": 12,
+            "category_counts": {"item": 1},
+            "index_file": index_path.name,
+            "index_sha256": hashlib.sha256(index_path.read_bytes()).hexdigest(),
+            "index_size_bytes": index_path.stat().st_size,
+        }
+        metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
 
     def check_by_id(self, report, code):
         return next(check for check in report["checks"] if check["id"] == code)
@@ -95,6 +125,8 @@ TOOLS = [
             report = checker.audit_package(root)
             self.assertEqual(report["status"], "PASS", report["checks"])
             self.assertEqual(report["mcp_registry"]["tool_count"], 5)
+            self.assertEqual(self.check_by_id(report, "manifest-metadata")["status"], "PASS")
+            self.assertEqual(self.check_by_id(report, "changelog-version")["status"], "PASS")
             self.assertEqual(report["mojang_samples_index"]["indexed_count"], 1)
             self.assertEqual(report["runtime_status"], "NOT RUN")
 
@@ -116,6 +148,34 @@ TOOLS = [
             (root / ".codex-plugin/plugin.json").write_text(json.dumps(compat), encoding="utf-8")
             report = checker.audit_package(root)
             self.assertEqual(self.check_by_id(report, "default-prompts")["status"], "FAIL")
+
+    def test_shared_manifest_metadata_mismatch_fails(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "package"
+            self.make_package(root)
+            compat = json.loads((root / ".codex-plugin/plugin.json").read_text(encoding="utf-8"))
+            compat["keywords"].append("unexpected-drift")
+            (root / ".codex-plugin/plugin.json").write_text(json.dumps(compat), encoding="utf-8")
+            report = checker.audit_package(root)
+            self.assertEqual(self.check_by_id(report, "manifest-metadata")["status"], "FAIL")
+
+    def test_interface_metadata_mismatch_fails(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "package"
+            self.make_package(root)
+            compat = json.loads((root / ".codex-plugin/plugin.json").read_text(encoding="utf-8"))
+            compat["interface"]["longDescription"] = "A different interface description."
+            (root / ".codex-plugin/plugin.json").write_text(json.dumps(compat), encoding="utf-8")
+            report = checker.audit_package(root)
+            self.assertEqual(self.check_by_id(report, "manifest-metadata")["status"], "FAIL")
+
+    def test_stale_changelog_entry_warns(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "package"
+            self.make_package(root)
+            (root / "CHANGELOG.md").write_text("# Changelog\n\n## 1.0.4 — Stale entry\n", encoding="utf-8")
+            report = checker.audit_package(root)
+            self.assertEqual(self.check_by_id(report, "changelog-version")["status"], "WARN")
 
     def test_duplicate_tool_name_fails_registry_audit(self):
         with tempfile.TemporaryDirectory() as td:
@@ -163,6 +223,53 @@ TOOLS = [
             index["entries"][0]["path"] = "../outside.json"
             with gzip.open(index_path, "wt", encoding="utf-8") as stream:
                 json.dump(index, stream)
+            metadata_path = root / "skills/bedrock-development/references/mojang-samples-1.26.50.4/INDEX_METADATA.json"
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            metadata["index_sha256"] = hashlib.sha256(index_path.read_bytes()).hexdigest()
+            metadata["index_size_bytes"] = index_path.stat().st_size
+            metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+            report = checker.audit_package(root)
+            self.assertEqual(self.check_by_id(report, "sample-index-content")["status"], "FAIL")
+
+    def test_sample_index_category_counts_mismatch_fails(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "package"
+            self.make_package(root)
+            metadata_path = root / "skills/bedrock-development/references/mojang-samples-1.26.50.4/INDEX_METADATA.json"
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            metadata["category_counts"] = {"block": 1}
+            metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+            report = checker.audit_package(root)
+            self.assertEqual(self.check_by_id(report, "sample-index-content")["status"], "FAIL")
+
+    def test_sample_index_digest_mismatch_fails(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "package"
+            self.make_package(root)
+            metadata_path = root / "skills/bedrock-development/references/mojang-samples-1.26.50.4/INDEX_METADATA.json"
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            metadata["index_sha256"] = "c" * 64
+            metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+            report = checker.audit_package(root)
+            self.assertEqual(self.check_by_id(report, "sample-index-content")["status"], "FAIL")
+
+    def test_missing_pinned_sample_index_fails_instead_of_falling_back(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "package"
+            self.make_package(root)
+            index_path = root / "skills/bedrock-development/references/mojang-samples-1.26.50.4/mojang-samples-index.json.gz"
+            index_path.unlink()
+            report = checker.audit_package(root)
+            self.assertEqual(self.check_by_id(report, "sample-index-content")["status"], "FAIL")
+
+    def test_sample_index_uncompressed_size_mismatch_fails(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "package"
+            self.make_package(root)
+            metadata_path = root / "skills/bedrock-development/references/mojang-samples-1.26.50.4/INDEX_METADATA.json"
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            metadata["declared_uncompressed_bytes"] = 13
+            metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
             report = checker.audit_package(root)
             self.assertEqual(self.check_by_id(report, "sample-index-content")["status"], "FAIL")
 

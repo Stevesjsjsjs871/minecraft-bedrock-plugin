@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import struct
 import tempfile
 import unittest
@@ -83,6 +84,32 @@ class TextureGeneratorMcpTests(unittest.TestCase):
             result = self._call({"width": width, "height": height, "style": "solid", "base_color": "#123456"}, output_path=relative_path)
         self.assertFalse(result["result"]["isError"], result["result"]["structuredContent"])
         return output
+
+    def _replace_png_idat(self, path, replacement):
+        payload = path.read_bytes()
+        self.assertTrue(payload.startswith(PNG_SIGNATURE))
+        chunks = []
+        offset = len(PNG_SIGNATURE)
+        inserted = False
+        while offset < len(payload):
+            length = struct.unpack(">I", payload[offset:offset + 4])[0]
+            kind = payload[offset + 4:offset + 8]
+            data = payload[offset + 8:offset + 8 + length]
+            offset += 12 + length
+            if kind == b"IDAT":
+                if not inserted:
+                    chunks.append((kind, replacement))
+                    inserted = True
+                continue
+            chunks.append((kind, data))
+        self.assertTrue(inserted, "test PNG must contain an IDAT chunk")
+        rebuilt = bytearray(PNG_SIGNATURE)
+        for kind, data in chunks:
+            rebuilt.extend(struct.pack(">I", len(data)))
+            rebuilt.extend(kind)
+            rebuilt.extend(data)
+            rebuilt.extend(struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF))
+        path.write_bytes(rebuilt)
 
     def test_tool_is_registered_with_closed_write_schema(self):
         listing = texture_mcp.handle_message({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
@@ -225,6 +252,92 @@ class TextureGeneratorMcpTests(unittest.TestCase):
         self.assertEqual(response["result"]["structuredContent"]["error"]["code"], "INVALID_ARGUMENT")
         self.assertFalse((outside / "escape.png").exists())
 
+    def test_registration_accepts_unused_trailing_idat_bytes(self):
+        png = self._generate_real_png()
+        payload = png.read_bytes()
+        offset = len(PNG_SIGNATURE)
+        idat_data = bytearray()
+        while offset < len(payload):
+            length = struct.unpack(">I", payload[offset:offset + 4])[0]
+            kind = payload[offset + 4:offset + 8]
+            data = payload[offset + 8:offset + 8 + length]
+            offset += 12 + length
+            if kind == b"IDAT":
+                idat_data.extend(data)
+        self._replace_png_idat(png, bytes(idat_data) + b"\x00\x00\x00")
+        response = self._register(identifier="trailing_bytes")
+        result = response["result"]["structuredContent"]
+        self.assertFalse(response["result"]["isError"], result)
+        self.assertEqual(result["status"], "registered")
+
+    def test_registration_rejects_crc_valid_invalid_idat_stream(self):
+        png = self._generate_real_png()
+        self._replace_png_idat(png, b"not-a-zlib-stream")
+        response = self._register()
+        result = response["result"]["structuredContent"]
+        self.assertTrue(response["result"]["isError"], result)
+        self.assertEqual(result["error"]["code"], "INVALID_PNG")
+        self.assertFalse((self.project / "resource_packs" / f"{self.project_name}_RP" / "textures" / "terrain_texture.json").exists())
+
+    def test_registration_rejects_crc_valid_wrong_scanline_length(self):
+        png = self._generate_real_png()
+        self._replace_png_idat(png, zlib.compress(b"\x00"))
+        response = self._register()
+        result = response["result"]["structuredContent"]
+        self.assertTrue(response["result"]["isError"], result)
+        self.assertEqual(result["error"]["code"], "INVALID_PNG")
+
+    def test_registration_rejects_invalid_png_scanline_filter(self):
+        png = self._generate_real_png()
+        payload = png.read_bytes()
+        width, height = struct.unpack(">II", payload[16:24])
+        bit_depth, color_type, _compression, _filter, interlace = payload[24:29]
+        channels = {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}[color_type]
+        self.assertEqual(interlace, 0, "bundled test generator should emit non-interlaced PNGs")
+        row_size = (width * channels * bit_depth + 7) // 8
+        invalid_scanlines = b"".join(b"\x05" + (b"\x00" * row_size) for _ in range(height))
+        self._replace_png_idat(png, zlib.compress(invalid_scanlines))
+        response = self._register()
+        result = response["result"]["structuredContent"]
+        self.assertTrue(response["result"]["isError"], result)
+        self.assertEqual(result["error"]["code"], "INVALID_PNG")
+
+    def test_registration_accepts_adam7_interlaced_png(self):
+        width = height = 5
+        pass_specs = (
+            (0, 0, 8, 8), (4, 0, 8, 8), (0, 4, 4, 8),
+            (2, 0, 4, 4), (0, 2, 2, 4), (1, 0, 2, 2), (0, 1, 1, 2),
+        )
+        filtered = bytearray()
+        for x_start, y_start, x_step, y_step in pass_specs:
+            pass_width = 0 if width <= x_start else (width - x_start + x_step - 1) // x_step
+            pass_height = 0 if height <= y_start else (height - y_start + y_step - 1) // y_step
+            if not pass_width or not pass_height:
+                continue
+            row_size = pass_width * 4
+            for _ in range(pass_height):
+                filtered.extend(b"\x00" + (b"\x00" * row_size))
+
+        png = bytearray(PNG_SIGNATURE)
+
+        def append_chunk(kind, data):
+            png.extend(struct.pack(">I", len(data)))
+            png.extend(kind)
+            png.extend(data)
+            png.extend(struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF))
+
+        append_chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 1))
+        append_chunk(b"IDAT", zlib.compress(bytes(filtered)))
+        append_chunk(b"IEND", b"")
+
+        relative_path = f"resource_packs/{self.project_name}_RP/textures/blocks/adam7.png"
+        (self.project / relative_path).write_bytes(png)
+        response = self._register(identifier="adam7", texture_path=relative_path)
+        result = response["result"]["structuredContent"]
+        self.assertFalse(response["result"]["isError"], result)
+        self.assertEqual(result["status"], "registered")
+        self.assertEqual((result["width"], result["height"]), (width, height))
+
     def test_register_block_texture_creates_atlas_and_preserves_existing_entries(self):
         self._generate_real_png()
         atlas_path = self.project / "resource_packs" / f"{self.project_name}_RP" / "textures" / "terrain_texture.json"
@@ -316,6 +429,103 @@ class TextureGeneratorMcpTests(unittest.TestCase):
         result = self._register(texture_path=path)["result"]["structuredContent"]
         self.assertEqual(result["error"]["code"], "UNSAFE_TEXTURE_PATH")
         self.assertFalse((self.project / "resource_packs" / f"{self.project_name}_RP" / "textures" / "terrain_texture.json").exists())
+
+
+    def test_concurrent_registrations_preserve_both_atlas_entries(self):
+        self._generate_real_png()
+        script = """
+import json
+import sys
+sys.path.insert(0, sys.argv[1])
+import texture_generator_mcp as module
+project_name, texture_path, identifier = sys.argv[2:5]
+request = {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/call",
+    "params": {
+        "name": "register_texture_atlas",
+        "arguments": {
+            "project_directory": project_name,
+            "texture_type": "blocks",
+            "texture_identifier": identifier,
+            "texture_path": texture_path,
+        },
+    },
+}
+print(json.dumps(module.handle_message(request), separators=(",", ":")))
+"""
+        env = os.environ.copy()
+        env["MINECRAFT_BEDROCK_WORKSPACE"] = str(self.workspace)
+        processes = [
+            subprocess.Popen(
+                [sys.executable, "-c", script, str(SERVER_DIR), self.project_name, self.output_rel, identifier],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                env=env,
+            )
+            for identifier in ("ruby_ore_a", "ruby_ore_b")
+        ]
+        for process in processes:
+            try:
+                stdout, stderr = process.communicate(timeout=20)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.communicate()
+                self.fail("concurrent atlas registration exceeded the 20-second timeout")
+            self.assertEqual(process.returncode, 0, stderr)
+            response = json.loads(stdout)
+            self.assertFalse(response["result"]["isError"], response)
+            self.assertEqual(response["result"]["structuredContent"]["status"], "registered")
+
+        atlas = self.project / "resource_packs" / f"{self.project_name}_RP" / "textures" / "terrain_texture.json"
+        saved = json.loads(atlas.read_text(encoding="utf-8"))
+        self.assertIn("ruby_ore_a", saved["texture_data"])
+        self.assertIn("ruby_ore_b", saved["texture_data"])
+
+    def test_atlas_lock_times_out_when_held_by_another_process(self):
+        atlas = self.texture_dir.parent / "terrain_texture.json"
+        script = """
+import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+import texture_generator_mcp as module
+try:
+    with module._atlas_update_lock(Path(sys.argv[2]), timeout_seconds=0.15):
+        print("ACQUIRED")
+except module.AtlasToolError as exc:
+    print(exc.code)
+"""
+        env = os.environ.copy()
+        env["MINECRAFT_BEDROCK_WORKSPACE"] = str(self.workspace)
+        with texture_mcp._atlas_update_lock(atlas):
+            completed = subprocess.run(
+                [sys.executable, "-c", script, str(SERVER_DIR), str(atlas)],
+                capture_output=True,
+                text=True,
+                env=env,
+                timeout=10,
+            )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(completed.stdout.strip(), "ATLAS_LOCK_TIMEOUT")
+
+    def test_atomic_update_rejects_replaced_parent_directory(self):
+        atlas_parent = self.texture_dir.parent
+        atlas = atlas_parent / "terrain_texture.json"
+        original_stat = atlas_parent.stat()
+        if not original_stat.st_ino:
+            self.skipTest("filesystem does not expose stable directory identities")
+        expected_identity = (original_stat.st_dev, original_stat.st_ino)
+        moved_parent = atlas_parent.with_name("textures-original")
+        atlas_parent.rename(moved_parent)
+        atlas_parent.mkdir()
+
+        with texture_mcp._atlas_update_lock(atlas):
+            with self.assertRaises(texture_mcp.AtlasToolError) as caught:
+                texture_mcp._atomic_update_json(atlas, b"{}\n", None, expected_identity)
+        self.assertEqual(caught.exception.code, "UNSAFE_ATLAS_PATH")
+        self.assertFalse(atlas.exists())
 
     def test_unknown_tool_and_unknown_method_return_protocol_errors(self):
         unknown_tool = texture_mcp.handle_message({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"something_else","arguments":{}}})

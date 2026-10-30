@@ -40,7 +40,7 @@ python skills/visual-resource-pipeline/scripts/generate_texture.py resource_pack
 The separate `minecraft-bedrock-texture-generator` stdio MCP server exposes two tools:
 
 - `generate_texture` creates a deterministic RGBA PNG inside an existing project's `resource_packs/<project>_RP/textures/` directory. It requires existing parent folders, refuses symlinked paths and existing destinations, validates style/color/dimensions, and returns structured output with a file hash.
-- `register_texture_atlas` registers an existing PNG in `textures/terrain_texture.json` (`texture_type: "blocks"`) or `textures/item_texture.json` (`texture_type: "items"`). It validates the PNG signature, chunk CRCs and dimensions, preserves unrelated atlas entries, refuses conflicting identifiers, and writes the JSON atomically. It does not modify BP/RP block or item definitions; those definitions must reference the selected texture identifier.
+- `register_texture_atlas` registers an existing PNG in `textures/terrain_texture.json` (`texture_type: "blocks"`) or `textures/item_texture.json` (`texture_type: "items"`). It validates PNG chunk structure/CRCs, legal IHDR combinations, zlib integrity, exact scanline lengths and filters (including Adam7 sizing), preserves unrelated atlas entries, refuses conflicting identifiers, and writes the JSON atomically. Atlas read/merge/write operations are serialized across cooperating plugin processes with OS advisory locks; a busy lock returns `ATLAS_LOCK_TIMEOUT`. The parent directory identity is rechecked before writes. It does not modify BP/RP block or item definitions; those definitions must reference the selected texture identifier.
 
 Example MCP call arguments:
 

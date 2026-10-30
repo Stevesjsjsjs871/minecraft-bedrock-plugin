@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import struct
@@ -30,8 +31,15 @@ def validate_png_file(path, **_limits):
 
 png_stub.PngValidationError = PngValidationError
 png_stub.validate_png_file = validate_png_file
+SERVER_DIR = Path(__file__).resolve().parents[1]
 with patch.dict(sys.modules, {"png_validation": png_stub}):
-    import geometry_uv_audit_mcp as auditor
+    spec = importlib.util.spec_from_file_location(
+        "_geometry_uv_audit_mcp_test", SERVER_DIR / "geometry_uv_audit_mcp.py"
+    )
+    if spec is None or spec.loader is None:
+        raise ImportError("could not load isolated geometry UV auditor test module")
+    auditor = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(auditor)
 
 
 def _chunk(kind: bytes, data: bytes) -> bytes:

@@ -44,7 +44,7 @@ The two MCP configuration files already contained these server registrations, so
 
 ## Verification
 
-CI is pending for this branch. The complete server suite and explicit registry contract will run in GitHub Actions. The follow-on packaging PR will then rerun its deterministic archive builder against this restored source tree.
+Final verification: GitHub Actions run [41045934327](https://github.com/Stevesjsjsjs871/minecraft-bedrock-plugin/actions/runs/41045934327) passed on Ubuntu 24.04 / Python 3.12.15. The full server suite passed 399/399; the explicit registry contract passed 3/3; PNG validation 15/15; texture audit 20/20; benchmark 12/12; Mojang indexer 6/6; procedural texture generator 12/12; package-integrity tests 11/11; analyzer regression 18/18. The package-integrity audit remained WARN (14 PASS, 1 WARN, 0 FAIL) because the full generated Stable Samples gzip index is absent and 14 curated fallback files remain. The follow-on packaging PR then successfully built a candidate archive from the restored source tree.
 
 ## Limits
 

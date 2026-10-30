@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import io
 import json
 import stat
+import tarfile
 import tempfile
 import unittest
 import warnings
@@ -22,7 +24,7 @@ class PluginCreatorParityTests(unittest.TestCase):
         self.repo.mkdir()
         self.archive = self.root / "plugin.zip"
         self._write_repo()
-        self._write_archive()
+        self._write_zip()
 
     def tearDown(self) -> None:
         self.temp.cleanup()
@@ -52,7 +54,7 @@ class PluginCreatorParityTests(unittest.TestCase):
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(content, encoding="utf-8")
 
-    def _write_archive(self, extra: dict[str, bytes] | None = None) -> None:
+    def _write_zip(self, extra: dict[str, bytes] | None = None) -> None:
         with zipfile.ZipFile(self.archive, "w", compression=zipfile.ZIP_DEFLATED) as archive:
             for path in sorted(self.repo.rglob("*")):
                 if path.is_file():
@@ -60,10 +62,24 @@ class PluginCreatorParityTests(unittest.TestCase):
             for name, content in (extra or {}).items():
                 archive.writestr(name, content)
 
-    def test_exact_package_passes(self) -> None:
+    def _write_tar(self, path: Path) -> None:
+        with tarfile.open(path, "w:gz") as archive:
+            for source in sorted(self.repo.rglob("*")):
+                if source.is_file():
+                    archive.add(source, arcname=source.relative_to(self.repo).as_posix(), recursive=False)
+
+    def test_exact_zip_package_passes(self) -> None:
         report = audit_archive(self.archive, self.repo)
         self.assertEqual(report["status"], "PASS", report)
+        self.assertEqual(report["archive_type"], "zip")
         self.assertEqual(report["summary"]["byte_identical_files"], 10)
+
+    def test_exact_tar_gz_package_passes(self) -> None:
+        tar_path = self.root / "plugin.tar.gz"
+        self._write_tar(tar_path)
+        report = audit_archive(tar_path, self.repo)
+        self.assertEqual(report["status"], "PASS", report)
+        self.assertEqual(report["archive_type"], "tar")
 
     def test_changed_source_is_reported_with_hashes(self) -> None:
         (self.repo / "server/mcp_server.py").write_text("def main(): return 1\n", encoding="utf-8")
@@ -90,12 +106,12 @@ class PluginCreatorParityTests(unittest.TestCase):
         report = audit_archive(self.archive, self.repo)
         self.assertTrue(any("duplicate archive entry" in item for item in report["errors"]))
 
-    def test_path_traversal_fails(self) -> None:
-        self._write_archive({"../outside.txt": b"no"})
+    def test_zip_path_traversal_fails(self) -> None:
+        self._write_zip({"../outside.txt": b"no"})
         report = audit_archive(self.archive, self.repo)
         self.assertTrue(any("unsafe archive path" in item for item in report["errors"]))
 
-    def test_symlink_entry_fails(self) -> None:
+    def test_zip_symlink_entry_fails(self) -> None:
         with zipfile.ZipFile(self.archive, "a") as archive:
             info = zipfile.ZipInfo("server/evil.py")
             info.create_system = 3
@@ -103,6 +119,26 @@ class PluginCreatorParityTests(unittest.TestCase):
             archive.writestr(info, "../../outside.py")
         report = audit_archive(self.archive, self.repo)
         self.assertTrue(any("archive entry is a symlink" in item for item in report["errors"]))
+
+    def test_tar_path_traversal_fails(self) -> None:
+        path = self.root / "traversal.tar.gz"
+        with tarfile.open(path, "w:gz") as archive:
+            info = tarfile.TarInfo("../outside.txt")
+            payload = b"no"
+            info.size = len(payload)
+            archive.addfile(info, io.BytesIO(payload))
+        report = audit_archive(path, self.repo)
+        self.assertTrue(any("unsafe archive path" in item for item in report["errors"]))
+
+    def test_tar_symlink_fails(self) -> None:
+        path = self.root / "symlink.tar.gz"
+        with tarfile.open(path, "w:gz") as archive:
+            info = tarfile.TarInfo("server/evil.py")
+            info.type = tarfile.SYMTYPE
+            info.linkname = "../../outside.py"
+            archive.addfile(info)
+        report = audit_archive(path, self.repo)
+        self.assertTrue(any("not a regular file" in item for item in report["errors"]))
 
     def test_default_prompt_drift_is_reported(self) -> None:
         with zipfile.ZipFile(self.archive, "w", compression=zipfile.ZIP_DEFLATED) as archive:
@@ -132,8 +168,8 @@ class PluginCreatorParityTests(unittest.TestCase):
         report = audit_archive(self.archive, self.repo)
         self.assertTrue(any("server script is absent" in item for item in report["errors"]))
 
-    def test_invalid_zip_fails_closed(self) -> None:
-        self.archive.write_bytes(b"not a zip")
+    def test_invalid_archive_fails_closed(self) -> None:
+        self.archive.write_bytes(b"not an archive")
         report = audit_archive(self.archive, self.repo)
         self.assertEqual(report["status"], "FAIL")
         self.assertTrue(report["errors"])

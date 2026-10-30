@@ -1,40 +1,28 @@
 ---
 name: visual-reference-analysis
-description: Use when inspecting a PNG concept/reference sheet for connected regions and preparing human-reviewed source crop candidates for Minecraft Bedrock geometry UV mapping.
+description: Manually inspect a supplied visual reference and document candidate crops for a human-reviewed Minecraft Bedrock texture workflow.
 ---
 
 # Visual Reference Analysis
 
-## Purpose
+## Capability boundary
 
-Use `minecraft-bedrock-visual-reference-analyzer` / `analyze_visual_reference` before manually authoring `source_assignments` for `build_uv_mapping_plan`. It identifies connected components, summarizes their bounds and colors, and can rank candidate image regions against the aspect ratio and relative area of geometry UV faces.
+The package does not include a standalone visual-reference segmentation script or semantic image analyzer. This Skill describes how to inspect an image that is actually supplied and visible to the current host. It cannot independently open arbitrary local paths or fetch remote images.
 
-## What the analyzer really does
+## Manual inspection workflow
 
-- `alpha_components`: 4-connected foreground regions using `alpha_threshold`; useful when a reference sheet has a transparent background and detached parts.
-- `color_components`: 4-connected regions of quantized RGB buckets; `color_bucket_size` controls merging. Increase it when antialiasing/noise makes too many small islands; decrease it to separate neighboring color families.
-- `min_region_area` suppresses tiny speckles; `max_regions` returns the largest regions first.
-- Optional `geometry_path` plus `geometry_identifier` extracts supported Bedrock cube-face UV regions and ranks image components by aspect ratio (80%) and normalized area (20%). This is strictly geometric ranking.
+1. Confirm that the reference image is attached or available through a real image-viewing capability. If not, mark the analysis BLOCKED.
+2. Record image dimensions and visible background/alpha characteristics only when they can be inspected reliably.
+3. Identify candidate regions visually and record pixel rectangles. Use neutral labels such as region A or front-head candidate until a human confirms their meaning.
+4. Do not infer that a region is a head, limb, clothing, armor or a particular face from color or shape alone.
+5. Compare candidate crop aspect ratios with the supported geometry UV inventory only as a geometric aid, never as semantic confidence.
+6. Ask for explicit human confirmation of every crop-to-bone/cube/face assignment before preparing a transfer plan.
+7. Preserve the original image and record its hash only when a real file executor can access it.
 
-## Required human review
+## Output
 
-Region names (`region_001`, etc.) are arbitrary identifiers, not semantic labels. The analyzer does not recognize heads, bodies, limbs, clothing, materials, front/back, or camera perspective. It does not infer 3D projection, face orientation, mirroring, or texture seams. Inspect the source image and select the intended `source_rect` for each target face. Only then pass explicit mappings to `build_uv_mapping_plan` and `map_reference_texture_to_uv`.
+Return image dimensions if verified, candidate crop bounds, visible uncertainties, proposed semantic labels clearly marked as unconfirmed, and the next manual review step.
 
-## Input/output constraints
+## Limits
 
-- Input is an existing PNG under `resource_packs/<project>_RP/textures/`.
-- Decoder accepts validated 8-bit non-interlaced PNGs supported by the shared painter decoder; convert unsupported/interlaced or high-bit-depth images first.
-- Maximum analyzer canvas: 2048 px per side and 1,048,576 total pixels; maximum 120,000 segmentation runs; maximum 96 returned components and 512 UV-face candidate rankings.
-- Reads files only. It never writes a preview, texture, geometry or mapping plan.
-- Symlinks, unsafe paths, duplicate geometry JSON keys and ambiguous geometry files are rejected unless an identifier disambiguates the geometry.
-
-## Recommended workflow
-
-1. Put the reference PNG inside the project's RP `textures/` tree.
-2. Call `analyze_visual_reference` with `color_components` for opaque concept sheets or `alpha_components` for isolated transparent elements.
-3. Inspect region bounds, average color and geometry-only candidate scores. Candidate scores are not semantic confidence.
-4. Visually confirm each source crop; record manual semantic labels outside the analyzer if needed.
-5. Supply confirmed rectangles to `build_uv_mapping_plan`; inspect UV overlap and coverage warnings.
-6. Transfer into a new output PNG, then run the texture-link/UV audits and in-game import tests.
-
-Always mark Minecraft import, face orientation, material appearance and runtime as `NOT RUN` until verified in the target build.
+No connected-component segmentation, color clustering, semantic recognition, 3D projection, face-orientation inference or automatic mapping is implemented in this package. Do not invent region IDs, scores or analyzer output. Geometry UV scripts do not analyze the semantics of a reference image. Minecraft rendering remains NOT RUN.

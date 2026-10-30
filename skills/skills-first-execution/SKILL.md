@@ -23,6 +23,8 @@ At the beginning of each task, identify which of these routes is actually availa
 
 Never infer a tool's availability from a skill name, README, old changelog or historical source code.
 
+Before claiming that an authoring generator or validator exists, read skills/skills-first-execution/references/capability-matrix.md. That matrix distinguishes real bundled local scripts from instruction-only workflows and legacy migration sources. Re-check actual host availability for every task.
+
 ## 3. Choose and combine specialist skills
 
 - New add-on: `addon-creation` + `bedrock-development` + relevant authoring skills + `automated-validation` + `build-release`.

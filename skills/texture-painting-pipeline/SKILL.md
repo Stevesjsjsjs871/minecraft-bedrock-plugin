@@ -1,23 +1,32 @@
 ---
 name: texture-painting-pipeline
-description: Use to plan and perform geometry-aware Bedrock texture painting with explicit UV selectors, deterministic pixel operations and source preservation.
+description: Plan Minecraft Bedrock entity texture work against geometry UVs while preserving source images and distinguishing real generators from unavailable painters.
 ---
 
-# Texture painting pipeline
+# Texture Painting Pipeline
 
-This is a Skills-only workflow. Do not call historical `paint_geometry_texture` or other MCP tool names as if they were active integrations. If an actual code executor and a supported local script are available, inspect the script contract before running; otherwise produce a precise paint plan or output asset through an available image/file capability.
+## Capability boundary
+
+The package does not include a geometry-aware texture painter. The bundled texture generator creates only the deterministic procedural styles implemented by its script; it is not a semantic skin painter, image inpainting system or reference-transfer engine.
+
+Use an actual authorized image editor or file/code capability only when it is available. Otherwise return a paint plan, pixel map or reviewable output specification and mark image editing NOT APPLIED.
 
 ## Inputs and preflight
-Identify the exact `.geo.json`, target texture dimensions, base PNG (if any), output path, selected bones/cubes/faces, operations and colors. Validate geometry identifier, cube/face UV bounds, texture canvas, source PNG decoding and path containment. Refuse ambiguous selectors, symlink escapes and unintended overwrites.
 
-## Operation planning
-Specify each operation in deterministic order: target selector, fill/border/checker/stripes/gradient/noise operation, palette, opacity/blend and seed where applicable. Preserve untouched pixels and alpha when a base texture is supplied. For overlaps, report exact pairs and require explicit approval before painting shared regions.
+Identify the exact .geo.json, geometry identifier, texture canvas dimensions, base PNG, desired output path, target version and intended visual result. Preserve the original texture. Use the standalone geometry audit and UV guide renderer to inspect supported cube-face layouts when a real executor can access them.
 
-## Reference transfer
-Use `reference-mapping-review` before transferring semantic regions. Bind the review to exact reference and geometry hashes; require explicit human-approved labels, crops and face selectors. Never infer that a portrait region maps to a particular 3D face solely from geometric similarity.
+## Planning workflow
 
-## Validation
-Check output PNG signature/chunks/decompression, dimensions, alpha and SHA-256; rerun UV bounds/overlap checks; inspect a visual preview if available. Write a separate output unless replacement was expressly requested. Record every mapped/unmapped region.
+1. Inventory geometry bones/cubes and supported UV faces.
+2. Record texture dimensions and verify that the base PNG matches the declared canvas.
+3. Define intended edits in texture-space coordinates and map each region to exact geometry selectors.
+4. Mark shared/mirrored UVs and overlaps for explicit review.
+5. Separate user-authored semantic decisions from geometric bounds calculations.
+6. If the procedural generator is suitable, inspect its current help and supported styles before use. Do not describe its output as hand-painted or semantically accurate.
+7. If an external editor is used, write a distinct output file, preserve the source and record the editor/version and changed-file hashes.
 
-## Limitations
-These are deterministic 2D pixel operations, not semantic AI texture synthesis or 3D projection. They do not prove Bedrock face orientation, seams, lighting, mip behavior or renderer output. Mark Minecraft import/rendering `NOT RUN` until tested.
+## Completion checks
+
+Validate output PNG integrity and dimensions with the standalone PNG validator. Re-run geometry and resource-link checks where applicable. Report pixel coverage and unresolved regions honestly.
+
+Static texture-space work does not simulate Bedrock 3D face orientation, lighting, mipmaps, seam bleed or materials. Minecraft rendering and Blockbench inspection remain NOT RUN until actually performed.

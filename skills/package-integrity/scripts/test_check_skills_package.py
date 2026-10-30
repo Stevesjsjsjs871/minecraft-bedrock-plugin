@@ -32,6 +32,11 @@ class SkillsPackageTests(unittest.TestCase):
         (geometry / "test_uv_template_engine.py").write_text("# tests\n", encoding="utf-8")
         (visual / "png_engine.py").write_text("# png engine\n", encoding="utf-8")
         (visual / "test_png_engine.py").write_text("# tests\n", encoding="utf-8")
+        visual_skill = self.root / "skills/visual-resource-pipeline/SKILL.md"
+        visual_skill.write_text("---\nname: visual-resource-pipeline\ndescription: Visual workflow.\n---\nUse skills/geometry-uv-engine/scripts/uv_template_engine.py and its focused tests.\n", encoding="utf-8")
+        matrix = self.root / "skills/skills-first-execution/references/capability-matrix.md"
+        matrix.parent.mkdir(parents=True, exist_ok=True)
+        matrix.write_text("# Capability matrix\n\nStandalone scripts and instruction-only workflows.\n", encoding="utf-8")
         prompts = list(checker.ORIGINAL_DEFAULT_PROMPTS) + ["A fourth test prompt."]
         interface = {"defaultPrompt": prompts}
         root_manifest = {"name": checker.EXPECTED_NAME, "version": "1.5.11", "skills": "./skills", "extensions": {"com.openai": {"interface": interface}}}
@@ -144,6 +149,31 @@ class SkillsPackageTests(unittest.TestCase):
         path = self.root / "skills/skills-only-maintenance/SKILL.md"
         path.write_text("---\nname: skills-only-maintenance\ndescription: Useful description.\n---\ncall `create_addon_project` now\n", encoding="utf-8")
         self.assertEqual(self.by_id(checker.check(self.root), "skill-tool-boundary")["status"], "FAIL")
+
+    def test_retired_tool_identifiers_rejected_even_when_negated(self):
+        path = self.root / "skills/skills-only-maintenance/SKILL.md"
+        for identifier in checker.RETIRED_TOOL_IDENTIFIERS:
+            with self.subTest(identifier=identifier):
+                path.write_text(
+                    "---\nname: skills-only-maintenance\ndescription: Boundary test.\n---\n"
+                    + f"The historical identifier {identifier} is not available.\n",
+                    encoding="utf-8",
+                )
+                self.assertEqual(self.by_id(checker.check(self.root), "skill-tool-boundary")["status"], "FAIL")
+        path.write_text("---\nname: skills-only-maintenance\ndescription: Test skill skills-only-maintenance.\n---\n", encoding="utf-8")
+
+    def test_missing_capability_matrix_fails_required_files(self):
+        (self.root / "skills/skills-first-execution/references/capability-matrix.md").unlink()
+        self.assertEqual(self.by_id(checker.check(self.root), "required-files")["status"], "FAIL")
+
+    def test_stale_uv_template_claim_fails(self):
+        path = self.root / "skills/visual-resource-pipeline/SKILL.md"
+        path.write_text(
+            "---\nname: visual-resource-pipeline\ndescription: Visual workflow.\n---\n"
+            "Template rendering is not yet a standalone executable.\n",
+            encoding="utf-8",
+        )
+        self.assertEqual(self.by_id(checker.check(self.root), "uv-template-workflow")["status"], "FAIL")
 
     def test_duplicate_skill_name_rejected(self):
         path = self.root / "skills/skills-only-maintenance/SKILL.md"

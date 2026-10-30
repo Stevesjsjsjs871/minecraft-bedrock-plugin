@@ -21,6 +21,7 @@ SEMVER = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]
 REQUIRED = [
     "VERSION", "README.md", "CHANGELOG.md", "plugin.json", ".codex-plugin/plugin.json",
     "skills/bedrock-engineer-core/SKILL.md", "skills/skills-first-execution/SKILL.md",
+    "skills/skills-first-execution/references/capability-matrix.md",
     "skills/skills-only-maintenance/SKILL.md", "skills/geometry-uv-engine/SKILL.md",
     "skills/geometry-uv-engine/scripts/geometry_engine.py",
     "skills/geometry-uv-engine/scripts/test_geometry_engine.py",
@@ -41,9 +42,16 @@ REQUIRED = [
 ]
 LEGACY_MCP_FILES = [".mcp.json", "mcp.json"]
 LEGACY_DEPLOYMENT_FILES = ["Dockerfile", "wrangler.toml", "package.json"]
-FORBIDDEN_ACTIVE_CALLS = [
-    "create_addon_project", "create_addon_item", "create_addon_block", "create_addon_recipe",
-    "create_addon_entity", "search_mojang_samples", "read_mojang_sample", "audit_texture_links", "diff_packs",
+RETIRED_TOOL_IDENTIFIERS = [
+    "audit_animation", "audit_entity_animation_pipeline", "audit_geometry", "audit_pack",
+    "compare_baseline", "create_addon_block", "create_addon_entity", "create_addon_item",
+    "create_addon_project", "create_addon_recipe", "create_animation_clip",
+    "create_animation_controller", "create_animated_entity_bundle", "diff_packs",
+    "get_resource_graph", "inspect_archive", "read_mojang_sample", "search_mojang_samples",
+    "validate_animation_clip", "validate_animation_controller", "validate_manifest",
+    "audit_texture_links", "analyze_visual_reference", "build_uv_mapping_plan",
+    "map_reference_texture_to_uv", "review_reference_mapping", "retarget_texture_to_entity",
+    "paint_geometry_texture", "register_texture_atlas",
 ]
 ORIGINAL_DEFAULT_PROMPTS = [
     "Create a Minecraft Bedrock add-on from scratch or extend my existing project. Work from files I provide or an actually connected workspace, preserve existing mechanics and assets, and produce complete BP/RP files with validation evidence.",
@@ -191,12 +199,20 @@ def check(root: Path) -> dict:
     stale = []
     for path in skills:
         body = path.read_text(encoding="utf-8")
-        for tool in FORBIDDEN_ACTIVE_CALLS:
-            if re.search(r"(?i)\b(?:call|invoke)\s+`" + re.escape(tool) + r"`", body):
-                stale.append(f"{path.relative_to(root)} invokes {tool}")
-        if re.search(r"(?i)actual MCP registry|MCP connection|MCP unit suite", body):
-            stale.append(f"{path.relative_to(root)} contains active MCP release instructions")
-    add("skill-tool-boundary", "PASS" if not stale else "FAIL", "No stale calls to retired tools in skill instructions" if not stale else "; ".join(stale[:20]))
+        for tool in RETIRED_TOOL_IDENTIFIERS:
+            if re.search(r"\b" + re.escape(tool) + r"\b", body):
+                stale.append(f"{path.relative_to(root)} contains retired tool identifier {tool}")
+        if re.search(r"(?i)active MCP server|callable MCP tool|MCP registry is available|Cloudflare MCP gateway is active", body):
+            stale.append(f"{path.relative_to(root)} claims a retired MCP capability is active")
+    add("skill-tool-boundary", "PASS" if not stale else "FAIL", "No retired server-tool identifiers or active MCP capability claims appear in Skills" if not stale else "; ".join(stale[:30]))
+
+    visual_skill_path = root / "skills/visual-resource-pipeline/SKILL.md"
+    visual_skill_text = visual_skill_path.read_text(encoding="utf-8") if visual_skill_path.is_file() else ""
+    uv_renderer = root / "skills/geometry-uv-engine/scripts/uv_template_engine.py"
+    uv_renderer_tests = root / "skills/geometry-uv-engine/scripts/test_uv_template_engine.py"
+    obsolete_uv_claim = re.search(r"(?i)template rendering is not yet a standalone executable|UV template renderer is dormant|automatic UV guide generation is not migrated", visual_skill_text) is not None
+    uv_workflow_ok = uv_renderer.is_file() and uv_renderer_tests.is_file() and "uv_template_engine.py" in visual_skill_text and not obsolete_uv_claim
+    add("uv-template-workflow", "PASS" if uv_workflow_ok else "FAIL", "Visual-resource Skill points to the current standalone UV guide renderer and tests" if uv_workflow_ok else "Visual-resource Skill is missing the standalone UV renderer workflow or contains stale dormant-renderer guidance")
 
     readme = (root / "README.md").read_text(encoding="utf-8")
     readme_heading = re.search(r"(?m)^# Minecraft Bedrock Engineer — (\S+)\s*$", readme)

@@ -1,43 +1,33 @@
 ---
 name: uv-texture-retargeting
-description: Convert a reviewed image reference into a Bedrock entity texture in one guarded operation by validating explicit source crops and exact geometry UV face selectors, planning the mapping, applying PNG transfer, and verifying the result.
+description: Coordinate a manually reviewed reference-to-UV texture workflow for an existing Minecraft Bedrock entity without claiming one-click retargeting.
 ---
 
 # UV Texture Retargeting
 
-Use `retarget_texture_to_entity` when a creator has a reference sheet and an existing Bedrock geometry and wants the reviewed texture mapping applied in one request.
+## Capability boundary
+
+The package does not contain a one-click retargeting service or automatic reference-to-UV transfer implementation. This Skill coordinates planning and human review only. It does not write a PNG.
 
 ## Required inputs
 
-- Existing project directory.
-- Exact `.geo.json` path and geometry identifier.
-- Reference PNG already in the selected Resource Pack.
-- New output PNG path under `textures/entity/`.
-- One or more explicit source crop rectangles (`x`, `y`, `width`, `height`) mapped to exact geometry selectors (`bone`, `cube_index`, `face`).
-- A short human-authored semantic label for every mapping.
-- `approved: true` for every assignment and `review_confirmed: true` at the request level, set only after visual inspection.
+- Existing BP/RP project and exact target version.
+- Exact .geo.json path and geometry identifier.
+- Reference image accessible to the current host.
+- New output PNG path under the selected RP.
+- Explicit source crop rectangles and exact bone/cube/face selectors.
+- Human-reviewed semantic labels and decisions.
 
-Do not guess which pixels depict the head, torso, limbs, armor or other semantic parts. Use an image viewer and the geometry UV template/UV inventory to establish each crop and face mapping. The deterministic visual-reference analyzer is a region inventory aid; its geometric candidate scores are not semantic confidence.
+## Manual sequence
 
-## Execution sequence
+1. Inspect the project, geometry, texture canvas and client-entity texture references.
+2. Run the standalone geometry audit and UV guide renderer only when a real executor can access the package and project files.
+3. Inspect the reference image and choose source crops manually. Do not infer semantic correspondences automatically.
+4. Prepare a mapping table with crop bounds, selectors, transforms, overlap decisions and reviewer approval.
+5. Check source rectangles against the reference dimensions and target rectangles against supported geometry UV bounds.
+6. If a real authorized image editor or separately tested transfer implementation is available, create a new PNG without replacing the source. Otherwise return the mapping plan and mark pixel transfer NOT APPLIED.
+7. Validate any produced PNG and re-audit resource links. Preserve the geometry, source image and base texture.
 
-1. The server hashes the geometry and reference files and verifies that they are safe, bounded project files.
-2. It runs `analyze_visual_reference` for diagnostics and checks that the analyzed PNG hash matches the input hash.
-3. It calls `build_uv_mapping_plan` with the reviewed assignments. The planner checks source rectangles, selector expansion, UV bounds, duplicate targets, overlaps and optional full coverage.
-4. If the plan is not executable, the operation stops before writing.
-5. It calls `map_reference_texture_to_uv` with the transfer request, creating a new PNG without overwriting any existing file.
-6. It rechecks geometry/reference hashes, validates the output PNG, verifies dimensions against the geometry texture canvas and compares the output SHA-256 with the transfer result.
+## Limits
 
-## Safety and scope
-
-- Source geometry and reference PNG are read-only.
-- Existing output paths are refused by the transfer engine.
-- Overlap, layered assignments and full-coverage requirements are explicit controls. Keep overlap disabled unless the shared pixels are intentional.
-- `review_confirmed` is an explicit approval gate, not a claim that the model recognized semantics automatically.
-- Current support is for geometry cube UV formats understood by the existing UV tools. Unsupported mesh formats are not silently projected.
-- This performs 2D texture-space transfer. It does not emulate Bedrock face sampling, lighting, normals, material rendering, mipmaps, seam bleed, animation or 3D projection.
-- Minecraft import, in-game rendering, Blockbench interoperability and runtime behavior remain `NOT RUN` unless separately tested.
-
-## Example
-
-See `references/retarget-request.example.json`. Paths are illustrative and must be changed to files that exist in the active project.
+The available scripts do not perform semantic segmentation, 3D projection, UV unwrapping, texture transfer or Bedrock face sampling. Poly-mesh and texture-mesh formats are outside the supported cube-face UV audit. Minecraft import, visual rendering, seams, mipmaps and Blockbench interoperability remain NOT RUN until tested.

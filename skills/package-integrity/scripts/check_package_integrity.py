@@ -30,6 +30,7 @@ REQUIRED_FILES = (
     "mcp.json",
     ".mcp.json",
     "README.md",
+    "CHANGELOG.md",
     "archive_safety.py",
     "server/mcp_server.py",
     "server/tests/test_mcp_server.py",
@@ -49,18 +50,19 @@ def _read_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _prompt(manifest: dict[str, Any], *, compatibility: bool) -> Any:
+def _interface(manifest: dict[str, Any], *, compatibility: bool) -> dict[str, Any] | None:
     if compatibility:
         interface = manifest.get("interface")
-        return interface.get("defaultPrompt") if isinstance(interface, dict) else None
-    extensions = manifest.get("extensions")
-    if not isinstance(extensions, dict):
-        return None
-    openai = extensions.get("com.openai")
-    if not isinstance(openai, dict):
-        return None
-    interface = openai.get("interface")
-    return interface.get("defaultPrompt") if isinstance(interface, dict) else None
+    else:
+        extensions = manifest.get("extensions")
+        openai = extensions.get("com.openai") if isinstance(extensions, dict) else None
+        interface = openai.get("interface") if isinstance(openai, dict) else None
+    return interface if isinstance(interface, dict) else None
+
+
+def _prompt(manifest: dict[str, Any], *, compatibility: bool) -> Any:
+    interface = _interface(manifest, compatibility=compatibility)
+    return interface.get("defaultPrompt") if interface is not None else None
 
 
 def _semver(value: Any) -> bool:
@@ -391,6 +393,23 @@ def audit_package(root: Path, *, deep_index: bool = True, strict_files: bool = T
     else:
         add("plugin-identity", "PASS", f"Both manifests retain {EXPECTED_PLUGIN_NAME}")
 
+    metadata_mismatches = [
+        field for field in ("name", "version", "description", "author", "keywords")
+        if root_manifest.get(field) != compat_manifest.get(field)
+    ]
+    root_interface = _interface(root_manifest, compatibility=False)
+    compat_interface = _interface(compat_manifest, compatibility=True)
+    if root_interface is None or compat_interface is None:
+        metadata_mismatches.append("interface")
+    else:
+        for field in ("displayName", "shortDescription", "longDescription", "developerName", "category", "capabilities"):
+            if root_interface.get(field) != compat_interface.get(field):
+                metadata_mismatches.append(f"interface.{field}")
+    if metadata_mismatches:
+        add("manifest-metadata", "FAIL", f"Shared manifest metadata differs: {metadata_mismatches}")
+    else:
+        add("manifest-metadata", "PASS", "Shared identity, description, author, keywords and interface metadata match")
+
     root_prompt = _prompt(root_manifest, compatibility=False)
     compat_prompt = _prompt(compat_manifest, compatibility=True)
     def valid_prompt(value: Any) -> bool:
@@ -460,6 +479,23 @@ def audit_package(root: Path, *, deep_index: bool = True, strict_files: bool = T
         except (OSError, UnicodeDecodeError, IndexError):
             add("readme-version", "WARN", "README heading could not be checked")
 
+    changelog_path = root / "CHANGELOG.md"
+    if not changelog_path.is_file():
+        add("changelog-version", "WARN", "CHANGELOG.md is missing; the latest release entry cannot be checked")
+    else:
+        try:
+            latest_heading = next((line.strip() for line in changelog_path.read_text(encoding="utf-8").splitlines() if line.startswith("## ")), None)
+            heading_match = re.match(r"^##\\s+(\\S+)", latest_heading or "")
+            if heading_match is None:
+                add("changelog-version", "WARN", "CHANGELOG.md has no versioned release heading")
+            elif heading_match.group(1) != versions[0]:
+                add("changelog-version", "WARN", f"Latest changelog entry is {heading_match.group(1)!r}; expected {versions[0]}")
+            else:
+                add("changelog-version", "PASS", f"Latest changelog entry matches package version {versions[0]}")
+        except (OSError, UnicodeDecodeError):
+            add("changelog-version", "WARN", "CHANGELOG.md could not be read")
+
+
     return _report(root, checks, registry, index)
 
 
@@ -469,7 +505,7 @@ def _report(root: Path, checks: list[dict[str, str]], registry: dict[str, Any], 
     status = "FAIL" if fails else ("WARN" if warns else "PASS")
     return {
         "checker": "minecraft-bedrock-engineer-package-integrity",
-        "checker_version": "1.0.6",
+        "checker_version": "1.0.7",
         "package_root": str(root),
         "status": status,
         "summary": {"checks": len(checks), "passed": sum(c["status"] == "PASS" for c in checks), "warnings": warns, "failures": fails},

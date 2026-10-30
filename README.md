@@ -1,8 +1,11 @@
-# Minecraft Bedrock Engineer — 1.3.0
+# Minecraft Bedrock Engineer — 1.4.0
 
 ## Release overview
 
-Minecraft Bedrock Engineer 1.3.0 consolidates the internal 1.2.0 release-candidate work into one release. It extends the existing Bedrock add-on authoring and auditing toolkit with animation authoring, end-to-end entity animation validation, geometry-aware UV inspection, UV template creation, deterministic texture painting, reference-image transfer, UV mapping plans, bounded reference analysis and a human-reviewed mapping gate.
+Version 1.4.0 adds an optional authenticated Cloudflare Workers HTTP MCP gateway backed by a Python container. The original local STDIO MCP configuration remains supported. See `cloudflare/README.md` for deployment instructions.
+
+
+Minecraft Bedrock Engineer 1.4.0 consolidates the internal 1.2.0 release-candidate work into one release. It extends the existing Bedrock add-on authoring and auditing toolkit with animation authoring, end-to-end entity animation validation, geometry-aware UV inspection, UV template creation, deterministic texture painting, reference-image transfer, UV mapping plans, bounded reference analysis and a human-reviewed mapping gate.
 
 The plugin targets the Minecraft Bedrock 1.26.50 workflow baseline unless a project selects another version. It preserves the existing project-first model: work inside an existing project scaffold, avoid overwriting user assets, protect project boundaries, and report static checks separately from in-game verification.
 

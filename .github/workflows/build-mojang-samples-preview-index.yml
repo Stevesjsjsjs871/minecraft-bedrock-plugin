@@ -239,7 +239,6 @@ jobs:
 
       - name: Run complete unit suites with the real Preview source archive
         env:
-          MINECRAFT_BEDROCK_WORKSPACE: ${{ runner.temp }}/mbe-workspace
           MOJANG_PREVIEW_ARCHIVE: ${{ steps.download.outputs.archive }}
         run: |
           python -m unittest discover -s server/tests -v

@@ -632,7 +632,7 @@ def _load_mojang_sample_index(sample_version: str = DEFAULT_MOJANG_SAMPLE_VERSIO
     corpus = MOJANG_SAMPLE_CORPORA.get(sample_version)
     if corpus is None:
         return None
-    index_path = corpus["index_path"]
+    index_path = MOJANG_SAMPLE_INDEX if sample_version == DEFAULT_MOJANG_SAMPLE_VERSION else corpus["index_path"]
     if not index_path.is_file():
         if sample_version == DEFAULT_MOJANG_SAMPLE_VERSION:
             return _build_curated_mojang_sample_index()

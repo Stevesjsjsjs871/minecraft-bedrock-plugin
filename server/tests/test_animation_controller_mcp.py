@@ -62,7 +62,7 @@ class ContractTests(unittest.TestCase):
 
     def test_initialize_and_tools_list_protocol(self):
         init = server.handle_message({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-03-26"}})
-        self.assertEqual(init["result"]["serverInfo"]["version"], server.SERVER_VERSION)
+        self.assertEqual(init["result"]["serverInfo"]["version"], "1.1.1")
         listing = server.handle_message({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}})
         self.assertEqual(len(listing["result"]["tools"]), 2)
 
@@ -97,6 +97,39 @@ class ControllerCreationTests(unittest.TestCase):
             description = client["minecraft:client_entity"]["description"]
             self.assertEqual(description["animations"]["forest_guardian"], result["controller_identifier"])
             self.assertIn("forest_guardian", description["scripts"]["animate"])
+
+    def test_ordered_transition_array_input_preserves_bedrock_priority(self):
+        with tempfile.TemporaryDirectory() as td:
+            project = scaffold(Path(td))
+            args = valid_args()
+            args["states"][0]["transitions"] = [
+                {"walking": "query.modified_move_speed > 0.01"},
+                {"idle": "query.is_sprinting"},
+            ]
+            with patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": td}):
+                result = server.call_tool("create_animation_controller", args)
+            self.assertEqual(result["status"], "created")
+            controller_path = project / "resource_packs/forest-addon_RP/animation_controllers/forest_guardian.animation_controllers.json"
+            controller = json.loads(controller_path.read_text(encoding="utf-8"))
+            transitions = controller["animation_controllers"][result["controller_identifier"]]["states"]["idle"]["transitions"]
+            self.assertEqual(transitions, [
+                {"walking": "query.modified_move_speed > 0.01"},
+                {"idle": "query.is_sprinting"},
+            ])
+
+    def test_rejects_transition_array_entries_with_multiple_targets_without_writes(self):
+        with tempfile.TemporaryDirectory() as td:
+            project = scaffold(Path(td))
+            args = valid_args()
+            args["states"][0]["transitions"] = [
+                {"walking": "query.modified_move_speed > 0.01", "idle": "query.is_sprinting"}
+            ]
+            with patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": td}):
+                result = server.call_tool("create_animation_controller", args)
+            self.assertEqual(result["status"], "error")
+            self.assertIn("exactly one target", result["error"]["message"])
+            controller_path = project / "resource_packs/forest-addon_RP/animation_controllers/forest_guardian.animation_controllers.json"
+            self.assertFalse(controller_path.exists())
 
     def test_optional_animate_condition_is_bound_as_expression(self):
         with tempfile.TemporaryDirectory() as td:

@@ -12,7 +12,8 @@ archive. It compares the package root files plus every regular file under
 - `.mcp.json` and `mcp.json` expose the same stdio server names;
 - every referenced `${PLUGIN_ROOT}` Python server script exists in the archive;
 - archive paths, duplicate entries, symlinks, case-insensitive collisions, and
-  declared uncompressed sizes are safe.
+  declared uncompressed sizes are safe;
+- repository package files cannot traverse symlinked parent directories, and ZIP directory records must have directory file types.
 
 ## Usage
 

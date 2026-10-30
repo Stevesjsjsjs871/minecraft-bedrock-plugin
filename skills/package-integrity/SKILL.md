@@ -15,7 +15,10 @@ For a release candidate, build a new deterministic archive outside the source tr
 
 ```bash
 mkdir -p dist
-python skills/package-integrity/scripts/build_skills_package.py . dist/minecraft-bedrock-engineer.tar.gz
+source_dir="$(mktemp -d)"
+trap 'rm -rf "$source_dir"' EXIT
+git archive HEAD | tar -x -C "$source_dir"
+python skills/package-integrity/scripts/build_skills_package.py "$source_dir" dist/minecraft-bedrock-engineer.tar.gz --source-commit "$(git rev-parse HEAD)" --source-date-epoch "$(git show -s --format=%ct HEAD)"
 ```
 
 Then extract it into a fresh directory and run the strict checker against the extracted package:

@@ -64,3 +64,21 @@ The generated mojang-samples-index.json.gz is intentionally not committed. CI re
 The checker is standard-library-only and read-only. The builder writes only a new archive and its sidecar, outside the package root, and never overwrites existing paths. Static package checks do not prove Minecraft import, rendering, gameplay, multiplayer, Blockbench interoperability or Script API runtime behavior; report those as NOT RUN unless actually tested.
 
 Legacy check_package_integrity.py and its tests validate the retired server/registry architecture. They are historical source, not the release gate for current Skills-only packages.
+
+
+## Plugin Creator source parity audit
+
+Use the read-only comparator when a clean GitHub source snapshot and a safely extracted Plugin Creator package are both available:
+
+```bash
+python skills/package-integrity/scripts/compare_plugin_sources.py \
+  /path/to/github-source-snapshot \
+  /path/to/plugin-creator-extracted \
+  --json-out /path/outside-both-roots/plugin-creator-parity.json
+```
+
+The comparator hashes every regular file, reports identical/changed/missing/extra paths, checks both manifest names and versions, validates VERSION/README/CHANGELOG version markers, and compares the complete default-prompt arrays plus the original first three prompts. It rejects symlinks, special files, generated Python bytecode/cache directories, unsafe paths and portable case/Unicode path collisions. JSON output is created exclusively and must be outside both compared roots.
+
+Exit codes: 0 = exact file and metadata parity; 1 = safe but different snapshots; 2 = unsafe input or invalid metadata. A difference is evidence to review, not permission to overwrite or delete files.
+
+The comparator accepts directories only; it does not extract or mutate archives. Safely prepare both roots before running it. Plugin Creator's backend plugin ID is not embedded in the package files and must be checked separately against Plugin Creator metadata. A parity PASS does not prove Minecraft runtime or Blockbench behavior.

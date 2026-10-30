@@ -38,7 +38,7 @@ def _pairs_no_duplicates(pairs):
 
 
 def _safe_path(value: str) -> bool:
-    return isinstance(value, str) and bool(value) and "\\" not in value and "\x00" not in value and not Path(value).is_absolute() and all(part not in ("", ".", "..") for part in value.split("/"))
+    return isinstance(value, str) and bool(value) and "\\" not in value and "\x00" not in value and not re.match(r"^[A-Za-z]:", value) and not Path(value).is_absolute() and all(part not in ("", ".", "..") for part in value.split("/"))
 
 
 def _hash_file(path: Path, before: os.stat_result) -> str:

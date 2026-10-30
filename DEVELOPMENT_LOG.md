@@ -22,7 +22,8 @@
 - Tool-level object-map input remains supported for backward compatibility; generated Bedrock controller JSON remains an ordered array.
 
 ### Verification
-- GitHub Actions on this follow-up branch: pending.
+- First GitHub Actions run #41019454214 executed 172 tests and found one stale assertion in the copied entity-server test: it expected server version 1.1.0 while the package is 1.1.1. All animation-array tests, registry tests, MCT-preservation checks and other entity tests passed.
+- Corrected the stale assertion in commit `03c7a170950969b1af1fe5d597e124c2de7b7410`; full rerun pending.
 - Minecraft import, entity spawn/render, Molang execution, controller transitions in-game and Creator Tools CLI: NOT RUN.
 
 ### Remaining

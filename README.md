@@ -52,6 +52,8 @@ python skills/package-integrity/scripts/check_skills_package.py "$tmp_dir"
 
 The checker requires BUILD_PROVENANCE.json and rejects symlinks, special files, Python bytecode/cache directories, mismatched metadata, changed default prompts and altered payload hashes. A failed check blocks packaging; do not bypass it.
 
+The provenance file and SHA-256 sidecar provide integrity metadata, not a digital signature or independent identity attestation. Verify the recorded Git commit and successful CI run against a trusted repository before distributing a candidate.
+
 The current GitHub mirror is missing the exact binary Mojang Samples index included in Plugin Creator 1.5.12. Until that pinned file is restored, the extracted-package release gate is expected to fail and no release candidate may be published. Do not fabricate or partially regenerate the index.
 
 Run only current standalone utilities and their corresponding tests. Historical changelog entries may mention retired architecture; they are retained as release history, not as active implementation. Runtime, multiplayer and Blockbench checks must be reported as NOT RUN unless actually performed.

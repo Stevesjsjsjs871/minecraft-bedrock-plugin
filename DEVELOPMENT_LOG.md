@@ -3,7 +3,7 @@
 ## 2026-10-30 — Package integrity and provenance hardening
 
 - Baseline: GitHub Skills-first source 1.5.11 at 208753f84a31ab4eae1ecfddc4a44eef7a87c7c0; Plugin Creator 1.5.12, Release ID pluginrel_6ae4b2ea22f88191a00187713b7e9b91.
-- Finding: Plugin Creator package inventory has 163 files, one generated .pyc (14,282 bytes), and no BUILD_PROVENANCE.json. The GitHub mirror lacks the exact compressed Mojang Samples 1.26.50.4 index.
+- Finding: Plugin Creator package inventory has 163 files, one generated .pyc (14,282 bytes), and no BUILD_PROVENANCE.json. Its paginated inventory confirms the 1,128,413-byte Mojang index exists but the text API marks it size-limited; the archive download did not materialize. The current Plugin Creator also lacks the new provenance helper/builder/tests and pinned audit-benchmark requirements file. The GitHub mirror lacks the index entirely.
 - Changes: safe package inventory, deterministic tar.gz builder, mandatory per-file provenance validation, archive SHA-256 sidecar, README/CHANGELOG/version parity, first-three-default-prompt preservation, bytecode/symlink/special-file rejection.
 - Files: skills/package-integrity/scripts/package_provenance.py; build_skills_package.py; check_skills_package.py; test_build_skills_package.py; test_check_skills_package.py; skills/audit-benchmark/requirements.txt; skills/audit-benchmark/SKILL.md; skills/package-integrity/SKILL.md; README.md; .github/workflows/validate.yml; GITHUB_SYNC_NOTES.md.
 - Local tests: compileall PASS; 34/34 package/provenance tests PASS; deterministic archive smoke test PASS.

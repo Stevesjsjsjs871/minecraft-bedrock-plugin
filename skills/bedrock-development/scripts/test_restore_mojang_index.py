@@ -95,6 +95,13 @@ class RestoreMojangIndexTests(unittest.TestCase):
         with self.assertRaises(RestoreIndexError):
             restore_index(link, self.metadata, self.indexer, self.output)
 
+    def test_rejects_generated_index_hash_mismatch(self):
+        self.metadata_data["index_sha256"] = "0" * 64
+        self.write_metadata()
+        with self.assertRaises(RestoreIndexError):
+            restore_index(self.archive, self.metadata, self.indexer, self.output)
+        self.assertFalse(self.output.exists())
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import gzip
+import hashlib
 import json
 import os
 import re
@@ -269,8 +270,15 @@ def check(root: Path) -> dict:
             and len(entries) == meta["indexed_count"]
         )
         category_ok = dict(sorted(actual_categories.items())) == dict(sorted(expected_categories.items()))
+        index_size = index_path.stat().st_size
         expected_index_bytes = meta.get("index_file_bytes")
-        size_ok = expected_index_bytes is None or (type(expected_index_bytes) is int and index_path.stat().st_size == expected_index_bytes)
+        size_ok = index_size <= 16 * 1024 * 1024 and (expected_index_bytes is None or (type(expected_index_bytes) is int and index_size == expected_index_bytes))
+        expected_index_sha = meta.get("index_sha256")
+        index_sha_ok = expected_index_sha is None or (
+            isinstance(expected_index_sha, str)
+            and re.fullmatch(r"[0-9a-f]{64}", expected_index_sha) is not None
+            and hashlib.sha256(index_path.read_bytes()).hexdigest() == expected_index_sha
+        )
         source_asset_ok = True
         if any(key in meta for key in ("source_release_tag", "source_asset_name", "source_asset_url")):
             tag, asset, url = meta.get("source_release_tag"), meta.get("source_asset_name"), meta.get("source_asset_url")
@@ -279,10 +287,10 @@ def check(root: Path) -> dict:
                 and isinstance(url, str)
                 and url == f"https://github.com/Mojang/bedrock-samples/releases/download/{tag}/{asset}"
             )
-        ok = bool(payload) and stats_ok and category_ok and size_ok and source_asset_ok
+        ok = bool(payload) and stats_ok and category_ok and size_ok and index_sha_ok and source_asset_ok
         detail = (
             f"Official archive hash/name, target version, {len(entries)} indexed entries, "
-            f"{stats.get('entry_count')} ZIP entries, category counts and compressed size "
+            f"{stats.get('entry_count')} ZIP entries, category counts, compressed size/hash "
             + ("match pinned metadata" if ok else "do not match pinned metadata")
         )
         add("mojang-index-integrity", "PASS" if ok else "FAIL", detail)

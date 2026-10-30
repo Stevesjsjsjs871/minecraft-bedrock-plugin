@@ -34,5 +34,7 @@
   "source_release_tag": "v1.26.50.4",
   "source_asset_name": "bedrock-samples-v1.26.50.4-full.zip",
   "source_asset_url": "https://github.com/Mojang/bedrock-samples/releases/download/v1.26.50.4/bedrock-samples-v1.26.50.4-full.zip",
-  "plugin_creator_index_bytes": 1128413
+  "plugin_creator_index_bytes": 1128413,
+  "index_file_bytes": 1128406,
+  "index_sha256": "48429d64391157553e6760b7f568e5e6d5d05fa6517427b5a1156c8bc18e61fc"
 }

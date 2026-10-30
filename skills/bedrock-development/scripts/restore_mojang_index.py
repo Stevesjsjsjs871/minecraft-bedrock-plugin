@@ -159,11 +159,15 @@ def restore_index(archive: Path, metadata_path: Path, indexer: Path, output: Pat
         expected_index_bytes = metadata.get("index_file_bytes")
         if expected_index_bytes is not None and (type(expected_index_bytes) is not int or output_info.st_size != expected_index_bytes):
             raise RestoreIndexError(f"generated index size mismatch: expected {expected_index_bytes}, got {output_info.st_size}")
+        index_sha = _sha256(output, MAX_INDEX_BYTES)
+        expected_index_sha = metadata.get("index_sha256")
+        if expected_index_sha is not None and (not isinstance(expected_index_sha, str) or not SHA256_RE.fullmatch(expected_index_sha) or index_sha != expected_index_sha):
+            raise RestoreIndexError("generated index SHA-256 does not match pinned index metadata")
         return {
             "status": "ok",
             "output": str(output),
             "index_bytes": output_info.st_size,
-            "index_sha256": _sha256(output, MAX_INDEX_BYTES),
+            "index_sha256": index_sha,
             "source_zip_sha256": archive_sha,
             "entry_count": stats["entry_count"],
             "indexed_count": stats["indexed_count"],

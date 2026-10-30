@@ -242,6 +242,12 @@ if __name__ == "__main__":
         with gzip.open(path, "wt", encoding="utf-8") as stream:
             json.dump(data, stream)
         self.assertEqual(self.by_id(checker.check(self.root), "mojang-index-integrity")["status"], "FAIL")
+    def test_mojang_index_pinned_hash_mismatch_fails(self):
+        meta_path = self.root / "skills/bedrock-development/references/mojang-samples-1.26.50.4/INDEX_METADATA.json"
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        meta["index_sha256"] = "0" * 64
+        meta_path.write_text(json.dumps(meta), encoding="utf-8")
+        self.assertEqual(self.by_id(checker.check(self.root), "mojang-index-integrity")["status"], "FAIL")
 
     def test_package_hygiene_failure_short_circuits_before_manifest_reads(self):
         (self.root / "stray.pyc").write_bytes(b"generated")

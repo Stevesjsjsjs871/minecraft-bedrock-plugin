@@ -63,7 +63,7 @@ def _tool() -> dict[str, Any]:
         },
     }
     return {
-        "name": "create_addon_entity_with_geometry_with_geometry",
+        "name": "create_addon_entity_with_geometry",
         "description": (
             "Create a custom Minecraft Bedrock entity in an EXISTING Minecraft Bedrock Engineer project scaffold. "
             "Writes a BP entity definition, RP client-entity definition, geometry model and render controller. "
@@ -98,7 +98,7 @@ def _tool() -> dict[str, Any]:
 TOOLS = [_tool()]
 TOOL_BY_NAME = {tool["name"]: tool for tool in TOOLS}
 WORKFLOW_INSTRUCTIONS = (
-    "Entity authoring: create_addon_entity_with_geometry_with_geometry writes a linked BP entity + RP client entity, geometry and render controller. "
+    "Entity authoring: create_addon_entity_with_geometry writes a linked BP entity + RP client entity, geometry and render controller. "
     "Supply bone/cube geometry explicitly; texture and animations are separate follow-up resources. "
     "Refuses output collisions and only writes inside an existing scaffold. Static checks do not prove game import/rendering."
 )
@@ -513,7 +513,7 @@ def _create_entity(args: dict[str, Any]) -> dict[str, Any]:
 
 
 def call_tool(name: str, raw_args: Any) -> dict[str, Any]:
-    if name != "create_addon_entity_with_geometry_with_geometry":
+    if name != "create_addon_entity_with_geometry":
         return _error("UNKNOWN_TOOL", f"unknown tool: {name}")
     try:
         args = _validate_arguments(raw_args)

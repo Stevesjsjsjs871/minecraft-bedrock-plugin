@@ -276,3 +276,12 @@ Build a separate `1.26.60.30-preview` metadata-only corpus only after verifying 
 - All 13 job steps completed successfully. No lint/type-check, macOS, Minecraft runtime/import/rendering or real Creator Tools CLI test was run.
 - A local clone attempt still fails because this execution environment cannot resolve `github.com`; GitHub-hosted CI supplied the actual test execution.
 - PR #3 remains Draft/open/unmerged and stacked on PR #2. Plugin Creator remains 1.0.11 with the same release ID; no release or main-branch update occurred.
+
+
+### Follow-up hardening — bind supplied ZIP bytes to selected source version
+- A final contract review found that `archive_path` was described as belonging to the selected `sample_version`, but the server previously checked only that the requested path existed in the supplied ZIP. That could allow a caller to read a same-path file from a different archive.
+- Added streaming SHA-256 verification of the supplied ZIP against the selected index's `archive_sha256` before opening any member for content. Mismatches return `SAMPLE_ARCHIVE_VERSION_MISMATCH`; an index without a valid digest returns `SAMPLE_ARCHIVE_DIGEST_UNAVAILABLE`. The archive remains workspace-confined and ZIP-bounded by the existing resolver.
+- Updated the synthetic read fixture to use its actual archive digest and added a negative regression test proving a different archive is refused.
+- Updated MCP schema description, Bedrock skill and README to document the exact-digest requirement.
+- Added one more test to the prior six source-version tests. Expected full-suite count is now 155 (MCP/server 109, benchmark 12, sample index 6, texture 12, package integrity 16).
+- CI for the new head is pending at the time of this log entry; do not treat these changes as verified until the final run completes.

@@ -1337,6 +1337,36 @@ class MojangSampleVersionSelectionTests(unittest.TestCase):
         self.assertIn(self.PREVIEW_VERSION, result["source_release_url"])
         self.assertGreater(len(result["results"]), 0)
 
+    def test_preview_index_target_version_must_match_selected_source(self):
+        import tempfile
+        from unittest.mock import patch
+        payload = dict(self._preview_payload())
+        payload["target_version"] = "1.26.60.29-preview"
+        with tempfile.TemporaryDirectory() as td:
+            index_path = Path(td) / "wrong-version.json.gz"
+            with gzip.open(index_path, "wt", encoding="utf-8") as stream:
+                json.dump(payload, stream)
+            corpus = dict(server.MOJANG_SAMPLE_CORPORA[self.PREVIEW_VERSION])
+            corpus["index_path"] = index_path
+            with patch.dict(server.MOJANG_SAMPLE_CORPORA, {self.PREVIEW_VERSION: corpus}):
+                with self.assertRaisesRegex(RuntimeError, "target_version does not match"):
+                    server._load_mojang_sample_index(self.PREVIEW_VERSION)
+
+    def test_preview_index_archive_digest_must_match_pinned_release_asset(self):
+        import tempfile
+        from unittest.mock import patch
+        payload = dict(self._preview_payload())
+        payload["archive_sha256"] = "0" * 64
+        with tempfile.TemporaryDirectory() as td:
+            index_path = Path(td) / "wrong-source.json.gz"
+            with gzip.open(index_path, "wt", encoding="utf-8") as stream:
+                json.dump(payload, stream)
+            corpus = dict(server.MOJANG_SAMPLE_CORPORA[self.PREVIEW_VERSION])
+            corpus["index_path"] = index_path
+            with patch.dict(server.MOJANG_SAMPLE_CORPORA, {self.PREVIEW_VERSION: corpus}):
+                with self.assertRaisesRegex(RuntimeError, "source archive SHA-256"):
+                    server._load_mojang_sample_index(self.PREVIEW_VERSION)
+
     def test_preview_read_without_source_archive_reports_not_bundled(self):
         payload = self._preview_payload()
         entry = next(item for item in payload["entries"] if item.get("category") == "item" and str(item.get("path", "")).endswith(".json"))

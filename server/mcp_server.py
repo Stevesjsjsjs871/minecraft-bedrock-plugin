@@ -644,6 +644,15 @@ def _load_mojang_sample_index(sample_version: str = DEFAULT_MOJANG_SAMPLE_VERSIO
         raise ValueError(f"bundled Mojang sample index for {sample_version} is unavailable or invalid: {exc}") from exc
     if not isinstance(payload, dict) or not isinstance(payload.get("entries"), list):
         raise ValueError(f"bundled Mojang sample index for {sample_version} has an invalid shape")
+    if payload.get("target_version") != sample_version:
+        raise RuntimeError(
+            f"bundled Mojang sample index target_version does not match selected source {sample_version!r}"
+        )
+    expected_archive_sha = MOJANG_SAMPLE_SOURCE_CATALOG.get(sample_version, {}).get("source_asset_sha256")
+    if not isinstance(expected_archive_sha, str) or payload.get("archive_sha256") != expected_archive_sha:
+        raise RuntimeError(
+            f"bundled Mojang sample index source archive SHA-256 does not match pinned source metadata for {sample_version!r}"
+        )
     payload.setdefault("index_mode", "full_index")
     payload.setdefault("sample_version", sample_version)
     payload.setdefault("source_channel", corpus["channel"])

@@ -296,14 +296,18 @@ jobs:
           git diff --check
           git add skills/bedrock-development/references/mojang-samples-1.26.60.30-preview/mojang-samples-index.json.gz
           git add skills/bedrock-development/references/mojang-samples-1.26.60.30-preview/INDEX_METADATA.json
-          changed="$(git diff --cached --name-only)"
-          expected=$'skills/bedrock-development/references/mojang-samples-1.26.60.30-preview/INDEX_METADATA.json\nskills/bedrock-development/references/mojang-samples-1.26.60.30-preview/mojang-samples-index.json.gz'
-          if [[ "$changed" != "$expected" ]]; then
-            echo "Unexpected generated-file set: $changed"
-            exit 1
+          if git diff --cached --quiet; then
+            echo "Verified Preview index and metadata are already current; no data commit required." >> "$GITHUB_STEP_SUMMARY"
+          else
+            changed="$(git diff --cached --name-only)"
+            expected=$'skills/bedrock-development/references/mojang-samples-1.26.60.30-preview/INDEX_METADATA.json\nskills/bedrock-development/references/mojang-samples-1.26.60.30-preview/mojang-samples-index.json.gz'
+            if [[ "$changed" != "$expected" ]]; then
+              echo "Unexpected generated-file set: $changed"
+              exit 1
+            fi
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "data: add verified Mojang samples index 1.26.60.30-preview"
+            git push origin "HEAD:$TARGET_BRANCH"
+            echo "Committed verified Preview index at $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
           fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "data: add verified Mojang samples index 1.26.60.30-preview"
-          git push origin "HEAD:$TARGET_BRANCH"
-          echo "Committed verified Preview index at $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"

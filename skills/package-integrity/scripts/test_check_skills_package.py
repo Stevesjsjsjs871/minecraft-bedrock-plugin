@@ -52,6 +52,8 @@ class SkillsPackageTests(unittest.TestCase):
         (package_scripts / "test_check_skills_package.py").write_text("# tests\n", encoding="utf-8")
         (package_scripts / "build_skills_package.py").write_text("# builder\n", encoding="utf-8")
         (package_scripts / "test_build_skills_package.py").write_text("# tests\n", encoding="utf-8")
+        (package_scripts / "compare_plugin_sources.py").write_text("# parity auditor\n", encoding="utf-8")
+        (package_scripts / "test_compare_plugin_sources.py").write_text("# parity tests\n", encoding="utf-8")
         index_metadata = {
             "source_archive": "bedrock-samples-v1.26.50.4-full.zip",
             "target_version": "1.26.50.4",
@@ -267,6 +269,13 @@ class SkillsPackageTests(unittest.TestCase):
         provenance["payload_total_bytes"] = float(provenance["payload_total_bytes"])
         ok, _ = validate_provenance(provenance, records)
         self.assertFalse(ok)
+
+    def test_missing_source_parity_auditor_fails_required_files(self):
+        path = self.root / "skills/package-integrity/scripts/compare_plugin_sources.py"
+        path.unlink()
+        result = checker.check(self.root)
+        self.assertEqual(self.by_id(result, "required-files")["status"], "FAIL")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

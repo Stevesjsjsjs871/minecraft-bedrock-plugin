@@ -33,6 +33,8 @@ REQUIRED = [
     "skills/package-integrity/scripts/test_check_skills_package.py",
     "skills/package-integrity/scripts/build_skills_package.py",
     "skills/package-integrity/scripts/test_build_skills_package.py",
+    "skills/package-integrity/scripts/compare_plugin_sources.py",
+    "skills/package-integrity/scripts/test_compare_plugin_sources.py",
     "skills/bedrock-development/scripts/restore_mojang_index.py",
     "skills/bedrock-development/scripts/test_restore_mojang_index.py",
     "skills/audit-benchmark/requirements.txt",

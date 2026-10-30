@@ -40,13 +40,13 @@ Build a deterministic candidate outside the source tree, extract it into a fresh
 ```bash
 mkdir -p dist
 source_dir="$(mktemp -d)"
-trap 'rm -rf "$source_dir"' EXIT
+tmp_dir="$(mktemp -d)"
+trap 'rm -rf "$source_dir" "$tmp_dir"' EXIT
 git archive HEAD | tar -x -C "$source_dir"
 python skills/package-integrity/scripts/build_skills_package.py "$source_dir" dist/minecraft-bedrock-engineer.tar.gz --source-commit "$(git rev-parse HEAD)" --source-date-epoch "$(git show -s --format=%ct HEAD)"
-tmp_dir="$(mktemp -d)"
 tar -xzf dist/minecraft-bedrock-engineer.tar.gz -C "$tmp_dir"
 python skills/package-integrity/scripts/check_skills_package.py "$tmp_dir"
-sha256sum -c dist/minecraft-bedrock-engineer.tar.gz.sha256
+(cd dist && sha256sum -c minecraft-bedrock-engineer.tar.gz.sha256)
 ```
 
 The checker requires BUILD_PROVENANCE.json and rejects symlinks, special files, Python bytecode/cache directories, mismatched metadata, changed default prompts and altered payload hashes. A failed check blocks packaging; do not bypass it.

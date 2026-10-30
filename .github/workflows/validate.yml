@@ -61,8 +61,8 @@ jobs:
           import runpy
           from pathlib import Path
 
-          expected = "1.0.14"
-          assert Path("VERSION").read_text(encoding="utf-8").strip() == expected
+          expected = Path("VERSION").read_text(encoding="utf-8").strip()
+          assert expected, "VERSION must not be empty"
           root = json.loads(Path("plugin.json").read_text(encoding="utf-8"))
           compat = json.loads(Path(".codex-plugin/plugin.json").read_text(encoding="utf-8"))
           assert root["name"] == compat["name"] == "minecraft-bedrock-engineer"

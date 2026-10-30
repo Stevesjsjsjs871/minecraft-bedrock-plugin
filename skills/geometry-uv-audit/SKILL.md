@@ -38,3 +38,14 @@ Use `minecraft-bedrock-geometry-uv-auditor` and its read-only `audit_geometry_uv
 ## UV template follow-up
 
 After a clean audit, use the `geometry-uv-template-authoring` skill to create a separate labeled PNG guide for painting. The guide does not rewrite geometry or replace the actual texture.
+
+
+## Standalone geometry analyzer
+
+For a geometry-only static check without an MCP client, run the bundled dependency-free analyzer:
+
+    python skills/geometry-uv-engine/scripts/geometry_engine.py path/to/entity.geo.json --geometry-identifier geometry.example
+
+It checks classic box/per-face cube UV bounds and overlaps. Missing texture canvas dimensions produce WARN and leave bounds unchecked; no default canvas is invented. Bone-level poly_mesh and texture_meshes are reported as unsupported. The MCP auditor remains available for workspace/PNG association checks in distributions that configure it.
+
+Official format reference: https://learn.microsoft.com/en-us/minecraft/creator/reference/content/visualreference/geometry.v1.21.0?view=minecraft-bedrock-stable

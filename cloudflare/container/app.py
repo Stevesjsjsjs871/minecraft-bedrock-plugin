@@ -6,8 +6,14 @@ from pathlib import Path
 
 ROOT=Path(os.environ.get("PLUGIN_ROOT","/app/plugin"))
 sys.path.insert(0,str(ROOT)); sys.path.insert(0,str(ROOT/"server"))
+WORKSPACE=Path(os.environ.get("MINECRAFT_BEDROCK_WORKSPACE","/data/workspace")).expanduser()
+WORKSPACE.mkdir(parents=True,exist_ok=True)
+os.environ.setdefault("MINECRAFT_BEDROCK_WORKSPACE",str(WORKSPACE))
 MODULE_NAMES=["mcp_server","texture_generator_mcp","texture_link_audit_mcp","entity_authoring_mcp","animation_controller_mcp","animation_clip_mcp","animation_pipeline_audit_mcp","animated_entity_bundle_mcp","geometry_uv_audit_mcp","geometry_uv_template_mcp","texture_painting_mcp","reference_texture_transfer_mcp","uv_mapping_assistant_mcp","visual_reference_analyzer_mcp","reference_mapping_review_mcp","uv_texture_retarget_mcp"]
 MODULES=[importlib.import_module(n) for n in MODULE_NAMES]
+for module in MODULES:
+    if not callable(getattr(module,"handle_message",None)):
+        raise RuntimeError("MCP module has no handle_message handler: "+module.__name__)
 ROUTES={}; TOOLS=[]
 for module in MODULES:
     for tool in getattr(module,"TOOLS",[]):

@@ -25,10 +25,9 @@ python skills/package-integrity/scripts/build_skills_package.py "$source_dir" di
 Then extract it into a fresh directory and run the strict checker against the extracted package:
 
 ```bash
-tmp_dir="$(mktemp -d)"
 tar -xzf dist/minecraft-bedrock-engineer.tar.gz -C "$tmp_dir"
 python skills/package-integrity/scripts/check_skills_package.py "$tmp_dir"
-sha256sum -c dist/minecraft-bedrock-engineer.tar.gz.sha256
+(cd dist && sha256sum -c minecraft-bedrock-engineer.tar.gz.sha256)
 ```
 
 Do not publish or install a candidate unless every check passes. A missing BUILD_PROVENANCE.json is a hard failure, not a warning.

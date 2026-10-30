@@ -2,6 +2,11 @@
  * Minecraft Bedrock Engineer — Cloudflare Workers Free gateway.
  * Stateless Streamable HTTP MCP endpoint; no Containers or Durable Objects.
  */
+import { DurableObject } from "cloudflare:workers";
+
+// Retained only to keep the previously provisioned namespace compatible; the free gateway never binds to or instantiates it.
+export class BedrockMcpContainer extends DurableObject {}
+
 interface Env {
   MCP_AUTH_TOKEN: string;
   GITHUB_BRANCH?: string;

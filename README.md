@@ -2,16 +2,17 @@
 
 ## Architecture
 
-Minecraft Bedrock Engineer is a Skills-and-instructions-only plugin. It does not use MCP servers, registries, remote endpoints or a plugin-owned execution backend. Specialist skills define workflows; they do not create tools, grant filesystem access, run code or work in the background. Bundled scripts run only when the active host exposes a real executor and the package files are accessible.
+Minecraft Bedrock Engineer is a Skills-and-instructions-only project. The active architecture is based on specialist skills, bundled reference data and standalone scripts. No MCP server, registry, remote endpoint, Cloudflare worker or plugin-owned execution backend is part of this repository. Skills define workflows; they do not create tools, grant filesystem access, run code or work in the background. Scripts run only when the host provides a real executor and the package files are accessible.
+
+The GitHub source intentionally excludes retired server wrappers and their obsolete tests. The Plugin Creator package remains the distribution artifact; this repository is the maintained Skills-first source mirror.
 
 ## Supported workflows
 
 - Version-aware BP/RP development and safe incremental changes to existing projects.
 - Entities, blocks, items, recipes, Script API guidance, manifests and pack dependencies.
 - RP UI-folder inventory, localization and cross-resource reference tracing.
-- Geometry, models, a standalone classic/per-face UV analyzer and transparent UV template renderer, animation clips/controllers and entity bundle validation.
-- Standalone PNG validation, static Geometry & UV parsing/auditing, transparent UV guide rendering, deterministic texture generation, geometry-aware painting plans and human-reviewed reference-to-UV mapping.
-- `geometry-uv-engine` migration workflow with explicit separation between the currently executable PNG validator and UV algorithms still retained as dormant migration sources.
+- Geometry, models, classic/per-face UV analysis and transparent UV template rendering.
+- Standalone PNG validation, deterministic texture generation, geometry-aware painting plans and human-reviewed reference-to-UV mapping.
 - Archive, package, manifest, resource integrity, baseline and regression audits.
 - Mojang Samples indexing and official Creator documentation research with version/source provenance.
 - Release preparation, evidence reporting and Skills-only package integrity checks.
@@ -28,11 +29,11 @@ Minecraft Bedrock Engineer is a Skills-and-instructions-only plugin. It does not
 
 ## Maintenance and validation
 
-Use `skills/skills-only-maintenance/SKILL.md` for plugin maintenance. Run the Skills-only package checker and its tests from the actual extracted package root:
+Use `skills/skills-only-maintenance/SKILL.md` for plugin maintenance. Run the active Skills-only package checker and its tests from the actual extracted package root:
 
 ```bash
 python skills/package-integrity/scripts/check_skills_package.py .
 python skills/package-integrity/scripts/test_check_skills_package.py -v
 ```
 
-The legacy server source is not an active integration. Geometry/UV source logic is still in migration; do not claim the UV audit/template wrappers are callable. Reusable logic must be migrated to standalone utilities before legacy wrappers are removed. Runtime, multiplayer and Blockbench checks must be reported as `NOT RUN` unless actually performed.
+Run only current standalone utilities and their corresponding tests. Historical changelog entries may mention retired architecture; they are retained as release history, not as active implementation. Runtime, multiplayer and Blockbench checks must be reported as `NOT RUN` unless actually performed.

@@ -38,6 +38,7 @@ python -m unittest discover -s skills/package-integrity/scripts -p 'test_*.py' -
 Build a deterministic candidate outside the source tree, extract it into a fresh directory, and run the strict release gate:
 
 ```bash
+set -euo pipefail
 mkdir -p dist
 source_dir="$(mktemp -d)"
 tmp_dir="$(mktemp -d)"

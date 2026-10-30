@@ -21,13 +21,13 @@ def _array_block(pattern: str, source: str, label: str) -> str:
 
 class CapabilityProfileContractTests(unittest.TestCase):
     def test_remote_tool_catalog_matches_machine_readable_contract(self):
-        block = _array_block(r"const tools\\s*=\\s*\\[(.*?)\\]\\s*as const;", WORKER, "tools")
-        names = re.findall(r'\\{\\s*name:\\s*"([^"]+)"', block)
+        block = _array_block(r"const tools\s*=\s*\[(.*?)\]\s*as const;", WORKER, "tools")
+        names = re.findall(r'\{\s*name:\s*"([^"]+)"', block)
         self.assertEqual(names, PROFILE["remote"]["tool_names"])
         self.assertEqual(len(names), PROFILE["remote"]["tool_count"])
         self.assertEqual(len(names), 4)
         for name in names:
-            self.assertIn(f"`{name}`", README)
+            self.assertIn(chr(96) + name + chr(96), README)
 
     def test_remote_profile_declares_non_filesystem_scope(self):
         remote = PROFILE["remote"]
@@ -39,7 +39,7 @@ class CapabilityProfileContractTests(unittest.TestCase):
         self.assertIn("does not execute the existing Python", README)
 
     def test_worker_module_catalog_matches_local_profile(self):
-        block = _array_block(r"const modules\\s*=\\s*\\[(.*?)\\];", WORKER, "modules")
+        block = _array_block(r"const modules\s*=\s*\[(.*?)\];", WORKER, "modules")
         names = re.findall(r'"([a-z0-9_]+)"', block)
         self.assertEqual(names, PROFILE["local"]["module_names"])
         self.assertEqual(len(names), PROFILE["local"]["server_count"])
@@ -48,6 +48,7 @@ class CapabilityProfileContractTests(unittest.TestCase):
     def test_both_local_configs_register_every_module_safely(self):
         local = PROFILE["local"]
         normalized_configs = []
+        prefix = "$" + "{PLUGIN_ROOT}/"
         for config_name in local["config_files"]:
             config = json.loads((ROOT / config_name).read_text(encoding="utf-8"))
             servers = config.get("mcpServers")
@@ -62,8 +63,8 @@ class CapabilityProfileContractTests(unittest.TestCase):
                 self.assertIsInstance(args, list)
                 self.assertEqual(len(args), 1)
                 script = args[0]
-                self.assertTrue(script.startswith("${PLUGIN_ROOT}/"), (name, script))
-                relative = script[len("${PLUGIN_ROOT}/"):]
+                self.assertTrue(script.startswith(prefix), (name, script))
+                relative = script[len(prefix):]
                 path = Path(relative)
                 self.assertFalse(path.is_absolute())
                 self.assertNotIn("..", path.parts)

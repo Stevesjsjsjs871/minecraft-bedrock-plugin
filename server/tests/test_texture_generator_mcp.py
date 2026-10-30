@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import struct
 import tempfile
 import unittest
@@ -428,6 +429,103 @@ class TextureGeneratorMcpTests(unittest.TestCase):
         result = self._register(texture_path=path)["result"]["structuredContent"]
         self.assertEqual(result["error"]["code"], "UNSAFE_TEXTURE_PATH")
         self.assertFalse((self.project / "resource_packs" / f"{self.project_name}_RP" / "textures" / "terrain_texture.json").exists())
+
+
+    def test_concurrent_registrations_preserve_both_atlas_entries(self):
+        self._generate_real_png()
+        script = """
+import json
+import sys
+sys.path.insert(0, sys.argv[1])
+import texture_generator_mcp as module
+project_name, texture_path, identifier = sys.argv[2:5]
+request = {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/call",
+    "params": {
+        "name": "register_texture_atlas",
+        "arguments": {
+            "project_directory": project_name,
+            "texture_type": "blocks",
+            "texture_identifier": identifier,
+            "texture_path": texture_path,
+        },
+    },
+}
+print(json.dumps(module.handle_message(request), separators=(",", ":")))
+"""
+        env = os.environ.copy()
+        env["MINECRAFT_BEDROCK_WORKSPACE"] = str(self.workspace)
+        processes = [
+            subprocess.Popen(
+                [sys.executable, "-c", script, str(SERVER_DIR), self.project_name, self.output_rel, identifier],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                env=env,
+            )
+            for identifier in ("ruby_ore_a", "ruby_ore_b")
+        ]
+        for process in processes:
+            try:
+                stdout, stderr = process.communicate(timeout=20)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.communicate()
+                self.fail("concurrent atlas registration exceeded the 20-second timeout")
+            self.assertEqual(process.returncode, 0, stderr)
+            response = json.loads(stdout)
+            self.assertFalse(response["result"]["isError"], response)
+            self.assertEqual(response["result"]["structuredContent"]["status"], "registered")
+
+        atlas = self.project / "resource_packs" / f"{self.project_name}_RP" / "textures" / "terrain_texture.json"
+        saved = json.loads(atlas.read_text(encoding="utf-8"))
+        self.assertIn("ruby_ore_a", saved["texture_data"])
+        self.assertIn("ruby_ore_b", saved["texture_data"])
+
+    def test_atlas_lock_times_out_when_held_by_another_process(self):
+        atlas = self.texture_dir.parent / "terrain_texture.json"
+        script = """
+import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+import texture_generator_mcp as module
+try:
+    with module._atlas_update_lock(Path(sys.argv[2]), timeout_seconds=0.15):
+        print("ACQUIRED")
+except module.AtlasToolError as exc:
+    print(exc.code)
+"""
+        env = os.environ.copy()
+        env["MINECRAFT_BEDROCK_WORKSPACE"] = str(self.workspace)
+        with texture_mcp._atlas_update_lock(atlas):
+            completed = subprocess.run(
+                [sys.executable, "-c", script, str(SERVER_DIR), str(atlas)],
+                capture_output=True,
+                text=True,
+                env=env,
+                timeout=10,
+            )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(completed.stdout.strip(), "ATLAS_LOCK_TIMEOUT")
+
+    def test_atomic_update_rejects_replaced_parent_directory(self):
+        atlas_parent = self.texture_dir.parent
+        atlas = atlas_parent / "terrain_texture.json"
+        original_stat = atlas_parent.stat()
+        if not original_stat.st_ino:
+            self.skipTest("filesystem does not expose stable directory identities")
+        expected_identity = (original_stat.st_dev, original_stat.st_ino)
+        moved_parent = atlas_parent.with_name("textures-original")
+        atlas_parent.rename(moved_parent)
+        atlas_parent.mkdir()
+
+        with texture_mcp._atlas_update_lock(atlas):
+            with self.assertRaises(texture_mcp.AtlasToolError) as caught:
+                texture_mcp._atomic_update_json(atlas, b"{}\n", None, expected_identity)
+        self.assertEqual(caught.exception.code, "UNSAFE_ATLAS_PATH")
+        self.assertFalse(atlas.exists())
 
     def test_unknown_tool_and_unknown_method_return_protocol_errors(self):
         unknown_tool = texture_mcp.handle_message({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"something_else","arguments":{}}})

@@ -33,3 +33,36 @@ Harden register_texture_atlas so a PNG with valid chunk CRCs but invalid compres
 - The new validator is static PNG-structure validation, not a full pixel reconstruction: it does not validate every ancillary-chunk semantic or every palette-index value. Minecraft's exact importer behavior still requires an in-game test.
 - Residual file-operation risk: _atomic_update_json compares the existing atlas hash and then calls os.replace. The compare and replace are separate operations, so a non-cooperating external writer can still race in the narrow interval between them; path-based parent checks also are not a complete defense against a hostile directory swap. The next safety task is to harden this update path with a cross-platform, tested concurrency strategy before claiming strict lost-update protection.
 - After that, reconcile the Plugin Creator/GitHub metadata and documentation drift without changing the three prompts, then review and clearly supersede draft PR #1.
+
+
+## 2026-10-30 — Cross-process texture-atlas transaction locking
+
+### Recovered state
+- Plugin Creator current release: 1.0.11 (release ID pluginrel_6ae3d2b1b6888191bf4727998f694e48); its current texture MCP source and tests match GitHub main, not the unmerged PR #2 branch. No Plugin Creator mutation was made.
+- GitHub main: 1.0.11 at 4eb35503095c735d725597bdb2f517f4bf188803. PR #2 is open Draft, unmerged, and based on main; its head before this stage was aba509a35f910e31232927a37db45e08b3f4ffc4. PR #1 remains open Draft and is based on an older divergent history; it is not merged.
+- Latest PR #2 CI run #110 succeeded on Ubuntu 24.04 with Python 3.12. The run contains one python-checks job. There are no open GitHub issues.
+
+### Selected task and acceptance criteria
+Harden the texture-atlas read/merge/write transaction so concurrent instances of this tool do not overwrite each other's updates. Acceptance: acquire a per-atlas cross-process lock on Windows and POSIX; hold it across atlas read, validation, merge and atomic write; return a stable timeout error; detect a replaced parent directory before writing; preserve atomic no-overwrite creation; test concurrent writers, lock contention and parent replacement.
+
+### Changes
+- Add a per-user lock directory in the OS temporary directory, with persistent per-atlas lock files. The files are deliberately not unlinked after release because unlinking can split waiters across different inodes.
+- Use fcntl.flock(LOCK_EX | LOCK_NB) on POSIX and msvcrt.locking(LK_NBLCK) on Windows. Locks are advisory and released by the OS when a process exits. A 10-second timeout returns ATLAS_LOCK_TIMEOUT.
+- Hold the lock over the complete atlas transaction, not just the final replace, so two cooperating tool processes serialize and the second process reads the first process's update.
+- Capture the atlas parent directory identity and recheck it before reading/writing and immediately before atomic link/replace. Keep the existing SHA-256 change check and atomic replacement/no-overwrite behavior.
+- Add subprocess tests for two concurrent registrations, lock timeout under contention, and detection of a replaced parent directory.
+- Add a dedicated Ubuntu/Windows Python 3.12 GitHub Actions workflow for the texture-atlas tests.
+- Update the visual-resource-pipeline skill to document structural PNG validation, cross-process locking and the timeout response.
+
+### Verification
+- Pending CI on the updated branch. Do not claim Windows behavior verified until the Windows job completes.
+- Existing Plugin Creator release 1.0.11, manifests, MCP server definitions and the three original default prompts remain unchanged.
+
+### Residual risks
+- Advisory locks serialize cooperating instances of this tool; unrelated programs that ignore the lock can still race with the final path-based replace.
+- Parent identity rechecks narrow and detect many directory-swap cases but do not provide a kernel-level directory-handle guarantee on both platforms. A hostile same-user process that swaps the directory after the final check remains outside the current guarantee.
+- Persistent zero/one-byte lock files accumulate in a private per-user temporary directory. They are not placed in Resource Packs and do not alter add-on contents.
+- Network-filesystem locking semantics are not verified. Minecraft import/rendering and Creator Tools CLI runtime remain NOT RUN.
+
+### Next step
+- Inspect both OS workflow results and fix any portability failures. After that, reconcile Plugin Creator/GitHub metadata drift without changing the three default prompts.

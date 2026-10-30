@@ -1,0 +1,34 @@
+name: Texture atlas lock portability
+
+on:
+  push:
+    branches:
+      - "hardening/**"
+    paths:
+      - "server/texture_generator_mcp.py"
+      - "server/tests/test_texture_generator_mcp.py"
+      - ".github/workflows/atlas-locking-portability.yml"
+  pull_request:
+    paths:
+      - "server/texture_generator_mcp.py"
+      - "server/tests/test_texture_generator_mcp.py"
+      - ".github/workflows/atlas-locking-portability.yml"
+  workflow_dispatch:
+
+jobs:
+  atlas-locking:
+    name: Atlas locking (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Test texture generator and atlas locking
+        run: python -m unittest discover -s server/tests -p "test_texture_generator_mcp.py" -v

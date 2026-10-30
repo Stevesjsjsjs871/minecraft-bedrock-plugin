@@ -1262,5 +1262,60 @@ class CreateAddonRecipeTests(unittest.TestCase):
         self.assertIn("create_addon_recipe",server.WORKFLOW_INSTRUCTIONS)
 
 
+
+
+class MojangSampleVersionSelectionTests(unittest.TestCase):
+    def test_search_omitted_source_version_preserves_stable_default(self):
+        result = server.call_tool("search_mojang_samples", {
+            "query": "minecraft:apple", "category": "item", "limit": 5
+        })
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(result["sample_version"], "1.26.50.4")
+        self.assertEqual(result["source_channel"], "stable")
+        self.assertEqual(result["target_version"], "1.26.50.4")
+
+    def test_search_accepts_explicit_indexed_stable_version(self):
+        result = server.call_tool("search_mojang_samples", {
+            "query": "minecraft:apple", "category": "item",
+            "sample_version": "1.26.50.4", "limit": 5
+        })
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(result["sample_version"], "1.26.50.4")
+        self.assertTrue(any(row["path"] == "behavior_pack/items/apple.json" for row in result["results"]))
+
+    def test_preview_search_fails_closed_without_cross_version_fallback(self):
+        result = server.call_tool("search_mojang_samples", {
+            "query": "minecraft:apple", "sample_version": "1.26.60.30-preview"
+        })
+        self.assertEqual(result["status"], "error")
+        self.assertEqual(result["error"]["code"], "SAMPLE_VERSION_NOT_INDEXED")
+        details = result["error"]["details"]
+        self.assertEqual(details["requested_version"], "1.26.60.30-preview")
+        self.assertEqual(details["source_channel"], "preview")
+        self.assertEqual(details["indexed_versions"], ["1.26.50.4"])
+        self.assertIn("v1.26.60.30-preview", details["source_release_url"])
+
+    def test_preview_read_fails_closed_without_cross_version_fallback(self):
+        result = server.call_tool("read_mojang_sample", {
+            "sample_path": "behavior_pack/items/apple.json",
+            "sample_version": "1.26.60.30-preview",
+        })
+        self.assertEqual(result["status"], "error")
+        self.assertEqual(result["error"]["code"], "SAMPLE_VERSION_NOT_INDEXED")
+
+    def test_unknown_sample_version_is_rejected_by_closed_tool_schema(self):
+        with self.assertRaisesRegex(ValueError, "sample_version must be one of"):
+            server._validate_arguments("search_mojang_samples", {
+                "query": "minecraft:apple", "sample_version": "1.26.60.5"
+            })
+
+    def test_read_omitted_source_version_preserves_stable_default(self):
+        result = server.call_tool("read_mojang_sample", {
+            "sample_path": "behavior_pack/items/apple.json"
+        })
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(result["sample_version"], "1.26.50.4")
+        self.assertEqual(result["source_channel"], "stable")
+
 if __name__ == "__main__":
     unittest.main()

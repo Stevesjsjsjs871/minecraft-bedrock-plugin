@@ -39,3 +39,16 @@
 - Safety: new branch is stacked on PR #20; no merge, Plugin Creator update, deployment or public release. Existing plugin identity, manifests, MCP boundaries and original three prompts are unchanged. No Spatial GUI.
 
 - Final PR #21 state: Draft/open, stacked on PR #20, CI #41095605082 SUCCESS; no merge or release.
+
+
+## 2026-10-30 — Python 3.12.16 and independent package reproducibility gate
+
+- Baseline: PR #21 remains Draft/open at 40b6bc55fc50bda15508e77d9269e0a7a0ce265c, stacked on PR #20. A current PR validation run still reported CPython 3.12.15 because the workflow selected the floating `3.12` range. PR #22 is also open against the default branch with the same head as PR #21; it is a duplicate/alternate-base review path and was not modified or closed.
+- Source check: Python 3.12.16 was released on 2026-10-25 as a security-only, source-only release. The current `actions/python-versions` manifest includes an Ubuntu 24.04 x64 build for 3.12.16, and `actions/setup-python` supports exact patch pinning. References: https://www.python.org/downloads/release/python-31216/ ; https://raw.githubusercontent.com/actions/python-versions/main/versions-manifest.json ; https://github.com/actions/setup-python/blob/main/docs/advanced-usage.md
+- Changes: pin `actions/setup-python` to `3.12.16`; assert `sys.version_info == (3, 12, 16)` before running the suite; add a second independent `git archive` snapshot and package build using the same commit, source-date epoch, source ref and verified Mojang index; compare both archive bytes and sidecar bytes exactly.
+- Acceptance: CI must install exactly CPython 3.12.16; all existing test suites and extracted-package gate must pass; two independent clean snapshots of the same Git commit must produce byte-identical tar.gz files and SHA-256 sidecars.
+- Files: `.github/workflows/validate.yml`; `DEVELOPMENT_LOG.md`.
+- CI: pending for this branch at log-update time. Previous streaming verifier baseline passed on Python 3.12.15; that result does not establish 3.12.16 compatibility.
+- Local execution: NOT RUN; GitHub-hosted CI is the available execution environment.
+- Risks: the verifier still depends on CPython `tarfile.TarInfo` internal processing hooks; this stage specifically tests those hooks on 3.12.16. Byte-identical builds on the same runner do not prove cross-platform or cross-zlib-version reproducibility. SHA-256 provenance is not a digital signature.
+- Safety: no Plugin Creator mutation, merge, deployment or public release. Plugin ID, manifests, MCP boundary, default prompts and Skills-only architecture are unchanged. No Spatial GUI.

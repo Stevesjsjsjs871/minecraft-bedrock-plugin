@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "minecraft-bedrock-engineer",
-  "version": "1.0.14",
-  "description": "Minecraft Bedrock Engineer — safe BP/RP authoring, Creator Tools coordination, resource auditing, project continuity and reproducible validation.",
+  "version": "1.1.1",
+  "description": "Minecraft Bedrock Engineer — safe BP/RP authoring, custom entity/model generation, Creator Tools coordination, resource auditing, project continuity and reproducible validation.",
   "author": {
     "name": "Plugin owner"
   },
@@ -86,14 +86,23 @@
     "png-generation",
     "texture-link-audit",
     "atlas-integrity",
-    "bp-rp-texture-validation"
+    "bp-rp-texture-validation",
+    "entity-authoring",
+    "entity-generation",
+    "entity-model",
+    "bedrock-geometry-generation",
+    "custom-entity-bundle",
+    "animation-controller-authoring",
+    "animation-state-machine",
+    "molang-transitions",
+    "client-entity-animation-binding"
   ],
   "extensions": {
     "com.openai": {
       "interface": {
         "displayName": "Minecraft Bedrock Engineer",
         "shortDescription": "Create & audit Bedrock add-ons",
-        "longDescription": "Minecraft Bedrock Engineer — safe BP/RP authoring, Creator Tools coordination, resource auditing, project continuity and reproducible validation.",
+        "longDescription": "Minecraft Bedrock Engineer — safe BP/RP authoring, custom entity/model generation, Creator Tools coordination, resource auditing, project continuity and reproducible validation.",
         "developerName": "Private project",
         "category": "Developer tools",
         "capabilities": [

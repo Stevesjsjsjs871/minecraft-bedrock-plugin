@@ -236,6 +236,8 @@ Minecraft Bedrock creation, version-matched example search, and verification too
 
 The analyzer and MCP server use Python's standard library. Schema validation and regression tests require `jsonschema`:
 
+The package-integrity gate also checks shared metadata/interface parity between the root and compatibility manifests, exact default-prompt parity, the latest versioned changelog entry, MCP configuration/registry consistency, and Mojang sample-index provenance.
+
 ```bash
 python -m pip install jsonschema
 python -m py_compile archive_safety.py server/mcp_server.py server/tests/test_mcp_server.py
@@ -243,6 +245,8 @@ python -m unittest discover -s server/tests -v
 python -m py_compile skills/automated-validation/scripts/bedrock_audit.py skills/automated-validation/scripts/validate_report.py skills/regression-evals/scripts/regression_tests.py
 python skills/regression-evals/scripts/regression_tests.py --auditor skills/automated-validation/scripts/bedrock_audit.py
 python -m unittest discover -s skills/audit-benchmark/scripts -p 'test_*.py' -v
+python -m unittest discover -s skills/package-integrity/scripts -p 'test_*.py' -v
+python skills/package-integrity/scripts/check_package_integrity.py .
 ```
 
 ## 0.6.8: task-directed MCP workflow instructions

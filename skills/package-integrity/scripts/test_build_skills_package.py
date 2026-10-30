@@ -69,10 +69,18 @@ class BuildSkillsPackageTests(unittest.TestCase):
         with self.assertRaises(PackageSafetyError):
             build_archive(self.root, archive, "1" * 40, 0)
 
-    def test_rejects_windows_drive_and_traversal_paths(self):
-        self.assertFalse(_safe_path("C:/outside/file.txt"))
-        self.assertFalse(_safe_path("../outside/file.txt"))
-        self.assertFalse(_safe_path("/absolute/file.txt"))
+    def test_rejects_windows_drive_traversal_ads_and_reserved_paths(self):
+        for path in (
+            "C:/outside/file.txt",
+            "../outside/file.txt",
+            "/absolute/file.txt",
+            "assets/C:stream.png",
+            "assets/NUL.txt",
+            "assets/CON",
+            "assets/trailing-dot.",
+            "assets/trailing-space ",
+        ):
+            self.assertFalse(_safe_path(path), path)
 
     def test_detects_sidecar_tampering(self):
         archive = self.base / "out/tamper.tar.gz"

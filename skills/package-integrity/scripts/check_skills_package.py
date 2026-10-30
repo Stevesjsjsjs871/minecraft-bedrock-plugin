@@ -7,6 +7,7 @@ import gzip
 import json
 import os
 import re
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +32,8 @@ REQUIRED = [
     "skills/package-integrity/scripts/test_check_skills_package.py",
     "skills/package-integrity/scripts/build_skills_package.py",
     "skills/package-integrity/scripts/test_build_skills_package.py",
+    "skills/bedrock-development/scripts/restore_mojang_index.py",
+    "skills/bedrock-development/scripts/test_restore_mojang_index.py",
     "skills/audit-benchmark/requirements.txt",
 ]
 LEGACY_MCP_FILES = [".mcp.json", "mcp.json"]
@@ -106,6 +109,9 @@ def check(root: Path) -> dict:
     try:
         records, hygiene_violations = scan_package(root)
         add("package-hygiene", "FAIL" if hygiene_violations else "PASS", "; ".join(hygiene_violations[:20]) if hygiene_violations else f"{len(records)} regular files; no symlinks, bytecode, cache directories or special files")
+        if hygiene_violations:
+            # Do not read package paths after discovering symlinks or special files.
+            return report(root, checks)
     except PackageSafetyError as exc:
         records = []
         add("package-hygiene", "FAIL", str(exc))
@@ -222,19 +228,63 @@ def check(root: Path) -> dict:
     index_path = sample_root / "mojang-samples-index.json.gz"
     try:
         meta = read_json(index_meta)
+        if not isinstance(meta, dict):
+            raise ValueError("INDEX_METADATA.json must be an object")
+        required_meta = {"source_archive", "target_version", "zip_sha256", "entry_count", "indexed_count", "declared_uncompressed_bytes", "category_counts"}
+        missing_meta = sorted(required_meta - meta.keys())
+        if missing_meta:
+            raise ValueError("index metadata is missing: " + ", ".join(missing_meta))
+        if not isinstance(meta["source_archive"], str) or not meta["source_archive"] or Path(meta["source_archive"]).name != meta["source_archive"]:
+            raise ValueError("index metadata source_archive must be a filename")
+        if not isinstance(meta["target_version"], str) or not meta["target_version"]:
+            raise ValueError("index metadata target_version is invalid")
+        if not isinstance(meta["zip_sha256"], str) or not re.fullmatch(r"[0-9a-f]{64}", meta["zip_sha256"]):
+            raise ValueError("index metadata zip_sha256 is invalid")
+        for field in ("entry_count", "indexed_count", "declared_uncompressed_bytes"):
+            if type(meta[field]) is not int or meta[field] < 0:
+                raise ValueError(f"index metadata {field} must be a non-negative integer")
+        expected_categories = meta["category_counts"]
+        if not isinstance(expected_categories, dict) or any(not isinstance(key, str) or type(value) is not int or value < 0 for key, value in expected_categories.items()):
+            raise ValueError("index metadata category_counts is invalid")
         with gzip.open(index_path, "rb") as stream:
             payload = stream.read(64 * 1024 * 1024 + 1)
         if len(payload) > 64 * 1024 * 1024:
             raise ValueError("decompressed Mojang index exceeds 64 MiB safety limit")
         decoded = json.loads(payload.decode("utf-8"), object_pairs_hook=_reject_duplicate_pairs, parse_constant=_reject_constant)
-        count = len(decoded) if isinstance(decoded, list) else len(decoded.get("entries", decoded.get("files", []))) if isinstance(decoded, dict) else 0
-        expected_count = meta.get("indexed_count")
-        ok = bool(payload) and (not expected_count or count == expected_count)
-        if count == 0:
-            ok = False
-            detail = "Compressed sample index is empty; full sample corpus must be retained"
-        else:
-            detail = f"Gzip/JSON valid; indexed entries={count}, metadata expected={expected_count}"
+        if not isinstance(decoded, dict):
+            raise ValueError("Mojang index payload must be an object")
+        stats = decoded.get("archive_stats")
+        entries = decoded.get("entries")
+        if not isinstance(stats, dict) or not isinstance(entries, list):
+            raise ValueError("Mojang index archive_stats/entries are missing or malformed")
+        actual_categories = Counter(item.get("category") for item in entries if isinstance(item, dict) and isinstance(item.get("category"), str))
+        stats_ok = (
+            decoded.get("archive_file_name") == meta["source_archive"]
+            and decoded.get("archive_sha256") == meta["zip_sha256"]
+            and decoded.get("target_version") == meta["target_version"]
+            and all(type(stats.get(field)) is int for field in ("entry_count", "indexed_count", "declared_uncompressed_bytes"))
+            and stats.get("entry_count") == meta["entry_count"]
+            and stats.get("indexed_count") == meta["indexed_count"]
+            and stats.get("declared_uncompressed_bytes") == meta["declared_uncompressed_bytes"]
+            and len(entries) == meta["indexed_count"]
+        )
+        category_ok = dict(sorted(actual_categories.items())) == dict(sorted(expected_categories.items()))
+        expected_index_bytes = meta.get("index_file_bytes")
+        size_ok = expected_index_bytes is None or (type(expected_index_bytes) is int and index_path.stat().st_size == expected_index_bytes)
+        source_asset_ok = True
+        if any(key in meta for key in ("source_release_tag", "source_asset_name", "source_asset_url")):
+            tag, asset, url = meta.get("source_release_tag"), meta.get("source_asset_name"), meta.get("source_asset_url")
+            source_asset_ok = (
+                isinstance(tag, str) and isinstance(asset, str) and asset == meta["source_archive"]
+                and isinstance(url, str)
+                and url == f"https://github.com/Mojang/bedrock-samples/releases/download/{tag}/{asset}"
+            )
+        ok = bool(payload) and stats_ok and category_ok and size_ok and source_asset_ok
+        detail = (
+            f"Official archive hash/name, target version, {len(entries)} indexed entries, "
+            f"{stats.get('entry_count')} ZIP entries, category counts and compressed size "
+            + ("match pinned metadata" if ok else "do not match pinned metadata")
+        )
         add("mojang-index-integrity", "PASS" if ok else "FAIL", detail)
     except Exception as exc:
         add("mojang-index-integrity", "FAIL", f"Sample index verification failed: {type(exc).__name__}: {exc}")

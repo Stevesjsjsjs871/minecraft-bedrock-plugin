@@ -5,9 +5,10 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import check_skills_package as checker
-from package_provenance import make_provenance, scan_package
+from package_provenance import make_provenance, scan_package, validate_provenance
 
 
 class SkillsPackageTests(unittest.TestCase):
@@ -51,9 +52,35 @@ class SkillsPackageTests(unittest.TestCase):
         (package_scripts / "test_check_skills_package.py").write_text("# tests\n", encoding="utf-8")
         (package_scripts / "build_skills_package.py").write_text("# builder\n", encoding="utf-8")
         (package_scripts / "test_build_skills_package.py").write_text("# tests\n", encoding="utf-8")
-        (sample / "INDEX_METADATA.json").write_text(json.dumps({"indexed_count": 2}), encoding="utf-8")
+        index_metadata = {
+            "source_archive": "bedrock-samples-v1.26.50.4-full.zip",
+            "target_version": "1.26.50.4",
+            "zip_sha256": "a" * 64,
+            "entry_count": 2,
+            "indexed_count": 2,
+            "declared_uncompressed_bytes": 123,
+            "category_counts": {"geometry": 1, "item": 1},
+        }
+        (sample / "INDEX_METADATA.json").write_text(json.dumps(index_metadata), encoding="utf-8")
+        index_payload = {
+            "schema_version": 1,
+            "dataset_id": "mojang-bedrock-samples",
+            "target_version": "1.26.50.4",
+            "source": "https://github.com/Mojang/bedrock-samples",
+            "archive_file_name": index_metadata["source_archive"],
+            "archive_sha256": index_metadata["zip_sha256"],
+            "archive_stats": {"entry_count": 2, "indexed_count": 2, "declared_uncompressed_bytes": 123},
+            "entries": [
+                {"path": "resource_pack/models/entity/pig.geo.json", "category": "geometry"},
+                {"path": "behavior_pack/items/apple.json", "category": "item"},
+            ],
+        }
         with gzip.open(sample / "mojang-samples-index.json.gz", "wb") as stream:
-            stream.write(json.dumps({"entries": [{}, {}]}).encode("utf-8"))
+            stream.write(json.dumps(index_payload).encode("utf-8"))
+        restore_scripts = self.root / "skills/bedrock-development/scripts"
+        restore_scripts.mkdir(parents=True, exist_ok=True)
+        (restore_scripts / "restore_mojang_index.py").write_text("# restore helper\n", encoding="utf-8")
+        (restore_scripts / "test_restore_mojang_index.py").write_text("# restore tests\n", encoding="utf-8")
         records, violations = scan_package(self.root)
         self.assertEqual(violations, [])
         provenance = make_provenance(self.root, records, "a" * 40, 0, "refs/heads/test")
@@ -197,3 +224,43 @@ class SkillsPackageTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+    def test_mojang_index_archive_hash_mismatch_fails(self):
+        path = self.root / "skills/bedrock-development/references/mojang-samples-1.26.50.4/mojang-samples-index.json.gz"
+        with gzip.open(path, "rt", encoding="utf-8") as stream:
+            data = json.load(stream)
+        data["archive_sha256"] = "0" * 64
+        with gzip.open(path, "wt", encoding="utf-8") as stream:
+            json.dump(data, stream)
+        self.assertEqual(self.by_id(checker.check(self.root), "mojang-index-integrity")["status"], "FAIL")
+
+    def test_mojang_index_category_mismatch_fails(self):
+        path = self.root / "skills/bedrock-development/references/mojang-samples-1.26.50.4/mojang-samples-index.json.gz"
+        with gzip.open(path, "rt", encoding="utf-8") as stream:
+            data = json.load(stream)
+        data["entries"][0]["category"] = "texture"
+        with gzip.open(path, "wt", encoding="utf-8") as stream:
+            json.dump(data, stream)
+        self.assertEqual(self.by_id(checker.check(self.root), "mojang-index-integrity")["status"], "FAIL")
+
+    def test_package_hygiene_failure_short_circuits_before_manifest_reads(self):
+        (self.root / "stray.pyc").write_bytes(b"generated")
+        with patch.object(checker, "read_json") as read_json:
+            result = checker.check(self.root)
+            read_json.assert_not_called()
+        self.assertEqual(result["status"], "FAIL")
+        self.assertEqual([item["id"] for item in result["checks"]], ["package-hygiene"])
+
+    def test_provenance_payload_count_requires_integer(self):
+        records, _ = scan_package(self.root)
+        provenance = make_provenance(self.root, records, "b" * 40, 0)
+        provenance["payload_file_count"] = float(provenance["payload_file_count"])
+        ok, _ = validate_provenance(provenance, records)
+        self.assertFalse(ok)
+
+    def test_provenance_payload_bytes_requires_integer(self):
+        records, _ = scan_package(self.root)
+        provenance = make_provenance(self.root, records, "c" * 40, 0)
+        provenance["payload_total_bytes"] = float(provenance["payload_total_bytes"])
+        ok, _ = validate_provenance(provenance, records)
+        self.assertFalse(ok)

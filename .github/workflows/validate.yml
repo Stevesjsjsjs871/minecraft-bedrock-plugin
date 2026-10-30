@@ -25,7 +25,7 @@ jobs:
         run: python -m unittest discover -s skills/visual-resource-pipeline/scripts -p 'test_*.py' -v
       - name: Package integrity and provenance tests
         run: python -m unittest discover -s skills/package-integrity/scripts -p 'test_*.py' -v
-      - name: Mojang sample indexer tests
+      - name: Mojang sample indexer and restore tests
         run: python -m unittest discover -s skills/bedrock-development/scripts -p 'test_*.py' -v
       - name: Install audit benchmark schema dependency
         run: python -m pip install --disable-pip-version-check -r skills/audit-benchmark/requirements.txt
@@ -47,3 +47,38 @@ jobs:
           assert not Path("Dockerfile").exists() and not Path("wrangler.toml").exists()
           print("PASS: manifests, prompts, Skills-only architecture and version", expected)
           PY
+
+      - name: Download and verify exact Mojang Bedrock Samples v1.26.50.4 release
+        env:
+          MOJANG_SAMPLES_URL: https://github.com/Mojang/bedrock-samples/releases/download/v1.26.50.4/bedrock-samples-v1.26.50.4-full.zip
+          MOJANG_SAMPLES_SHA256: c0b6151f5f9a0c31ebe3c909dfc82d97f12473ed2c6e039aa7e22d667042026c
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/bedrock-samples-v1.26.50.4-full.zip"
+          curl --fail --location --retry 3 --retry-delay 2 --connect-timeout 30 --max-time 600 "$MOJANG_SAMPLES_URL" -o "$archive"
+          echo "$MOJANG_SAMPLES_SHA256  $archive" | sha256sum --check -
+          python skills/bedrock-development/scripts/restore_mojang_index.py "$archive" \
+            --metadata skills/bedrock-development/references/mojang-samples-1.26.50.4/INDEX_METADATA.json \
+            --indexer skills/bedrock-development/scripts/index_mojang_samples.py \
+            --output "$RUNNER_TEMP/mojang-samples-index.json.gz"
+      - name: Build and verify complete extracted Skills-only candidate
+        run: |
+          set -euo pipefail
+          source_dir="$RUNNER_TEMP/mbe-source"
+          extract_dir="$RUNNER_TEMP/mbe-extracted"
+          version="$(cat VERSION)"
+          candidate="$RUNNER_TEMP/minecraft-bedrock-engineer-$version.tar.gz"
+          rm -rf "$source_dir" "$extract_dir" "$candidate" "$candidate.sha256"
+          mkdir -p "$source_dir" "$extract_dir"
+          git archive "$GITHUB_SHA" | tar -x -C "$source_dir"
+          cp "$RUNNER_TEMP/mojang-samples-index.json.gz" \
+            "$source_dir/skills/bedrock-development/references/mojang-samples-1.26.50.4/mojang-samples-index.json.gz"
+          epoch="$(git show -s --format=%ct "$GITHUB_SHA")"
+          python "$source_dir/skills/package-integrity/scripts/build_skills_package.py" \
+            "$source_dir" "$candidate" \
+            --source-commit "$GITHUB_SHA" \
+            --source-date-epoch "$epoch" \
+            --source-ref "$GITHUB_REF"
+          tar -xzf "$candidate" -C "$extract_dir"
+          python "$extract_dir/skills/package-integrity/scripts/check_skills_package.py" "$extract_dir"
+          (cd "$RUNNER_TEMP" && sha256sum --check "$(basename "$candidate").sha256")

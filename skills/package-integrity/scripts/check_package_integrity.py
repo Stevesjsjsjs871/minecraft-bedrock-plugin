@@ -7,6 +7,7 @@ MCP host, download references, execute pack scripts, or extract archives.
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 import ast
 import gzip
 import hashlib
@@ -253,21 +254,56 @@ def _index_audit(root: Path, checks: list[dict[str, str]], *, deep: bool) -> dic
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         checks.append({"id": "sample-index-metadata", "status": "FAIL", "message": f"Cannot parse sample-index metadata: {exc}"})
         return None
+
     sha = metadata.get("zip_sha256")
     target_version = metadata.get("target_version")
     indexed_count = metadata.get("indexed_count")
     entry_count = metadata.get("entry_count")
-    if not SHA256_RE.fullmatch(sha or "") or not isinstance(target_version, str) or not re.fullmatch(r"\d+\.\d+\.\d+\.\d+", target_version):
+    source_archive = metadata.get("source_archive")
+    expected_index_sha = metadata.get("index_sha256")
+    expected_index_size = metadata.get("index_size_bytes")
+    declared_uncompressed = metadata.get("declared_uncompressed_bytes")
+    expected_categories = metadata.get("category_counts")
+    source_asset_sha = metadata.get("source_asset_sha256")
+
+    if not SHA256_RE.fullmatch(sha or "") or not isinstance(target_version, str) or not re.fullmatch(r"\\d+\\.\\d+\\.\\d+\\.\\d+", target_version):
         checks.append({"id": "sample-index-metadata", "status": "FAIL", "message": "Metadata needs a four-part target_version and a 64-character lowercase ZIP SHA-256"})
         return None
     if not isinstance(indexed_count, int) or not isinstance(entry_count, int) or indexed_count < 1 or entry_count < indexed_count:
         checks.append({"id": "sample-index-metadata", "status": "FAIL", "message": "Metadata entry/index counts are missing or inconsistent"})
         return None
+    if source_archive is not None and (not isinstance(source_archive, str) or not source_archive or "/" in source_archive or "\\" in source_archive):
+        checks.append({"id": "sample-index-metadata", "status": "FAIL", "message": "source_archive must be a basename, not a path"})
+        return None
+    if expected_index_sha is not None and (not isinstance(expected_index_sha, str) or not SHA256_RE.fullmatch(expected_index_sha)):
+        checks.append({"id": "sample-index-metadata", "status": "FAIL", "message": "index_sha256 must be a 64-character lowercase SHA-256"})
+        return None
+    if expected_index_size is not None and (type(expected_index_size) is not int or expected_index_size < 1):
+        checks.append({"id": "sample-index-metadata", "status": "FAIL", "message": "index_size_bytes must be a positive integer"})
+        return None
+    if declared_uncompressed is not None and (type(declared_uncompressed) is not int or declared_uncompressed < 0):
+        checks.append({"id": "sample-index-metadata", "status": "FAIL", "message": "declared_uncompressed_bytes must be a non-negative integer"})
+        return None
+    if expected_categories is not None and (
+        not isinstance(expected_categories, dict)
+        or not expected_categories
+        or any(not isinstance(key, str) or not key or type(value) is not int or value < 0 for key, value in expected_categories.items())
+    ):
+        checks.append({"id": "sample-index-metadata", "status": "FAIL", "message": "category_counts must map non-empty category names to non-negative integers"})
+        return None
+    if source_asset_sha is not None and source_asset_sha != sha:
+        checks.append({"id": "sample-index-metadata", "status": "FAIL", "message": "source_asset_sha256 disagrees with zip_sha256"})
+        return None
+
     checks.append({"id": "sample-index-metadata", "status": "PASS", "message": f"Sample provenance metadata is structurally valid ({target_version}; indexed {indexed_count}/{entry_count} entries)"})
     if not deep:
         checks.append({"id": "sample-index-content", "status": "WARN", "message": "Deep compressed-index validation skipped by option"})
         return {"target_version": target_version, "indexed_count": indexed_count, "entry_count": entry_count, "zip_sha256": sha}
+
     if not index_path.is_file():
+        if expected_index_sha is not None or expected_index_size is not None:
+            checks.append({"id": "sample-index-content", "status": "FAIL", "message": "Metadata pins a full generated index, but the compressed index file is absent"})
+            return None
         curated = [
             p for p in base.rglob("*")
             if p.is_file() and p.suffix.lower() in {".json", ".md", ".html", ".lang"}
@@ -289,6 +325,7 @@ def _index_audit(root: Path, checks: list[dict[str, str]], *, deep: bool) -> dic
             }
         checks.append({"id": "sample-index-content", "status": "FAIL", "message": "Compressed index is absent and no curated fallback files are present"})
         return None
+
     try:
         with gzip.open(index_path, "rt", encoding="utf-8") as stream:
             index = json.load(stream)
@@ -298,6 +335,7 @@ def _index_audit(root: Path, checks: list[dict[str, str]], *, deep: bool) -> dic
     if not isinstance(index, dict):
         checks.append({"id": "sample-index-content", "status": "FAIL", "message": "Compressed sample index root must be a JSON object"})
         return None
+
     actual_entries = index.get("entries")
     stats = index.get("archive_stats")
     actual_count = len(actual_entries) if isinstance(actual_entries, list) else None
@@ -305,6 +343,7 @@ def _index_audit(root: Path, checks: list[dict[str, str]], *, deep: bool) -> dic
     duplicate_paths = []
     seen: set[str] = set()
     malformed_entries = []
+    actual_categories: Counter[str] = Counter()
     if isinstance(actual_entries, list):
         for pos, entry in enumerate(actual_entries):
             if not isinstance(entry, dict):
@@ -320,6 +359,8 @@ def _index_audit(root: Path, checks: list[dict[str, str]], *, deep: bool) -> dic
                 seen.add(path)
             if not isinstance(category, str) or not category:
                 malformed_entries.append(f"{pos}:missing category")
+            else:
+                actual_categories[category] += 1
             size = entry.get("size_bytes")
             if not isinstance(size, int) or size < 0:
                 malformed_entries.append(f"{pos}:invalid size")
@@ -328,7 +369,20 @@ def _index_audit(root: Path, checks: list[dict[str, str]], *, deep: bool) -> dic
                 malformed_entries.append(f"{pos}:invalid sha256")
     else:
         malformed_entries.append("entries is not a list")
-    archive_sha = index.get("archive_sha256") if isinstance(index, dict) else None
+
+    archive_sha = index.get("archive_sha256")
+    if index.get("schema_version") != 1:
+        malformed_entries.append("schema_version must be 1")
+    if index.get("dataset_id") != "mojang-bedrock-samples":
+        malformed_entries.append("dataset_id is not mojang-bedrock-samples")
+    if source_archive is not None and index.get("archive_file_name") != source_archive:
+        malformed_entries.append("archive_file_name disagrees with INDEX_METADATA.json")
+    if index.get("target_version") != target_version:
+        malformed_entries.append("sample index target_version disagrees with INDEX_METADATA.json")
+    policy = index.get("index_policy")
+    if not isinstance(policy, dict) or any(policy.get(flag) is not True for flag in ("no_extraction", "no_execution", "no_network")):
+        malformed_entries.append("index_policy must explicitly disable extraction, execution and network access")
+
     if actual_count != indexed_count:
         malformed_entries.append(f"indexed_count metadata {indexed_count} != index entries {actual_count}")
     if isinstance(stats, dict):
@@ -336,22 +390,43 @@ def _index_audit(root: Path, checks: list[dict[str, str]], *, deep: bool) -> dic
             malformed_entries.append(f"archive_stats.entry_count {stats.get('entry_count')} != metadata {entry_count}")
         if stats.get("indexed_count") != indexed_count:
             malformed_entries.append(f"archive_stats.indexed_count {stats.get('indexed_count')} != metadata {indexed_count}")
+        if declared_uncompressed is not None and stats.get("declared_uncompressed_bytes") != declared_uncompressed:
+            malformed_entries.append("archive_stats.declared_uncompressed_bytes disagrees with INDEX_METADATA.json")
     else:
         malformed_entries.append("archive_stats is not an object")
+
     if archive_sha != sha:
         malformed_entries.append("sample index archive_sha256 disagrees with INDEX_METADATA.json")
-    if index.get("target_version") != target_version:
-        malformed_entries.append("sample index target_version disagrees with INDEX_METADATA.json")
+    if expected_categories is not None and dict(sorted(actual_categories.items())) != dict(sorted(expected_categories.items())):
+        malformed_entries.append("category_counts disagrees with indexed entries")
+
+    actual_index_sha = hashlib.sha256(index_path.read_bytes()).hexdigest()
+    actual_index_size = index_path.stat().st_size
+    if expected_index_sha is not None and actual_index_sha != expected_index_sha:
+        malformed_entries.append("compressed index SHA-256 disagrees with INDEX_METADATA.json")
+    if expected_index_size is not None and actual_index_size != expected_index_size:
+        malformed_entries.append("compressed index size disagrees with INDEX_METADATA.json")
+    expected_index_file = metadata.get("index_file")
+    if expected_index_file is not None and expected_index_file != index_path.name:
+        malformed_entries.append("index_file metadata does not name the bundled gzip file")
+
     if bad_paths or duplicate_paths or malformed_entries:
         details = []
         if bad_paths: details.append(f"unsafe paths sample={bad_paths[:3]}")
         if duplicate_paths: details.append(f"duplicate paths sample={duplicate_paths[:3]}")
-        if malformed_entries: details.append(f"contract errors sample={malformed_entries[:5]}")
+        if malformed_entries: details.append(f"contract errors sample={malformed_entries[:8]}")
         checks.append({"id": "sample-index-content", "status": "FAIL", "message": "; ".join(details)})
     else:
-        checks.append({"id": "sample-index-content", "status": "PASS", "message": f"Compressed index validated: {actual_count} unique canonical entries; provenance hash/version match"})
-    return {"target_version": target_version, "indexed_count": indexed_count, "entry_count": entry_count, "zip_sha256": sha}
-
+        checks.append({"id": "sample-index-content", "status": "PASS", "message": f"Compressed index validated: {actual_count} unique canonical entries; provenance, categories, policy and content digest match"})
+    return {
+        "target_version": target_version,
+        "indexed_count": indexed_count,
+        "entry_count": entry_count,
+        "zip_sha256": sha,
+        "index_mode": "full_index",
+        "index_sha256": actual_index_sha,
+        "index_size_bytes": actual_index_size,
+    }
 
 def audit_package(root: Path, *, deep_index: bool = True, strict_files: bool = True) -> dict[str, Any]:
     root = root.expanduser().resolve()

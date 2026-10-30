@@ -29,8 +29,14 @@
 - Adds nine synthetic positive/negative regression tests for package structure, schema closure, tool dispatch, version drift, unsafe sample paths and conservative README heading repair.
 - Adds release-engineering, validation-runbook, readiness, MCP contract, tool-registry and resource-integrity workflows.
 - Preserves the existing GitHub MCP server implementation, including the optional Minecraft Creator Tools CLI staging workflow. Package-level checks do not replace the full MCP/analyzer suite.
-- This GitHub checkout uses curated Mojang sample fallback when the generated compressed full index is absent; the checker reports that as a warning rather than a full-index pass.
+- The source tree now carries the metadata-only 1.26.50.4 full index, regenerated from Mojang's pinned official full release asset by CI. The original 169 MB ZIP and binary asset bytes are not committed; the checker verifies the compressed index digest and corpus statistics.
 - Minecraft runtime/import/rendering and multiplayer tests remain `NOT RUN` unless actually executed in-game.
+
+## Mojang sample index pipeline
+
+- `skills/bedrock-development/references/mojang-samples-1.26.50.4/mojang-samples-index.json.gz` is a metadata-only index of 22,252 entries from Mojang's official `v1.26.50.4` full release asset.
+- `.github/workflows/build-mojang-samples-index.yml` pins the official asset ID, SHA-256 and size; verifies the full ZIP CRC table and archive statistics; runs the existing no-extraction indexer; checks category counts; records the generated index digest/size; runs the full test suite and package-integrity audit; then commits only the generated index and its metadata.
+- The original full ZIP and binary texture/sound contents are not committed. The index supports offline path/category/identifier search, but reading a non-curated text file still requires the original ZIP in the configured workspace. Minecraft import/rendering remains `NOT RUN`.
 
 
 ## 0.9.3: optional Minecraft Creator Tools integration

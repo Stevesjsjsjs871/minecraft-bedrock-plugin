@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import gzip
+import hashlib
 import importlib.util
 import json
 import tempfile
@@ -85,20 +86,34 @@ class PackageIntegrityTests(unittest.TestCase):
 TOOLS = [
 """ + ",\n".join(entries) + "\n]\n\ndef call_tool(name, args):\n" + "\n".join(handlers) + "\n    return {'status': 'error'}\n"
         (root / "server/mcp_server.py").write_text(server, encoding="utf-8")
-        (root / "skills/bedrock-development/references/mojang-samples-1.26.50.4/INDEX_METADATA.json").write_text(
-            json.dumps({"target_version": "1.26.50.4", "zip_sha256": "a" * 64, "entry_count": 1, "indexed_count": 1}),
-            encoding="utf-8",
-        )
+        sample_root = root / "skills/bedrock-development/references/mojang-samples-1.26.50.4"
+        index_path = sample_root / "mojang-samples-index.json.gz"
+        metadata_path = sample_root / "INDEX_METADATA.json"
         index = {
             "schema_version": 1,
             "dataset_id": "mojang-bedrock-samples",
             "target_version": "1.26.50.4",
+            "archive_file_name": "samples.zip",
             "archive_sha256": "a" * 64,
-            "archive_stats": {"entry_count": 1, "indexed_count": 1},
+            "index_policy": {"no_extraction": True, "no_execution": True, "no_network": True},
+            "archive_stats": {"entry_count": 1, "indexed_count": 1, "declared_uncompressed_bytes": 12},
             "entries": [{"path": "behavior_pack/items/test.json", "category": "item", "size_bytes": 12, "sha256": "b" * 64, "identifiers": [], "json_parsed": True}],
         }
-        with gzip.open(root / "skills/bedrock-development/references/mojang-samples-1.26.50.4/mojang-samples-index.json.gz", "wt", encoding="utf-8") as stream:
+        with gzip.open(index_path, "wt", encoding="utf-8") as stream:
             json.dump(index, stream)
+        metadata = {
+            "source_archive": "samples.zip",
+            "target_version": "1.26.50.4",
+            "zip_sha256": "a" * 64,
+            "entry_count": 1,
+            "indexed_count": 1,
+            "declared_uncompressed_bytes": 12,
+            "category_counts": {"item": 1},
+            "index_file": index_path.name,
+            "index_sha256": hashlib.sha256(index_path.read_bytes()).hexdigest(),
+            "index_size_bytes": index_path.stat().st_size,
+        }
+        metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
 
     def check_by_id(self, report, code):
         return next(check for check in report["checks"] if check["id"] == code)
@@ -208,6 +223,53 @@ TOOLS = [
             index["entries"][0]["path"] = "../outside.json"
             with gzip.open(index_path, "wt", encoding="utf-8") as stream:
                 json.dump(index, stream)
+            metadata_path = root / "skills/bedrock-development/references/mojang-samples-1.26.50.4/INDEX_METADATA.json"
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            metadata["index_sha256"] = hashlib.sha256(index_path.read_bytes()).hexdigest()
+            metadata["index_size_bytes"] = index_path.stat().st_size
+            metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+            report = checker.audit_package(root)
+            self.assertEqual(self.check_by_id(report, "sample-index-content")["status"], "FAIL")
+
+    def test_sample_index_category_counts_mismatch_fails(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "package"
+            self.make_package(root)
+            metadata_path = root / "skills/bedrock-development/references/mojang-samples-1.26.50.4/INDEX_METADATA.json"
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            metadata["category_counts"] = {"block": 1}
+            metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+            report = checker.audit_package(root)
+            self.assertEqual(self.check_by_id(report, "sample-index-content")["status"], "FAIL")
+
+    def test_sample_index_digest_mismatch_fails(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "package"
+            self.make_package(root)
+            metadata_path = root / "skills/bedrock-development/references/mojang-samples-1.26.50.4/INDEX_METADATA.json"
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            metadata["index_sha256"] = "c" * 64
+            metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+            report = checker.audit_package(root)
+            self.assertEqual(self.check_by_id(report, "sample-index-content")["status"], "FAIL")
+
+    def test_missing_pinned_sample_index_fails_instead_of_falling_back(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "package"
+            self.make_package(root)
+            index_path = root / "skills/bedrock-development/references/mojang-samples-1.26.50.4/mojang-samples-index.json.gz"
+            index_path.unlink()
+            report = checker.audit_package(root)
+            self.assertEqual(self.check_by_id(report, "sample-index-content")["status"], "FAIL")
+
+    def test_sample_index_uncompressed_size_mismatch_fails(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "package"
+            self.make_package(root)
+            metadata_path = root / "skills/bedrock-development/references/mojang-samples-1.26.50.4/INDEX_METADATA.json"
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            metadata["declared_uncompressed_bytes"] = 13
+            metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
             report = checker.audit_package(root)
             self.assertEqual(self.check_by_id(report, "sample-index-content")["status"], "FAIL")
 

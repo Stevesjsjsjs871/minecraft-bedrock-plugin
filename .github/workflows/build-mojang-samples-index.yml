@@ -1,0 +1,227 @@
+name: Build pinned Mojang sample index
+
+on:
+  push:
+    branches:
+      - hardening/png-decoder-validation-1-0-11-20261030
+    paths:
+      - .github/workflows/build-mojang-samples-index.yml
+      - skills/bedrock-development/scripts/index_mojang_samples.py
+      - skills/bedrock-development/references/mojang-samples-1.26.50.4/INDEX_METADATA.json
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mojang-samples-index-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-verify:
+    if: github.ref_name == 'hardening/png-decoder-validation-1-0-11-20261030'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12.10"
+
+      - name: Download the pinned official full release asset
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/bedrock-samples-v1.26.50.4-full.zip"
+          curl --proto '=https' --tlsv1.2 --fail --location --retry 3 --retry-delay 2 \
+            --output "$archive" \
+            "https://github.com/Mojang/bedrock-samples/releases/download/v1.26.50.4/bedrock-samples-v1.26.50.4-full.zip"
+          echo "archive=$archive" >> "$GITHUB_OUTPUT"
+        id: download
+
+      - name: Verify official asset size, SHA-256 and complete ZIP CRC table
+        env:
+          ARCHIVE: ${{ steps.download.outputs.archive }}
+        run: |
+          set -euo pipefail
+          test "$(stat -c%s "$ARCHIVE")" = "169385576"
+          echo "c0b6151f5f9a0c31ebe3c909dfc82d97f12473ed2c6e039aa7e22d667042026c  $ARCHIVE" | sha256sum --check -
+          python - <<'PY'
+          import os
+          import zipfile
+          from pathlib import Path
+
+          path = Path(os.environ["ARCHIVE"])
+          with zipfile.ZipFile(path) as archive:
+              infos = archive.infolist()
+              total = sum(info.file_size for info in infos if not info.is_dir())
+              if len(infos) != 22859:
+                  raise SystemExit(f"entry count mismatch: {len(infos)}")
+              if total != 319437100:
+                  raise SystemExit(f"uncompressed byte count mismatch: {total}")
+              bad_member = archive.testzip()
+              if bad_member is not None:
+                  raise SystemExit(f"ZIP CRC failure: {bad_member}")
+          print("PASS: 22,859 ZIP entries; 319,437,100 declared uncompressed bytes; all member CRCs valid")
+          PY
+
+      - name: Generate deterministic metadata-only index
+        env:
+          ARCHIVE: ${{ steps.download.outputs.archive }}
+        run: |
+          python skills/bedrock-development/scripts/index_mojang_samples.py \
+            "$ARCHIVE" \
+            --output skills/bedrock-development/references/mojang-samples-1.26.50.4/mojang-samples-index.json.gz \
+            --target-version 1.26.50.4
+
+      - name: Verify corpus statistics and record generated index digest
+        run: |
+          python - <<'PY'
+          from collections import Counter
+          import gzip
+          import hashlib
+          import json
+          from pathlib import Path
+          import platform
+
+          base = Path("skills/bedrock-development/references/mojang-samples-1.26.50.4")
+          metadata_path = base / "INDEX_METADATA.json"
+          index_path = base / "mojang-samples-index.json.gz"
+          metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+          with gzip.open(index_path, "rt", encoding="utf-8") as stream:
+              index = json.load(stream)
+
+          if metadata["target_version"] != "1.26.50.4":
+              raise SystemExit("metadata target version mismatch")
+          if metadata["zip_sha256"] != "c0b6151f5f9a0c31ebe3c909dfc82d97f12473ed2c6e039aa7e22d667042026c":
+              raise SystemExit("metadata source ZIP digest mismatch")
+          if index.get("archive_sha256") != metadata["zip_sha256"]:
+              raise SystemExit("generated index archive digest mismatch")
+          if index.get("archive_file_name") != "bedrock-samples-v1.26.50.4-full.zip":
+              raise SystemExit("generated index source filename mismatch")
+          if index.get("schema_version") != 1 or index.get("dataset_id") != "mojang-bedrock-samples":
+              raise SystemExit("generated index schema/dataset mismatch")
+          if index.get("target_version") != metadata["target_version"]:
+              raise SystemExit("generated index version mismatch")
+          stats = index.get("archive_stats", {})
+          expected_stats = {
+              "entry_count": metadata["entry_count"],
+              "indexed_count": metadata["indexed_count"],
+              "declared_uncompressed_bytes": metadata["declared_uncompressed_bytes"],
+          }
+          if any(stats.get(key) != value for key, value in expected_stats.items()):
+              raise SystemExit(f"archive statistics mismatch: {stats}")
+          categories = dict(sorted(Counter(entry["category"] for entry in index["entries"]).items()))
+          if categories != dict(sorted(metadata["category_counts"].items())):
+              raise SystemExit("generated category counts disagree with INDEX_METADATA.json")
+          policy = index.get("index_policy", {})
+          if any(policy.get(flag) is not True for flag in ("no_extraction", "no_execution", "no_network")):
+              raise SystemExit("index policy must explicitly disable extraction, execution and network")
+          if len(index["entries"]) != metadata["indexed_count"]:
+              raise SystemExit("generated indexed entry count mismatch")
+
+          metadata["source_archive"] = "bedrock-samples-v1.26.50.4-full.zip"
+          metadata["source_release_tag"] = "v1.26.50.4"
+          metadata["source_release_url"] = "https://github.com/Mojang/bedrock-samples/releases/tag/v1.26.50.4"
+          metadata["source_release_commit"] = "46ba6ea985fb5a92d79a9419198f10dda14c199d"
+          metadata["source_asset_id"] = 567172887
+          metadata["source_asset_size_bytes"] = 169385576
+          metadata["source_asset_sha256"] = metadata["zip_sha256"]
+          metadata["index_file"] = index_path.name
+          metadata["index_sha256"] = hashlib.sha256(index_path.read_bytes()).hexdigest()
+          metadata["index_size_bytes"] = index_path.stat().st_size
+          metadata["index_generator"] = "skills/bedrock-development/scripts/index_mojang_samples.py"
+          metadata["index_generation_python"] = platform.python_version()
+          metadata_path.write_text(json.dumps(metadata, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+          print(json.dumps({
+              "status": "PASS",
+              "entry_count": stats["entry_count"],
+              "indexed_count": stats["indexed_count"],
+              "declared_uncompressed_bytes": stats["declared_uncompressed_bytes"],
+              "category_counts": categories,
+              "index_sha256": metadata["index_sha256"],
+              "index_size_bytes": metadata["index_size_bytes"],
+          }, ensure_ascii=False, indent=2))
+          PY
+
+      - name: Compile project Python sources
+        run: |
+          python -m py_compile archive_safety.py
+          python -m py_compile server/mcp_server.py server/tests/test_mcp_server.py
+          python -m py_compile server/texture_generator_mcp.py server/tests/test_texture_generator_mcp.py
+          python -m py_compile skills/automated-validation/scripts/bedrock_audit.py
+          python -m py_compile skills/automated-validation/scripts/validate_report.py
+          python -m py_compile skills/regression-evals/scripts/regression_tests.py
+          python -m py_compile skills/audit-benchmark/scripts/evaluate_benchmark.py
+          python -m py_compile skills/audit-benchmark/scripts/test_evaluate_benchmark.py
+          python -m py_compile skills/bedrock-development/scripts/index_mojang_samples.py
+          python -m py_compile skills/bedrock-development/scripts/test_index_mojang_samples.py
+          python -m py_compile skills/package-integrity/scripts/check_package_integrity.py
+          python -m py_compile skills/package-integrity/scripts/test_check_package_integrity.py
+          python -m py_compile skills/visual-resource-pipeline/scripts/generate_texture.py skills/visual-resource-pipeline/scripts/test_generate_texture.py
+
+      - name: Install report-schema validator
+        run: python -m pip install jsonschema
+
+      - name: Run complete unit-test suites
+        run: |
+          python -m unittest discover -s server/tests -v
+          python -m unittest discover -s skills/audit-benchmark/scripts -p 'test_*.py' -v
+          python -m unittest discover -s skills/bedrock-development/scripts -p 'test_*.py' -v
+          python -m unittest discover -s skills/visual-resource-pipeline/scripts -p 'test_*.py' -v
+          python -m unittest discover -s skills/package-integrity/scripts -p 'test_*.py' -v
+
+      - name: Run deep package-integrity audit
+        run: python skills/package-integrity/scripts/check_package_integrity.py .
+
+      - name: Run analyzer regression cases and report-schema checks
+        run: python skills/regression-evals/scripts/regression_tests.py --auditor skills/automated-validation/scripts/bedrock_audit.py
+
+      - name: Verify identity, version, prompts and MCP registration
+        run: |
+          python - <<'PY'
+          import json
+          import runpy
+          from pathlib import Path
+
+          expected = "1.0.11"
+          assert Path("VERSION").read_text(encoding="utf-8").strip() == expected
+          root = json.loads(Path("plugin.json").read_text(encoding="utf-8"))
+          compat = json.loads(Path(".codex-plugin/plugin.json").read_text(encoding="utf-8"))
+          assert root["name"] == compat["name"] == "minecraft-bedrock-engineer"
+          assert root["version"] == compat["version"] == expected
+          assert root["extensions"]["com.openai"]["interface"]["defaultPrompt"] == compat["interface"]["defaultPrompt"]
+          assert len(root["extensions"]["com.openai"]["interface"]["defaultPrompt"]) == 3
+          server = runpy.run_path("server/mcp_server.py")
+          texture_server = runpy.run_path("server/texture_generator_mcp.py")
+          assert server["SERVER_VERSION"] == expected
+          assert texture_server["SERVER_VERSION"] == expected
+          texture_tools = {tool["name"]: tool for tool in texture_server["TOOLS"]}
+          assert {"generate_texture", "register_texture_atlas"} <= set(texture_tools)
+          for config_path in (".mcp.json", "mcp.json"):
+              config = json.loads(Path(config_path).read_text(encoding="utf-8"))
+              assert config.get("mcpServers", {}).get("minecraft-bedrock-texture-generator")
+          print("PASS: package identity/version, three default prompts, MCP servers and texture tools")
+          PY
+
+      - name: Commit verified index and metadata to the PR branch
+        env:
+          TARGET_BRANCH: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$TARGET_BRANCH" = "hardening/png-decoder-validation-1-0-11-20261030"
+          git diff --check
+          git add skills/bedrock-development/references/mojang-samples-1.26.50.4/mojang-samples-index.json.gz
+          git add skills/bedrock-development/references/mojang-samples-1.26.50.4/INDEX_METADATA.json
+          if git diff --cached --quiet; then
+            echo "No generated-index changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "data: add verified Mojang samples index 1.26.50.4"
+          git push origin "HEAD:$TARGET_BRANCH"
+          echo "Committed generated index at $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"

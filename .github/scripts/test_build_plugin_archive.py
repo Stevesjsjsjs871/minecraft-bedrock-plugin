@@ -161,7 +161,7 @@ class BuildPluginArchiveTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp); repo = make_repo(root)
             config = json.loads((repo / "mcp.json").read_text())
-            config["mcpServers"]["minecraft-bedrock-engineer"]["cwd"] = "\${PLUGIN_ROOT}"
+            config["mcpServers"]["minecraft-bedrock-engineer"]["cwd"] = "$" + "{PLUGIN_ROOT}"
             write(repo, "mcp.json", json.dumps(config))
             git(repo, "add", "mcp.json"); git(repo, "commit", "-qm", "MCP cwd mismatch")
             self.run_builder(repo, root / "out.tar.gz", 1)

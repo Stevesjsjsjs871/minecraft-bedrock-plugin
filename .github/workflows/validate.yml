@@ -23,7 +23,7 @@ jobs:
         run: python -m unittest discover -s skills/geometry-uv-engine/scripts -p 'test_*.py' -v
       - name: PNG engine and texture generator tests
         run: python -m unittest discover -s skills/visual-resource-pipeline/scripts -p 'test_*.py' -v
-      - name: Package integrity checker tests
+      - name: Package integrity and provenance tests
         run: python -m unittest discover -s skills/package-integrity/scripts -p 'test_*.py' -v
       - name: Mojang sample indexer tests
         run: python -m unittest discover -s skills/bedrock-development/scripts -p 'test_*.py' -v

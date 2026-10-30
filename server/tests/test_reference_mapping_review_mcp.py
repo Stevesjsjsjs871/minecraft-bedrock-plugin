@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 # The current release supplies the full PNG validator. This overlay-only test
 # harness injects a bounded structural shim before importing the texture stack.
-validation = sys.modules.get("png_validation") or types.ModuleType("png_validation")
+validation = types.ModuleType("png_validation")
 if not hasattr(validation, "PngValidationError"):
     class PngValidationError(ValueError):
         pass
@@ -49,16 +49,15 @@ if not hasattr(validation, "validate_png_bytes"):
             raise validation.PngValidationError("PNG IDAT missing")
         return width, height
     validation.validate_png_bytes = validate_png_bytes
-sys.modules["png_validation"] = validation
-
 HERE = Path(__file__).resolve()
 SERVER = HERE.parents[1]
 sys.path.insert(0, str(SERVER))
 
-import texture_painting_mcp as painter
-import visual_reference_analyzer_mcp as analyzer
-import reference_mapping_review_mcp as review
-import geometry_uv_template_mcp as uv
+with patch.dict(sys.modules, {"png_validation": validation}):
+    import texture_painting_mcp as painter
+    import visual_reference_analyzer_mcp as analyzer
+    import reference_mapping_review_mcp as review
+    import geometry_uv_template_mcp as uv
 
 
 class ReferenceMappingReviewTests(unittest.TestCase):

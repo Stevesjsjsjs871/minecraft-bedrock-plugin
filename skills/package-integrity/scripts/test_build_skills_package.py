@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 from build_skills_package import build_archive
-from package_provenance import PackageSafetyError, verify_archive
+from package_provenance import PackageSafetyError, _safe_path, verify_archive
 
 
 class BuildSkillsPackageTests(unittest.TestCase):
@@ -68,6 +68,11 @@ class BuildSkillsPackageTests(unittest.TestCase):
         build_archive(self.root, archive, "1" * 40, 0)
         with self.assertRaises(PackageSafetyError):
             build_archive(self.root, archive, "1" * 40, 0)
+
+    def test_rejects_windows_drive_and_traversal_paths(self):
+        self.assertFalse(_safe_path("C:/outside/file.txt"))
+        self.assertFalse(_safe_path("../outside/file.txt"))
+        self.assertFalse(_safe_path("/absolute/file.txt"))
 
     def test_detects_sidecar_tampering(self):
         archive = self.base / "out/tamper.tar.gz"

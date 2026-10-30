@@ -1,23 +1,24 @@
 ---
 name: entity-authoring
-description: Use to design and author a Minecraft Bedrock entity bundle across BP and RP files, including geometry, textures, client entity, render controllers and behavior references.
+description: Design and manually author the coordinated BP entity and RP client-entity resources for a Minecraft Bedrock entity.
 ---
 
-# Entity authoring workflow
+# Entity Authoring
 
-This skill describes a file-authoring procedure; it does not provide a `create_addon_entity` tool. Follow `skills-first-execution` and use a real file/code route. Otherwise return complete files and mark them `NOT APPLIED`.
+## Capability boundary
 
-## Discovery
-Inspect target version, pack manifests, namespace conventions, existing entities and identifier collisions. Search exact-version Mojang Samples and official Creator docs. Establish the required gameplay behavior and visual design before generating resources.
+This Skill provides a file-authoring procedure, not an automatic entity generator. Use an actual authorized file/workspace capability. Otherwise provide complete JSON files and mark them NOT APPLIED.
 
-## Behavior Pack
-Create only the required entity definition and supporting spawn rules, loot tables, component groups, events or scripts. Validate identifier, format version, components, properties, events, spawn conditions and references against the target version. Avoid copying unrelated vanilla behavior.
+## Workflow
 
-## Resource Pack
-Create the client entity with exact entity identifier, geometry/material/texture aliases and render-controller bindings. Add geometry with a unique identifier, valid bones/parents/pivots/cubes and UVs. Add texture only when supplied or explicitly generated; verify canvas dimensions and alpha. Add animation clips/controllers only when requested and ensure aliases/states/transitions and animated bone names resolve.
+1. Confirm the exact target Bedrock version, BP/RP roots and linked manifest UUIDs.
+2. Inspect existing namespaces, identifiers, entity files, client-entity definitions, geometry, textures, render controllers, animations, spawn rules and loot resources.
+3. Define the namespaced entity identifier once and use it consistently in BP and RP resources.
+4. Add only the behavior components required by the request. Verify each component and version-sensitive property against official documentation and matching Mojang Samples.
+5. Define the client entity's geometry, texture, material, render-controller and animation references only when the corresponding files exist.
+6. Preserve existing resources and aliases. Do not silently replace a vanilla or project identifier.
+7. Parse changed JSON and run the standalone entity-pipeline audit when its script and project roots are accessible.
 
-## Bundle integrity
-Check BP entity ↔ RP client entity identifier match, geometry identifier ↔ client alias, texture path ↔ file, render controller ↔ client binding, animation alias ↔ clip/controller, and any spawn/loot/script references. Check manifest UUID uniqueness and BP dependency UUID equals RP header UUID.
+## Limits
 
-## Safety and tests
-Preserve existing resources and use new distinct file paths. Do not overwrite existing definitions or silently replace vanilla entities. Validate JSON and references, then compare the file tree with baseline. In-game spawn, rendering, AI, animation playback, multiplayer and performance checks are `NOT RUN` until tested in the target game build.
+The static audit checks selected literal resource links; it is not a full Bedrock schema validator and does not evaluate Molang or spawn behavior. Minecraft import, spawn, rendering and gameplay remain NOT RUN until tested.

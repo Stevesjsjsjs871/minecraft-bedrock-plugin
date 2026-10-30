@@ -1,5 +1,12 @@
 # Plugin package changelog
 
+## Unreleased — Skills capability-boundary correction
+- Adds a canonical capability matrix distinguishing standalone local scripts from instruction-only authoring workflows and optional external applications.
+- Rewrites animation, entity-bundle, reference-mapping, texture-transfer, texture-painting and add-on authoring Skills so they no longer claim unavailable writer, analyzer or server operations.
+- Corrects the visual-resource workflow to use the existing standalone UV guide renderer and its focused tests.
+- Extends the package checker to reject retired server-tool identifiers in any Skill and to detect stale UV-renderer instructions.
+- No plugin version bump or release candidate is assigned by this source-only maintenance change.
+
 ## 1.5.11 — Standalone UV template renderer
 - Adds `uv_template_engine.py`, a separate transparent PNG UV guide generator for classic box and supported per-face cube UV.
 - Adds pixel-scale and total-pixel budget controls, labeled bone/cube/face regions, output SHA-256 and exclusive no-overwrite file creation.

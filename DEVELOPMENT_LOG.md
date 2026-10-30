@@ -86,3 +86,27 @@
 - The PR merge-ref candidate contained 134 payload files / 1,994,338 bytes. Two independent clean snapshots produced byte-identical tar.gz files and sidecars; archive SHA-256 `c824d81a277660b4633236fe0f05f1e76620e85c92f35ee36c5ba405c8cedb57`.
 - CI warnings remain for Node.js 20-targeting actions/checkout@v4 and actions/setup-python@v5, plus Node's deprecated `punycode` module. They did not fail the run.
 - PR #24 remains Draft/open and is not merged. PR #20, #21 and #23 remain the dependency chain; PR #22 remains an alternate-base duplicate and must not be independently merged. No Plugin Creator update or public release.
+
+
+## 2026-10-30 — Skills capability-boundary correction
+
+- Baseline Plugin Creator: published 1.6.1, Release ID pluginrel_6ae508aa6218819182db8e97b190d771, created 2026-10-30 21:14:18 UTC. Previous published release: 1.6.0, Release ID pluginrel_6ae506408aa88191bc2bfb6749711f53. No candidate was assigned.
+- GitHub source baseline: PR #24 head 97dad600d999ade795eaffd2db456ef4389826a7, based on the 1.5.11 Skills-first source line. The GitHub default branch still points to the historical feat/cloudflare-workers-mcp branch; do not treat it as the Plugin Creator 1.6.1 source.
+- Plugin Creator inventory contains 51 SKILL.md files. Inspection found references to 20 tool names registered only by retained legacy server modules, plus additional legacy animation/reference helpers, and Skills that claimed unavailable safe writers or one-call generators. The 1.6.1 visual-resource workflow also described the existing UV template renderer as not yet standalone.
+- Changes in this source branch: add a canonical capability matrix; rewrite the affected Skills as instruction-only/manual workflows where no standalone implementation exists; document the actual geometry, UV-renderer, PNG, procedural-texture, entity-audit, sample-index and package-check scripts; strengthen the package checker against retired tool identifiers and stale renderer claims.
+- Version status: published remains 1.6.1. The next possible candidate is 1.6.2, but no bump is made until a complete, tested candidate is ready. VERSION_HISTORY and VERSIONING in the Plugin Creator package are NOT UPDATED in this source-only PR.
+- Plugin Creator archive bytes could not be materialized in this run. Binary Mojang-index gzip integrity and exact full source parity therefore remain NOT VERIFIED. The current source-side PR is not represented as a 1.6.1 package sync.
+- Tests: local execution NOT RUN. GitHub CI is expected to validate the new checker regressions after the Draft PR is opened; no PASS is claimed before that run.
+- Safety: no Plugin Creator update, no release, no merge, no deployment, no deletion of legacy server files, no MCP restoration and no Spatial GUI.
+- Next: review CI for this capability-contract PR, then establish a reproducible full source snapshot of the live Plugin Creator 1.6.1 package before reconciling version history or allocating a candidate.
+
+
+### CI follow-up — PR #26
+
+- GitHub Actions run #41140817989 succeeded on PR #26's merge ref 43c08feeeeb95c7cb9d18af6ac68b37926138519; source head at run time was 102d4689e1697288965582d3397d4db08779b9b6.
+- Exact Python runtime assertion and compileall passed. Focused suites: geometry/UV 18/18; PNG/texture 22/22; package integrity/provenance 70/70; Mojang indexer/restore 14/14; audit benchmark 12/12. Total: 136/136 tests.
+- Release metadata and Skills-only boundary check passed. The official Mojang Bedrock Samples v1.26.50.4 archive verification step passed.
+- Extracted Skills-only package gate: 23/23 PASS, 0 WARN, 0 FAIL.
+- Two independent clean snapshots produced byte-identical tar.gz archives and SHA-256 sidecars. The CI-built 1.5.11 source snapshot contains 135 payload files / 1,986,907 bytes; payload SHA-256 f77e333126f6fdeec5ba0a94a49ae56a2f4b7cbee4b4ff5583ad5dce84a8ec15; archive SHA-256 f225efb3ae102ab006860970fa5714b04dcbd3111ac9949322cfec1fe1d79c68.
+- This validates the PR's 1.5.11 GitHub source line only. It does not establish parity with Plugin Creator 1.6.1 and is not a published release or assigned 1.6.2 candidate. Minecraft, Blockbench and in-game rendering remain NOT RUN.
+- PR #26 remains Draft/open and unmerged. No Plugin Creator mutation, release, deployment or merge was performed.

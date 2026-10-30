@@ -82,3 +82,8 @@ The comparator hashes every regular file, reports identical/changed/missing/extr
 Exit codes: 0 = exact file and metadata parity; 1 = safe but different snapshots; 2 = unsafe input or invalid metadata. A difference is evidence to review, not permission to overwrite or delete files.
 
 The comparator accepts directories only; it does not extract or mutate archives. Safely prepare both roots before running it. Plugin Creator's backend plugin ID is not embedded in the package files and must be checked separately against Plugin Creator metadata. A parity PASS does not prove Minecraft runtime or Blockbench behavior.
+
+
+## Skills capability-boundary gate
+
+Read skills/skills-first-execution/references/capability-matrix.md as the canonical list of bundled standalone utilities and instruction-only workflows. The package checker rejects retired server-tool identifiers anywhere in SKILL.md files and checks that the visual-resource workflow references the current standalone UV guide renderer. A passing package check does not prove that the host can execute those scripts.

@@ -1,6 +1,6 @@
 """HTTP MCP adapter dispatching to the original Bedrock Python MCP handlers."""
 from __future__ import annotations
-import importlib, json, os, sys
+import importlib, json, os, sys, hmac
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 ROOT=Path(os.environ.get("PLUGIN_ROOT","/app/plugin"))
@@ -37,6 +37,10 @@ class Handler(BaseHTTPRequestHandler):
   self.send_json(405,{"error":"POST required"})
  def do_POST(self):
   try:
+   expected=os.environ.get("MCP_BACKEND_TOKEN","")
+   supplied=self.headers.get("Authorization","")
+   if not expected or not hmac.compare_digest(supplied, "Bearer "+expected):
+    return self.send_json(401,{"error":"unauthorized"})
    n=int(self.headers.get("Content-Length","0"))
    if n<1 or n>8*1024*1024:return self.send_json(413,{"error":"request_size_out_of_bounds"})
    msg=json.loads(self.rfile.read(n)); result=dispatch(msg)

@@ -28,7 +28,9 @@ from archive_safety import (  # noqa: E402
 )
 
 VERSION_FILE = ROOT / "VERSION"
-SERVER_VERSION = VERSION_FILE.read_text(encoding="utf-8").strip()\nMCP_SERVER_NAME = "minecraft-bedrock-engineer"\nMCP_TRANSPORTS = ("stdio", "http-gateway")
+SERVER_VERSION = VERSION_FILE.read_text(encoding="utf-8").strip()
+MCP_SERVER_NAME = "minecraft-bedrock-engineer"
+MCP_TRANSPORTS = ("stdio", "http-gateway")
 MAX_MEMBERS_RETURNED = 2000
 SUPPORTED_SUFFIXES = {".mcaddon", ".mcpack", ".mcworld", ".zip"}
 AUDITOR = ROOT / "skills" / "automated-validation" / "scripts" / "bedrock_audit.py"

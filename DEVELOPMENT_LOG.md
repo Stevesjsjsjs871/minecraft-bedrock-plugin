@@ -23,3 +23,5 @@
 - Candidate archive SHA-256 6e262b797153715362dccb567542de1be1994725066b0f00e07d7f398e37d9e2; 132 payload files / 1,946,359 bytes; extracted package checker 22/22 PASS, 0 WARN, 0 FAIL; sidecar PASS.
 - Plugin Creator 1.5.12 remains unchanged and differs from GitHub source 1.5.11. Its stored index (1,128,413 bytes) was not directly materialized; generated index is independently pinned and semantically checked, not claimed byte-identical.
 - No artifact upload, PR merge, Plugin Creator update or public release. Minecraft/Blockbench runtime NOT RUN.
+
+- Local README and package-integrity skill recipes now keep the downloaded ZIP/generated index in a temporary input directory and extract the candidate into a separate clean directory; this prevents source inputs from being mistaken for package payload. Commands disable Python bytecode generation while building/checking.

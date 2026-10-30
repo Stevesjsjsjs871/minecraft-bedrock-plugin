@@ -1,41 +1,56 @@
-# Minecraft Bedrock Engineer — Cloudflare Workers Free MCP Gateway
+# Minecraft Bedrock Engineer — unified remote MCP
 
-## Architecture
+## Current architecture
 
-The remote endpoint is a stateless Cloudflare Worker. It does **not** use Cloudflare Containers, Durable Objects, paid storage, a Docker runtime, or a paid external API.
+The Cloudflare Worker is now an authenticated **HTTP proxy**, not a second implementation of a reduced toolset:
 
-- MCP HTTP endpoint: `POST /mcp`
-- Health endpoint: `GET /health`
-- Authentication: `Authorization: Bearer <MCP_AUTH_TOKEN>`
-- Source reference reads: public GitHub repository, restricted to `server/` and `skills/` paths.
-- Local MCP: the existing Python STDIO servers remain unchanged and retain the full local toolset.
+- ChatGPT MCP endpoint: `POST /mcp` on the Worker.
+- Worker validates the public `MCP_AUTH_TOKEN`.
+- Worker forwards the unchanged JSON-RPC request to the Python MCP backend.
+- Python backend validates a separate `MCP_BACKEND_TOKEN`.
+- Python backend imports all 16 original MCP modules and builds `tools/list` directly from their `TOOLS` declarations. Tool calls dispatch to the original module handlers.
+- Health endpoint: `GET /health` on both services.
 
-## Free remote toolset (current phase)
+This avoids maintaining a hand-written, incomplete TypeScript copy of the tool registry. Existing local STDIO configuration remains unchanged.
 
-- `bedrock_generate_manifest` — generate a BP/RP manifest with fresh UUIDs.
-- `bedrock_validate_manifest` — static manifest structure/UUID/version checks.
-- `bedrock_read_plugin_source` — read bounded source/reference files from this repository.
-- `bedrock_plugin_capabilities` — report the preserved local modules and remote limitations.
+## Required deployment topology
 
-The remote Worker does not execute the existing Python filesystem, archive, MCT CLI, texture, geometry, or animation audit handlers. Those remain available through the local Python MCP runtime. The remote gateway is being expanded in small TypeScript-native steps rather than pretending Python containers run on the Free plan.
+The Python backend must run as a persistent HTTPS container service. The repository root `Dockerfile` builds it and starts `cloudflare/container/app.py`.
 
-## Deploy
+The Cloudflare Worker Free plan does not execute this Python container. Deploy the container to a Python/Docker-capable host first, then configure the Worker to proxy to it. The backend URL must be a public HTTPS base URL, for example `https://your-service.example`; the Worker appends `/mcp`.
 
-Cloudflare Workers Free is sufficient for this gateway's current feature set.
+Do not expose the backend without `MCP_BACKEND_TOKEN`. The backend refuses to start if this token is missing and requires it for every POST to `/mcp`. Its `/health` endpoint is intentionally public and read-only.
 
-1. In Workers & Pages, keep the GitHub-connected project and production branch `feat/cloudflare-workers-mcp`.
-2. In Workers Builds → Settings → Variables and secrets, add a **Secret** named `MCP_AUTH_TOKEN` with a long random value (at least 32 characters). Workers Builds secrets are build-time only and are not automatically available to the running Worker.
-3. Set the Workers Builds **Deploy command** to `node cloudflare/deploy-with-secrets.mjs`. This helper creates a temporary secrets file outside the repository, invokes `wrangler deploy --secrets-file`, and removes the temporary file.
-4. Trigger a new deployment from the latest commit.
+## Secrets
 
-Do not commit or share the secret in chat. The deploy helper fails before deployment if `MCP_AUTH_TOKEN` is absent or shorter than 32 characters.
+Configure these as **Workers Builds secrets** (the deploy helper transfers them to Worker runtime secrets without printing values):
 
-Endpoint after deployment: `https://<worker-subdomain>.workers.dev/mcp`
+- `MCP_AUTH_TOKEN`: public ChatGPT-to-Worker bearer token, at least 32 characters.
+- `MCP_BACKEND_URL`: HTTPS base URL of the Python container.
+- `MCP_BACKEND_TOKEN`: independent Worker-to-backend bearer token, at least 32 characters.
 
-Health check: `GET https://<worker-subdomain>.workers.dev/health`
+Configure `MCP_BACKEND_TOKEN` as an environment secret on the Python container as well. Generate independent random values for the two tokens. Never commit them or paste them into chat.
 
-MCP requests use JSON-RPC over HTTP POST with the Bearer token. This implementation is stateless and does not require session storage.
+The deploy helper aborts if any required value is missing. It writes a temporary secrets file outside the repository, deploys with Wrangler, and removes the file.
 
-## Legacy files
+## Verification sequence
 
-`Dockerfile` and `cloudflare/container/app.py` are retained for reference only; the Free Worker deployment does not build or invoke them.
+1. Check backend `GET /health`; it should report the module and tool counts.
+2. Check Worker `GET /health`; `backend_configured` must be `true`.
+3. Send MCP `initialize` to Worker `POST /mcp`.
+4. Send `tools/list`; verify the returned tool names match the union of the 16 Python modules.
+5. Call representative read-only, generation and audit tools. Only then test write-capable tools inside a disposable project.
+6. Confirm the ChatGPT custom MCP connection and invoke it in a chat using `@`.
+
+## Security and limits
+
+- Worker and backend use separate bearer credentials.
+- The backend requires authentication for all MCP POST requests; only the read-only health check is public.
+- The backend enforces an 8 MiB request-body limit.
+- The Worker enforces a 1 MiB request-body limit in its current configuration. Large ZIP/image requests may therefore need a later, deliberate limit increase after evaluating Worker platform limits.
+- Worker-to-backend requests time out after 30 seconds. Long-running tools may require asynchronous job handling in a future iteration.
+- Static audits are not Minecraft runtime verification. Do not claim in-game validation unless performed in the target game.
+
+## Status
+
+The unified proxy and authenticated Python adapter are implemented on the development branch. They are **not deployed or live-verified yet**. A Docker-capable backend host and its secrets are still required. The Cloudflare Free Worker alone cannot run the Python modules.

@@ -5,11 +5,12 @@ import json
 import struct
 import tempfile
 import unittest
+import zlib
 from pathlib import Path
 
 from uv_template_engine import (
-    MAX_OUTPUT_PIXELS, TemplateError, encode_png, extract_regions,
-    render_template, validate_png_bytes, write_new_png,
+    MAX_OUTPUT_PIXELS, TemplateError, _chunk, _clip_line, encode_png,
+    extract_regions, render_template, validate_png_bytes, write_new_png,
 )
 
 
@@ -205,6 +206,41 @@ class UVTemplateTests(unittest.TestCase):
             with self.assertRaisesRegex(TemplateError, "must already exist"):
                 _safe_output_path(output)
             self.assertFalse(output.parent.exists())
+
+    def test_png_validator_hard_cap_cannot_be_raised(self):
+        report, regions = extract_regions(geometry([0, 0]))
+        png, _ = render_template(report, regions, pixel_scale=1)
+        with self.assertRaisesRegex(TemplateError, "max_pixels must be between"):
+            validate_png_bytes(png, max_pixels=MAX_OUTPUT_PIXELS + 1)
+
+    def test_png_validator_rejects_decompression_overrun(self):
+        ihdr = struct.pack(">IIBBBBB", 1, 1, 8, 6, 0, 0, 0)
+        payload = (
+            b"\x89PNG\r\n\x1a\n"
+            + _chunk(b"IHDR", ihdr)
+            + _chunk(b"IDAT", zlib.compress(b"\x00" + b"\x00" * 1024))
+            + _chunk(b"IEND", b"")
+        )
+        with self.assertRaisesRegex(TemplateError, "decompressed length"):
+            validate_png_bytes(payload)
+
+    def test_png_validator_rejects_truncated_zlib_stream(self):
+        ihdr = struct.pack(">IIBBBBB", 1, 1, 8, 6, 0, 0, 0)
+        compressed = zlib.compress(b"\x00" + b"\x00" * 4)[:-2]
+        payload = (
+            b"\x89PNG\r\n\x1a\n"
+            + _chunk(b"IHDR", ihdr)
+            + _chunk(b"IDAT", compressed)
+            + _chunk(b"IEND", b"")
+        )
+        with self.assertRaisesRegex(TemplateError, "decompressed length"):
+            validate_png_bytes(payload)
+
+    def test_line_clipping_preserves_crossing_segment(self):
+        self.assertEqual(_clip_line(-1e100, 4, 1e100, 4, 16, 16), (0, 4, 15, 4))
+
+    def test_line_clipping_rejects_parallel_outside_segment(self):
+        self.assertIsNone(_clip_line(-100, -20, -50, -20, 16, 16))
 
 
 if __name__ == "__main__":

@@ -258,18 +258,19 @@ def validate_png_bytes(payload, *, max_pixels=MAX_OUTPUT_PIXELS):
     if (depth, color, compression, filtering, interlace) != (8, 6, 0, 0, 0):
         raise TemplateError("PNG must use non-interlaced 8-bit RGBA encoding")
 
+    if isinstance(max_pixels, bool) or not isinstance(max_pixels, int):
+        raise TemplateError("PNG max_pixels must be an integer")
+    if not 1 <= max_pixels <= MAX_OUTPUT_PIXELS:
+        raise TemplateError(f"PNG max_pixels must be between 1 and {MAX_OUTPUT_PIXELS}")
     expected = height * (width * 4 + 1)
     decoder = zlib.decompressobj()
     try:
         raw = decoder.decompress(chunks[1][1], expected + 1)
-        if len(raw) > expected or decoder.unconsumed_tail:
-            raise TemplateError("PNG decompressed data exceeds expected image size")
-        raw += decoder.flush()
     except zlib.error as exc:
         raise TemplateError(f"invalid PNG compressed data: {exc}") from exc
     if (
-        len(raw) != expected or not decoder.eof
-        or decoder.unused_data or decoder.unconsumed_tail
+        len(raw) > expected or decoder.unconsumed_tail
+        or len(raw) != expected or not decoder.eof or decoder.unused_data
     ):
         raise TemplateError("PNG decompressed length or stream termination is invalid")
     stride = width * 4 + 1

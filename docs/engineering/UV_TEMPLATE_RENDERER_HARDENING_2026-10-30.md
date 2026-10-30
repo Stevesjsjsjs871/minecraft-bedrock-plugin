@@ -43,3 +43,12 @@ The reference documents per-face UV objects, clockwise uv_rotation values, textu
 - Existing MCP registrations, project IDs and all three original default prompts remain untouched.
 - Plugin Creator 1.5.12 was read for source audit only. No Plugin Creator mutation, release creation, deployment or public release was performed.
 - PR #18 must be reviewed/merged before this dependent PR; do not merge this branch independently of its base.
+
+
+## Post-CI security review
+
+The first PR CI run (GitHub Actions run 41079643776) completed successfully, including the renderer test step. A follow-up code review identified that PNG validation called zlib flush after a bounded decompress. That could permit additional buffered output beyond the expected scanline budget for a malicious compressed stream supplied to the public validator.
+
+The validator now requires the bounded decompress call itself to reach the exact expected output and the zlib end marker; it no longer calls flush. The caller-supplied max_pixels argument is also constrained by the same hard 4,194,304-pixel cap. Added regression cases cover decompression overrun, truncated zlib streams, hard-cap override attempts, and line clipping across / outside the canvas.
+
+The workflow must be rerun on the updated HEAD before this follow-up can be called verified.

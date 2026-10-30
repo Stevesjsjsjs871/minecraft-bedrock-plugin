@@ -40,6 +40,10 @@ class SkillsPackageTests(unittest.TestCase):
         (self.root / "VERSION").write_text("1.5.11\n", encoding="utf-8")
         (self.root / "README.md").write_text("# Minecraft Bedrock Engineer — 1.5.11\n\nSkills-and-instructions-only plugin. It does not use MCP.\n", encoding="utf-8")
         (self.root / "CHANGELOG.md").write_text("# Changelog\n\n## 1.5.11 — Test fixture\n", encoding="utf-8")
+        audit_benchmark = self.root / "skills/audit-benchmark"
+        audit_benchmark.mkdir(parents=True)
+        (audit_benchmark / "SKILL.md").write_text("---\\nname: audit-benchmark\\ndescription: Benchmark tests.\\n---\\n", encoding="utf-8")
+        (audit_benchmark / "requirements.txt").write_text("jsonschema==4.26.0\\n", encoding="utf-8")
         package_scripts = self.root / "skills/package-integrity/scripts"
         package_scripts.mkdir(parents=True)
         (package_scripts / "package_provenance.py").write_text("# provenance helper\n", encoding="utf-8")
@@ -160,6 +164,14 @@ class SkillsPackageTests(unittest.TestCase):
     def test_duplicate_json_keys_rejected(self):
         (self.root / "plugin.json").write_text('{"name":"one","name":"two"}', encoding="utf-8")
         self.assertEqual(self.by_id(checker.check(self.root), "manifest-parse")["status"], "FAIL")
+
+    def test_missing_benchmark_dependency_fails(self):
+        (self.root / "skills/audit-benchmark/requirements.txt").unlink()
+        self.assertEqual(self.by_id(checker.check(self.root), "required-files")["status"], "FAIL")
+
+    def test_unpinned_benchmark_dependency_fails(self):
+        (self.root / "skills/audit-benchmark/requirements.txt").write_text("jsonschema>=4.0\\n", encoding="utf-8")
+        self.assertEqual(self.by_id(checker.check(self.root), "benchmark-schema-dependency")["status"], "FAIL")
 
     def test_provenance_duplicate_path_rejected(self):
         path = self.root / checker.PROVENANCE_NAME

@@ -95,3 +95,23 @@ jobs:
               assert any("server/texture_link_audit_mcp.py" in arg.replace("\\", "/") for arg in audit.get("args", []))
           print("PASS: manifests, prompts, texture authoring/audit MCP tools, three MCP servers and both MCP configurations are synchronized at", expected)
           PY
+      - name: Compile and test deterministic package builder
+        run: |
+          python -m py_compile .github/scripts/build_plugin_archive.py .github/scripts/test_build_plugin_archive.py
+          python -m unittest discover -s .github/scripts -p 'test_build_plugin_archive.py' -v
+      - name: Build candidate archive from committed Git tree
+        run: |
+          mkdir -p dist
+          version="$(cat VERSION)"
+          python .github/scripts/build_plugin_archive.py \
+            --repo-root . \
+            --output "dist/minecraft-bedrock-engineer-${version}.tar.gz"
+      - name: Upload candidate archive (not a Plugin Creator release)
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: minecraft-bedrock-engineer-${{ github.sha }}
+          path: |
+            dist/*.tar.gz
+            dist/*.sha256
+          retention-days: 7

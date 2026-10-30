@@ -17,16 +17,18 @@ The remote endpoint is a stateless Cloudflare Worker. It does **not** use Cloudf
 - `bedrock_read_plugin_source` — read bounded source/reference files from this repository.
 - `bedrock_plugin_capabilities` — report the preserved local modules and remote limitations.
 
-The remote Worker does not execute the existing Python filesystem, archive, MCT CLI, texture, geometry, or animation audit handlers. Those remain available through the local Python MCP runtime. The remote gateway is being expanded in small TypeScript-native steps rather than pretending Python containers run on the Free plan.
+By default, the Worker retains its four lightweight TypeScript tools. To expose the complete Python toolset remotely, deploy a separate Python MCP backend and configure Worker settings `MCP_BACKEND_URL` (HTTPS MCP endpoint) and `MCP_BACKEND_TOKEN` (a long random backend-only secret). The Worker authenticates ChatGPT using `MCP_AUTH_TOKEN`, then proxies MCP JSON-RPC requests to the Python backend with the separate backend token. The Python adapter checks that token before dispatching to the preserved Python modules. Do not reuse the public Worker token as the backend token.
+
+The Python backend must run `cloudflare/container/app.py` with the original plugin source mounted at `/app/plugin` (or set `PLUGIN_ROOT`), dependencies installed, and `MCP_BACKEND_TOKEN` configured as a runtime secret. The backend must have a publicly reachable HTTPS endpoint. This repository change adds the authenticated proxy path; it does not provision the Python hosting service automatically. Until the backend is deployed and both Worker settings are configured, the Worker continues to use its four-tool fallback.
 
 ## Deploy
 
-Cloudflare Workers Free is sufficient for this gateway's current feature set.
+Cloudflare Workers Free can host the proxy, but a separate reachable Python host is required for the full toolset.
 
 1. In Workers & Pages, keep the GitHub-connected project and production branch `feat/cloudflare-workers-mcp`.
 2. In Workers Builds → Settings → Variables and secrets, add a **Secret** named `MCP_AUTH_TOKEN` with a long random value (at least 32 characters). Workers Builds secrets are build-time only and are not automatically available to the running Worker.
 3. Set the Workers Builds **Deploy command** to `node cloudflare/deploy-with-secrets.mjs`. This helper creates a temporary secrets file outside the repository, invokes `wrangler deploy --secrets-file`, and removes the temporary file.
-4. Trigger a new deployment from the latest commit.
+4. When the Python backend is ready, also configure `MCP_BACKEND_URL` and `MCP_BACKEND_TOKEN` as Worker settings, then trigger a new deployment from the latest commit.
 
 Do not commit or share the secret in chat. The deploy helper fails before deployment if `MCP_AUTH_TOKEN` is absent or shorter than 32 characters.
 

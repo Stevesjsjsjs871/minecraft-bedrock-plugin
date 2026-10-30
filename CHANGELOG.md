@@ -1,5 +1,13 @@
 # Plugin package changelog
 
+## Unreleased — Entity geometry and animation-controller authoring
+- Adds dedicated stdio MCP servers for advanced entity geometry authoring and animation-controller creation/validation.
+- Adds `create_addon_entity_with_geometry` instead of reusing the existing `create_addon_entity` name; the original core tool and its input contract remain available.
+- Adds `create_animation_controller` and read-only `validate_animation_controller`, including safe client-entity binding and no-overwrite behavior.
+- Prefers ordered transition arrays, preserving Bedrock's transition priority; the legacy object-map input remains accepted for backward compatibility.
+- Adds MCP registry checks for all five stdio servers, unique tool names, retained Creator Tools bridge tools and unchanged default prompts.
+- Static authoring only. Geometry UV coverage is classic box UV; textures and animation clips are not fabricated; Molang is not executed; Minecraft runtime remains NOT RUN.
+
 ## 1.0.14 — Full PNG stream validation and bounded texture audit
 - Adds shared `server/png_validation.py` to validate PNG chunks/CRCs, legal IHDR/PLTE/tRNS rules, consecutive IDAT chunks, bounded zlib decompression, exact scanline sizes/filter bytes and Adam7 passes.
 - Upgrades `audit_texture_links` from header/chunk checks to full decoded scanline validation, catching files with valid chunk CRCs but broken or inconsistent compressed image data.

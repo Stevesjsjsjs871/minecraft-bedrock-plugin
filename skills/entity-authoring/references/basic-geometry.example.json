@@ -1,0 +1,35 @@
+{
+  "texture_width": 64,
+  "texture_height": 64,
+  "visible_bounds_width": 2.5,
+  "visible_bounds_height": 3.0,
+  "visible_bounds_offset": [0, 1.5, 0],
+  "bones": [
+    {
+      "name": "root",
+      "pivot": [0, 0, 0],
+      "cubes": [
+        {
+          "origin": [-4, 0, -2],
+          "size": [8, 16, 4],
+          "uv": [0, 0]
+        }
+      ]
+    },
+    {
+      "name": "head",
+      "parent": "root",
+      "pivot": [0, 16, 0],
+      "cubes": [
+        {
+          "origin": [-3, 16, -3],
+          "size": [6, 6, 6],
+          "uv": [24, 0]
+        }
+      ],
+      "locators": {
+        "head_top": [0, 23, 0]
+      }
+    }
+  ]
+}

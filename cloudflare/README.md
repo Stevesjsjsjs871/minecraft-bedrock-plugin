@@ -39,3 +39,10 @@ MCP requests use JSON-RPC over HTTP POST with the Bearer token. This implementat
 ## Legacy files
 
 `Dockerfile` and `cloudflare/container/app.py` are retained for reference only; the Free Worker deployment does not build or invoke them.
+
+
+## Capability contract
+
+The machine-readable profile is in `cloudflare/capabilities.json`. The contract tests compare the TypeScript Worker catalog with the declared four-tool remote profile and verify that both local MCP configuration files continue to register all 16 Python STDIO servers.
+
+Do not infer remote availability from the presence of a Python module in the package: the Free Worker is TypeScript-native and does not execute the local Python handlers or write into a user's project. Use the local STDIO profile for the full filesystem, texture, geometry, animation, archive and Creator Tools workflows.

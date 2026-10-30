@@ -1,0 +1,29 @@
+{
+  "project_directory": "forest-addon",
+  "geometry_path": "resource_packs/forest-addon_RP/models/entity/forest_guardian.geo.json",
+  "geometry_identifier": "geometry.forest_guardian",
+  "reference_image_path": "resource_packs/forest-addon_RP/textures/references/guardian_reference_sheet.png",
+  "base_texture_path": "resource_packs/forest-addon_RP/textures/entity/forest_guardian_base.png",
+  "output_path": "resource_packs/forest-addon_RP/textures/entity/forest_guardian_reference.png",
+  "mappings": [
+    {
+      "selector": { "bone": "body", "cube_index": 0, "face": "north" },
+      "source_rect": { "x": 0, "y": 0, "width": 32, "height": 32 },
+      "sampling": "nearest",
+      "rotation": 0,
+      "opacity": 255,
+      "blend_mode": "over"
+    },
+    {
+      "selector": { "bone": "head", "cube_index": 0, "face": "north" },
+      "source_rect": { "x": 32, "y": 0, "width": 16, "height": 16 },
+      "sampling": "bilinear",
+      "rotation": 90,
+      "flip_x": false,
+      "flip_y": false,
+      "opacity": 255,
+      "blend_mode": "over"
+    }
+  ],
+  "allow_uv_overlap": false
+}

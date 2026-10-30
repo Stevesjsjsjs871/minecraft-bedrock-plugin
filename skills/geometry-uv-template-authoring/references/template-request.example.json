@@ -1,0 +1,9 @@
+{
+  "project_directory": "forest-addon",
+  "geometry_path": "resource_packs/forest-addon_RP/models/entity/forest_guardian.geo.json",
+  "geometry_identifier": "geometry.forest_guardian",
+  "output_path": "resource_packs/forest-addon_RP/textures/uv_templates/forest_guardian_uv_guide.png",
+  "pixel_scale": 4,
+  "include_labels": true,
+  "include_grid": true
+}

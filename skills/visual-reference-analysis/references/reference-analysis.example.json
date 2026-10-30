@@ -1,0 +1,11 @@
+{
+  "project_directory": "forest-addon",
+  "reference_image_path": "resource_packs/forest-addon_RP/textures/references/forest_guardian_concept.png",
+  "segmentation_mode": "color_components",
+  "alpha_threshold": 8,
+  "color_bucket_size": 16,
+  "min_region_area": 12,
+  "max_regions": 48,
+  "geometry_path": "resource_packs/forest-addon_RP/models/entity/forest_guardian.geo.json",
+  "geometry_identifier": "geometry.forest_guardian"
+}

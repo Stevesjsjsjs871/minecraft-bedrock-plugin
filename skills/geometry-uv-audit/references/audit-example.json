@@ -1,0 +1,5 @@
+{
+  "project_directory": "forest-addon",
+  "geometry_path": "resource_packs/forest-addon_RP/models/entity/forest_guardian.geo.json",
+  "texture_path": "resource_packs/forest-addon_RP/textures/entity/forest_guardian.png"
+}

@@ -54,15 +54,22 @@ The auditor follows the documented static link shapes; it cannot infer runtime-g
 }
 ```
 
+## Geometry UV guide generation
+
+Before external texture painting, use `minecraft-bedrock-geometry-uv-auditor.audit_geometry_uvs` to check the model and any explicitly linked PNG. Then use `minecraft-bedrock-geometry-uv-template.generate_geometry_uv_template` to create a separate transparent face-labeled UV guide under `resource_packs/<project>_RP/textures/uv_templates/`. It expands classic box UVs, supports per-face UV rectangles and rotations, and marks possible UV intersections in magenta. Review intersections as possible intentional mirrored/shared texture regions, not automatic errors.
+
+The guide is not the entity texture and is not automatically bound to a client entity or registered in an atlas. Never replace the model texture with the guide. Review the returned face-region map to map each label back to its bone/cube. See `skills/geometry-uv-template-authoring/SKILL.md` for the full input contract and limitations.
+
 ## Asset workflow
 
 1. Inventory existing geometry, animation, animation-controller, render-controller, material and texture files. Locate definitions and references rather than guessing.
 2. Search version-matched Mojang samples for relevant patterns and record source paths and compatibility evidence.
 3. Use supported Creator Tools capabilities only when actually exposed by the host; do not fabricate a successful delegation.
 4. Validate identifier/path consistency, geometry structure, bones, UVs, animation names and controller transitions with available static checks.
-5. Compare against the baseline and report unresolved links, changed definitions, resource removals and severity changes.
+5. Compare against the baseline and report the file list before and after, changed definitions, resource removals and severity changes.
 6. Run `audit_texture_links` after adding or changing item/block textures and atlas entries. Resolve errors before packaging; treat unused entries as review warnings, not automatic deletion candidates.
-7. Import into the target game when possible. Check missing textures, rendering, animation transitions and behavior; record the exact build/scenario.
+7. For entity texture work, run `audit_geometry_uvs`, generate a separate UV guide, paint the actual PNG at the declared canvas size, then re-run the geometry and texture-link audits.
+8. Import into the target game when possible. Check missing textures, rendering, animation transitions and behavior; record the exact build/scenario.
 
 ## Asset discipline
 
@@ -70,3 +77,9 @@ The auditor follows the documented static link shapes; it cannot infer runtime-g
 - Do not delete unrelated geometry, bones, animations, controllers, textures or atlas entries.
 - Distinguish generated assets, reference samples, existing assets and placeholders; preserve provenance/licensing boundaries.
 - Mark all unexecuted runtime checks `NOT RUN`.
+
+## Geometry-aware texture painting
+
+For entity textures, use `minecraft-bedrock-texture-painter` / `paint_geometry_texture` after UV audit and template review. The tool maps explicit bone/cube/face selectors to regions extracted from `.geo.json` and paints an existing or transparent canvas with fill, border, checker, stripes, gradient or seeded noise operations. It writes a distinct PNG, keeps a supplied source image's unpainted pixels/alpha, requires exact geometry texture dimensions and refuses out-of-bounds UVs. Overlaps require an explicit opt-in.
+
+This feature is deterministic 2D pixel painting, not AI texture synthesis or a 3D render preview. It does not simulate face sampling orientation, Molang/material lighting, or engine rendering. See `skills/texture-painting-pipeline/SKILL.md` for the full contract and example.

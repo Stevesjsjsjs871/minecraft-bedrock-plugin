@@ -4,17 +4,115 @@
     "minecraft-bedrock-engineer": {
       "type": "stdio",
       "command": "python3",
-      "args": ["${PLUGIN_ROOT}/server/mcp_server.py"]
+      "args": [
+        "${PLUGIN_ROOT}/server/mcp_server.py"
+      ]
     },
     "minecraft-bedrock-texture-generator": {
       "type": "stdio",
       "command": "python3",
-      "args": ["${PLUGIN_ROOT}/server/texture_generator_mcp.py"]
+      "args": [
+        "${PLUGIN_ROOT}/server/texture_generator_mcp.py"
+      ]
     },
     "minecraft-bedrock-texture-link-auditor": {
       "type": "stdio",
       "command": "python3",
-      "args": ["${PLUGIN_ROOT}/server/texture_link_audit_mcp.py"]
+      "args": [
+        "${PLUGIN_ROOT}/server/texture_link_audit_mcp.py"
+      ]
+    },
+    "minecraft-bedrock-entity-authoring": {
+      "type": "stdio",
+      "command": "python3",
+      "args": [
+        "${PLUGIN_ROOT}/server/entity_authoring_mcp.py"
+      ]
+    },
+    "minecraft-bedrock-animation-controller-authoring": {
+      "type": "stdio",
+      "command": "python3",
+      "args": [
+        "${PLUGIN_ROOT}/server/animation_controller_mcp.py"
+      ]
+    },
+    "minecraft-bedrock-animation-clip-authoring": {
+      "type": "stdio",
+      "command": "python3",
+      "args": [
+        "${PLUGIN_ROOT}/server/animation_clip_mcp.py"
+      ]
+    },
+    "minecraft-bedrock-animation-pipeline-audit": {
+      "type": "stdio",
+      "command": "python3",
+      "args": [
+        "${PLUGIN_ROOT}/server/animation_pipeline_audit_mcp.py"
+      ]
+    },
+    "minecraft-bedrock-animated-entity-authoring": {
+      "type": "stdio",
+      "command": "python3",
+      "args": [
+        "${PLUGIN_ROOT}/server/animated_entity_bundle_mcp.py"
+      ],
+      "env": {}
+    },
+    "minecraft-bedrock-geometry-uv-auditor": {
+      "type": "stdio",
+      "command": "python3",
+      "args": [
+        "${PLUGIN_ROOT}/server/geometry_uv_audit_mcp.py"
+      ],
+      "env": {}
+    },
+    "minecraft-bedrock-geometry-uv-template": {
+      "type": "stdio",
+      "command": "python3",
+      "args": [
+        "${PLUGIN_ROOT}/server/geometry_uv_template_mcp.py"
+      ],
+      "env": {}
+    },
+    "minecraft-bedrock-texture-painter": {
+      "type": "stdio",
+      "command": "python3",
+      "args": [
+        "${PLUGIN_ROOT}/server/texture_painting_mcp.py"
+      ],
+      "env": {}
+    },
+    "minecraft-bedrock-reference-texture-transfer": {
+      "type": "stdio",
+      "command": "python3",
+      "args": [
+        "${PLUGIN_ROOT}/server/reference_texture_transfer_mcp.py"
+      ],
+      "env": {}
+    },
+    "minecraft-bedrock-uv-mapping-assistant": {
+      "type": "stdio",
+      "command": "python3",
+      "args": [
+        "${PLUGIN_ROOT}/server/uv_mapping_assistant_mcp.py"
+      ],
+      "env": {}
+    },
+    "minecraft-bedrock-visual-reference-analyzer": {
+      "type": "stdio",
+      "command": "python3",
+      "args": [
+        "${PLUGIN_ROOT}/server/visual_reference_analyzer_mcp.py"
+      ],
+      "env": {}
+    },
+    "minecraft-bedrock-reference-mapping-review": {
+      "type": "stdio",
+      "command": "python3",
+      "args": [
+        "${PLUGIN_ROOT}/server/reference_mapping_review_mcp.py"
+      ],
+      "env": {}
     }
   }
 }

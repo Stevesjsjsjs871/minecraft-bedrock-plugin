@@ -1,0 +1,42 @@
+{
+  "project_directory": "forest-addon",
+  "geometry_path": "resource_packs/forest-addon_RP/models/entity/forest_guardian.geo.json",
+  "geometry_identifier": "geometry.forest_guardian",
+  "output_path": "resource_packs/forest-addon_RP/textures/entity/forest_guardian_reviewed.png",
+  "analysis_result": {
+    "status": "success",
+    "reference": {
+      "path": "resource_packs/forest-addon_RP/textures/references/forest_guardian_sheet.png",
+      "width": 128,
+      "height": 96,
+      "sha256": "REPLACE_WITH_ANALYZER_SHA256"
+    },
+    "regions": [
+      {
+        "region_id": "region_001",
+        "source_rect": {"x": 8, "y": 8, "width": 24, "height": 24},
+        "pixel_area": 480,
+        "average_color": "#8C6248"
+      }
+    ],
+    "geometric_candidates": []
+  },
+  "review_decisions": [
+    {
+      "source_region_id": "region_001",
+      "target": {"bone": "head", "cube_index": 0, "face": "north"},
+      "decision": "approve",
+      "semantic_label": "front_head",
+      "rotation": 0,
+      "flip_x": false,
+      "flip_y": false,
+      "sampling": "nearest",
+      "opacity": 255,
+      "blend_mode": "replace",
+      "review_note": "Example only; visually confirm orientation before approval."
+    }
+  ],
+  "allow_uv_overlap": false,
+  "allow_layered_assignments": false,
+  "require_full_coverage": false
+}

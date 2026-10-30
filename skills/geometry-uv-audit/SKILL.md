@@ -38,3 +38,14 @@ Use `minecraft-bedrock-geometry-uv-auditor` and its read-only `audit_geometry_uv
 ## UV template follow-up
 
 After a clean audit, use the `geometry-uv-template-authoring` skill to create a separate labeled PNG guide for painting. The guide does not rewrite geometry or replace the actual texture.
+
+
+## Local CLI alternative
+
+When the MCP server is not configured but a real local Python executor can access the package and project, use the geometry UV engine adapter:
+
+    python skills/geometry-uv-engine/scripts/geometry_uv_cli.py --workspace <workspace> audit --project <project-name> --geometry-path resource_packs/<project-name>_RP/models/entity/example.geo.json
+
+The adapter calls the existing read-only audit function directly; it does not start an MCP transport. If no genuine executor or project filesystem is available, mark the audit NOT RUN rather than inferring results.
+
+Official format reference: https://learn.microsoft.com/en-us/minecraft/creator/reference/content/visualreference/geometry.v1.21.0?view=minecraft-bedrock-stable

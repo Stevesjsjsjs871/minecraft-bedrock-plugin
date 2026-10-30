@@ -69,3 +69,48 @@ Harden the texture-atlas read/merge/write transaction so concurrent instances of
 
 ### Next step
 - Inspect both OS workflow results and fix any portability failures. After that, reconcile Plugin Creator/GitHub metadata drift without changing the three default prompts.
+
+
+## 2026-10-30 — Manifest metadata parity and changelog release guard
+
+### Recovered state
+- Plugin Creator current private release: 1.0.11, release ID `pluginrel_6ae3d2b1b6888191bf4727998f694e48`; its source files and metadata were re-read before deciding not to mutate it. No Plugin Creator update was made.
+- GitHub `main`: 1.0.11 at `4eb35503095c735d725597bdb2f517f4bf188803`; latest main CI run #103 succeeded. The repository has no open Issues; GitHub code search for TODO/FIXME returned no results (not proof that every unindexed/local file is clear).
+- PR #2 remains Draft/open/unmerged, based on `main`. At the end of this stage its head is `05db0c94c1c5b1e1c3c7f531c1bd81185bf00217`, 14 commits ahead and 0 behind. PR #1 remains Draft/open/unmerged on the older procedural-texture branch; it is not merged.
+- Plugin Creator and GitHub package source are not fully synchronized: `VERSION` matches byte-for-byte; `.mcp.json` matches byte-for-byte; `mcp.json` is semantically equivalent; the two original Creator Tools bridge skills match byte-for-byte. The root and compatibility manifests in the Plugin Creator release share the same metadata and all three prompts. On GitHub `main`, root and compatibility metadata matched except the compatibility manifest had six fewer keywords. README, CHANGELOG, root/compat manifests and `visual-resource-pipeline/SKILL.md` also differ between the Plugin Creator release and GitHub source. GitHub's README is substantially more complete; it was not replaced with the shorter Plugin Creator copy.
+- The three default prompts were compared directly between Plugin Creator and GitHub and remain exactly equal (3/3).
+
+### Selected task and acceptance criteria
+Add a deterministic package-integrity gate for shared root/compatibility manifest metadata and the latest versioned CHANGELOG entry. Fix the observed keyword drift in the GitHub compatibility manifest without changing identity, MCP configuration or default prompts. Do not mutate Plugin Creator or publish a release without explicit confirmation.
+
+### Changes
+- Align `.codex-plugin/plugin.json` keywords with the root `plugin.json` list (52 entries); retain the three default prompts unchanged.
+- Add `manifest-metadata` validation for shared name, version, description, author, keywords and interface display metadata. Keep exact prompt parity as its separate existing check.
+- Make `CHANGELOG.md` a required package file and add `changelog-version` validation. A stale/missing latest release heading is a warning rather than an automatic failure.
+- Bump the package checker implementation marker to 1.0.7; add regression tests for top-level metadata drift, interface metadata drift and stale changelog entries. The synthetic fixture now uses three prompts.
+- Update the package-integrity skill and README instructions to describe and run the new checks.
+- Changed files: `.codex-plugin/plugin.json`, `README.md`, `skills/package-integrity/SKILL.md`, `skills/package-integrity/scripts/check_package_integrity.py`, `skills/package-integrity/scripts/test_check_package_integrity.py`. Earlier texture-atlas changes remain in the same PR branch.
+
+### Commits
+- `48e85898aa451df0eff085fe59d39b7f1504135e` — metadata and changelog audit.
+- `3865eb0187e40cc2eda7486cf4d272245d2bfb0f` — regression tests.
+- `86509a0ac54ea3b555fbaaf05394289fd5f9871c` — skill documentation.
+- `a00feb7daaabef8be543a50ce9c76a8d0a0ab5e3` — compatibility keyword alignment.
+- `25ef66020f3eb754e1a8505005db460f9d373ab4` — fix changelog-heading regex after CI failure.
+- `05db0c94c1c5b1e1c3c7f531c1bd81185bf00217` — README instructions.
+
+### Verification
+- Initial CI runs #113 and #114 failed in the new package-integrity suite: the first implementation over-escaped the changelog-heading regex, so a valid synthetic heading was reported missing. All earlier test groups passed. The failure was inspected in job logs and fixed in commit `25ef660`; it is not hidden.
+- Final validation run #116 on head `05db0c94` succeeded. Unit tests: 143/143 across five suites (101 MCP/server, 12 benchmark, 6 Mojang sample index, 12 procedural texture, 12 package-integrity). Python compilation, report-schema checks, 18/18 analyzer regression cases, version/manifest checks and the package-integrity test step passed.
+- Package-integrity checker 1.0.7: 17 checks, 16 PASS, 1 WARN, 0 FAIL. The sole warning is expected source-checkout coverage: the generated full gzip Mojang index is absent while 14 curated fallback files remain. The new `manifest-metadata` and `changelog-version` checks both PASS. Runtime status remains `NOT RUN`.
+- Portability run #7 on the same head succeeded: Ubuntu ran 26/26 texture/atlas tests in 0.375s; Windows ran 26/26 in 0.693s.
+- Non-failing GitHub Actions warning remains: actions/checkout@v4 and actions/setup-python@v5 target Node.js 20 and are currently forced to Node.js 24. Dedicated lint/type-check, macOS, network-filesystem semantics, Minecraft import/rendering and real Creator Tools CLI execution remain `NOT RUN`.
+
+### Git and release state
+- PR #2 remains Draft, open and unmerged; `main` remains unchanged. The latest head has 14 commits ahead and 0 behind `main`.
+- Plugin Creator remains at 1.0.11 with release ID `pluginrel_6ae3d2b1b6888191bf4727998f694e48`. No Plugin Creator update or public release was made.
+- Plugin Creator/GitHub README, CHANGELOG, manifest description/keywords and visual-resource-pipeline skill drift remains. Synchronizing the Plugin Creator release would change its current release and therefore remains blocked pending explicit user authorization.
+
+### Risks and next step
+- Metadata parity is now enforced inside the GitHub package, but it does not prove parity with the separately stored Plugin Creator release. The latter is a separately versioned source and must be updated only with an explicitly authorized, expected-release-ID-guarded operation.
+- Next: prepare a precise Plugin Creator-to-GitHub synchronization diff without applying it; then review PR #1's divergent history and propose safe supersession/closure rather than merging it. Keep all runtime and Creator Tools claims marked `NOT RUN` until actually exercised.

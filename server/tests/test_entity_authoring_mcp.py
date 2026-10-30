@@ -87,7 +87,7 @@ class SchemaAndProtocolTests(unittest.TestCase):
 
     def test_initialize_reports_server_version_and_workflow(self):
         response = server.handle_message({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-03-26"}})
-        self.assertEqual(response["result"]["serverInfo"]["version"], "1.1.0")
+        self.assertEqual(response["result"]["serverInfo"]["version"], "1.1.1")
         self.assertIn("create_addon_entity_with_geometry", response["result"]["instructions"])
 
 

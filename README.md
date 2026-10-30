@@ -1,5 +1,10 @@
 # Minecraft Bedrock Engineer — 1.1.1
 
+## Unreleased: animation blend expressions
+
+- Animation-controller state animation entries now accept both existing alias strings and Bedrock single-key alias-to-Molang blend objects, for example `{ "walk": "query.modified_move_speed" }`.
+- The linked client-entity alias must exist; Molang is only checked for bounded printable text and is not parsed or executed.
+
 ## 1.1.1: animation-controller state machines
 
 - Adds the dedicated `minecraft-bedrock-animation-controller-authoring` stdio MCP server.

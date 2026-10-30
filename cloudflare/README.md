@@ -24,10 +24,11 @@ The remote Worker does not execute the existing Python filesystem, archive, MCT 
 Cloudflare Workers Free is sufficient for this gateway's current feature set.
 
 1. In Workers & Pages, keep the GitHub-connected project and production branch `feat/cloudflare-workers-mcp`.
-2. Add a Worker secret named `MCP_AUTH_TOKEN` (long random value). Never commit or share the secret in chat.
-3. Trigger a new deployment from the latest commit.
+2. In Workers Builds → Settings → Variables and secrets, add a **Secret** named `MCP_AUTH_TOKEN` with a long random value (at least 32 characters). Workers Builds secrets are build-time only and are not automatically available to the running Worker.
+3. Set the Workers Builds **Deploy command** to `node cloudflare/deploy-with-secrets.mjs`. This helper creates a temporary secrets file outside the repository, invokes `wrangler deploy --secrets-file`, and removes the temporary file.
+4. Trigger a new deployment from the latest commit.
 
-No build command is required. Deploy command: `npx wrangler deploy`.
+Do not commit or share the secret in chat. The deploy helper fails before deployment if `MCP_AUTH_TOKEN` is absent or shorter than 32 characters.
 
 Endpoint after deployment: `https://<worker-subdomain>.workers.dev/mcp`
 

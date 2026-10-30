@@ -295,3 +295,89 @@ Build a separate `1.26.60.30-preview` metadata-only corpus only after verifying 
 - Analyzer regression cases: **18/18 passed**; report-schema, package/version, manifest, three-prompt and MCP configuration checks passed.
 - All workflow steps completed successfully. Runtime Minecraft import/rendering, real Creator Tools CLI, macOS, network-filesystem, lint and dedicated type-check remain `NOT RUN`.
 - Current source-version branch remains Draft PR #3, stacked on PR #2; neither PR is merged. `main` and Plugin Creator are unchanged.
+
+
+## 2026-10-30 — Separate Mojang Bedrock Samples Preview corpus
+
+### Starting state
+- GitHub `main`: Plugin Creator 1.0.11, commit `4eb3550`; main CI #103 was successful.
+- PR #2 (stable full index/atlas hardening): open Draft, not merged.
+- PR #3 (explicit source-version selector): open Draft, based on PR #2, not merged.
+- PR #1 remains an older, divergent Draft and was not changed.
+- Plugin Creator ID: `plugins_6ae33ff6e8d8819182f246d8d3d97323`.
+- Plugin Creator version/release: `1.0.11` / `pluginrel_6ae3d2b1b6888191bf4727998f694e48`.
+- No open repository Issues or TODO/FIXME matches were found in the inspected search scope.
+
+### Task and implementation
+Added a distinct metadata-only index for Mojang Preview `1.26.60.30-preview`; stable `1.26.50.4` remains the default and is not replaced.
+
+Official source pinned:
+- Release: https://github.com/Mojang/bedrock-samples/releases/tag/v1.26.60.30-preview
+- Published: `2026-10-26T06:24:22Z`; GitHub reports prerelease=true and draft=false.
+- Full asset ID: `677229806`; filename: `bedrock-samples-v1.26.60.30-preview-full.zip`.
+- Asset size: `169961030` bytes; SHA-256: `b7e66ccb64370d345d898ac92cf5a524866657d5aad6ff2655ce1dc6a8d102b9`.
+- Tag commit: `4d30ae63750467771b6eccda105f732c6cb77ff7`.
+- GitHub reports the source commit as unsigned/unverified; the release asset digest and size are independently pinned and verified.
+
+Generated Preview index:
+- ZIP entries: 23,048.
+- Indexed records: 22,429.
+- Declared uncompressed bytes: 323,888,008.
+- Gzip index size: 1,138,413 bytes.
+- Index SHA-256: `7fc728d20a337e9d8d36bb68d7a1d19d4d25d8dff17a620d6b5d2d3f25a5f6c1`.
+- The original full ZIP and binary assets are not committed.
+
+Code changes:
+- `server/mcp_server.py`: Preview corpus registry, explicit index path, release/commit provenance in results, fail-closed missing index behavior, runtime target-version and source-archive SHA-256 checks. Stable `MOJANG_SAMPLE_INDEX` selection remains intact for backwards compatibility.
+- `server/tests/test_mcp_server.py`: separate Preview search/read tests, no cross-version fallback, missing-index behavior, wrong archive digest, index target/digest tampering, and real archive member round-trip.
+- `skills/bedrock-development/scripts/index_mojang_samples.py`: validates four-part stable labels and explicit prerelease suffixes.
+- `skills/bedrock-development/scripts/test_index_mojang_samples.py`: valid Preview label and malformed-label tests.
+- `skills/package-integrity/scripts/check_package_integrity.py`: discovers and audits each `mojang-samples-*` corpus independently; validates directory/metadata/index version binding; preserves legacy `mojang_samples_index` and adds `mojang_samples_indices`.
+- `skills/package-integrity/scripts/test_check_package_integrity.py`: multi-index pass and cross-directory version mismatch regression tests.
+- Added `.github/workflows/build-mojang-samples-preview-index.yml`, the Preview corpus README, and updated root/skill documentation. The workflow verifies release API metadata, tag commit, asset digest/size and ZIP CRCs; indexes without extraction/execution; runs tests/audit; commits only generated index and metadata; and is idempotent.
+
+### Files, commits and PR
+PR #4: https://github.com/Stevesjsjsjs871/minecraft-bedrock-plugin/pull/4
+- Draft, open, not merged.
+- Base: `feature/versioned-mojang-sample-selection-20261030` (PR #3 head `b08dd0a`).
+- Head: `feature/mojang-samples-preview-index-20261030`, commit `ce1f25b4773f1fec4cdc1d2cc66646bd4b4ccd00`.
+- 13 changed files in the PR diff; 693 additions and 52 deletions.
+- Stage commits include `0695d74`, `ab86c21`, `05ba10f`, generated-index commit `079e34a`, runtime-integrity commit `4f67bdd`, and final test-fixture commit `ce1f25b`.
+
+### Verification
+Pinned Preview build workflow #5: https://github.com/Stevesjsjsjs871/minecraft-bedrock-plugin/actions/runs/41011805615 — Success.
+- MCP/server: 114 tests.
+- Benchmark evaluator: 12 tests.
+- Mojang indexer: 8 tests.
+- Texture generator: 12 tests.
+- Package integrity: 18 tests.
+- Total: 164 unit tests; all passed.
+- Real Preview ZIP member read/hash round-trip: passed in this build workflow.
+- Analyzer regression/report-schema suite: 18/18 passed.
+- Python compilation: passed.
+- Deep package-integrity audit: PASS, no warnings/errors.
+- Identity, manifests, three original default prompts, stdio MCP configs and both corpus registrations: passed.
+- Repeat build verified the same index bytes/metadata and skipped a redundant data commit (idempotence).
+
+PR validation CI #138: https://github.com/Stevesjsjsjs871/minecraft-bedrock-plugin/actions/runs/41011916521 — Success.
+- Same five unit suites: 164 tests passed.
+- The real-archive test is run with the full archive in build workflow #5; ordinary PR validation does not download the 170 MB archive.
+- Analyzer regression/report schema, package audit and manifest/MCP consistency: passed.
+
+Intermediate failed build runs were retained and corrected:
+- #1: stable-index fallback compatibility and global workspace environment polluted existing tests; restored the stable constant path and scoped workspace setup to the real-archive test.
+- #2: per-version audit map was not passed into the package report; fixed report signature/call.
+- #4: new tests lacked local gzip imports and isolated stable archive fixtures did not align their pinned catalog digest; fixed both.
+- #3 passed before the final runtime-provenance guard; #5 is the final passing run after all fixes.
+
+### Preserved state and limitations
+- Plugin Creator remains 1.0.11; Release ID unchanged; no Plugin Creator write or public release.
+- Plugin ID, MCP stdio servers, existing tool set, stable default, three original default prompts and configuration preserved.
+- Spatial GUI was not reintroduced.
+- Preview search is offline from its metadata index. Reading non-curated Preview text still requires the exact matching full ZIP inside the configured workspace; no full ZIP or binary assets are bundled.
+- Preview source is not a stable compatibility guarantee and does not change add-on `target_game_version`.
+- Minecraft import/rendering, Creator Tools CLI, macOS, standalone lint/type-check and direct parity/performance benchmarking against official Creator Tools: NOT RUN.
+- GitHub Actions still emits its existing Node.js 20 / deprecated `punycode` warnings.
+
+### Next priority
+Build a versioned search-evaluation suite across stable and Preview corpora: exact-path, identifier, category and natural-language queries; expected-result precision/recall; ranking stability; and explicit tests proving that no query result crosses source-version boundaries. Record timings separately for index loading and query execution. Do not claim parity with Creator Tools without a controlled comparison.

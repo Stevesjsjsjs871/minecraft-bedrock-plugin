@@ -2,7 +2,7 @@
   "interface": {
     "displayName": "Minecraft Bedrock Engineer",
     "shortDescription": "Create & audit Bedrock add-ons",
-    "longDescription": "Minecraft Bedrock Engineer \u2014 safe BP/RP authoring, model and animation generation, geometry-aware texture workflows, human-reviewed reference mapping, resource integrity audits and reproducible validation.",
+    "longDescription": "Minecraft Bedrock Engineer — safe BP/RP authoring, model and animation generation, geometry-aware texture workflows, human-reviewed reference mapping, resource integrity audits and reproducible validation.",
     "developerName": "Private project",
     "category": "Developer tools",
     "capabilities": [
@@ -25,8 +25,8 @@
     ]
   },
   "name": "minecraft-bedrock-engineer",
-  "version": "1.3.0",
-  "description": "Minecraft Bedrock Engineer \u2014 safe BP/RP authoring, entity/model and animation generation, geometry UV audits/templates/mapping, deterministic reference analysis, human-reviewed reference-to-UV transfer, geometry-aware texture painting, resource integrity and reproducible validation.",
+  "version": "1.4.0",
+  "description": "Minecraft Bedrock Engineer — safe BP/RP authoring, entity/model and animation generation, geometry UV audits/templates/mapping, deterministic reference analysis, human-reviewed reference-to-UV transfer, geometry-aware texture painting, resource integrity and reproducible validation.",
   "author": {
     "name": "Plugin owner"
   },

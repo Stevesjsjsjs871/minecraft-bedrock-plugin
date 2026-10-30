@@ -41,3 +41,10 @@
 - The geometry algorithms are still implemented in the preserved server modules; this is a transitional CLI adapter, not a complete pure-library extraction.
 - Minecraft import/render, Blockbench interoperability and gameplay are NOT RUN.
 - Plugin Creator 1.5.8 was not modified and no new release was created.
+
+
+## Follow-up hardening
+
+- Isolated PNG-shim test imports under a private module name and removed temporary painter/transfer modules from the global import cache. This prevents the CLI from accidentally reusing a test stub instead of the full PNG validator.
+- Added a regression assertion that the CLI loads server/png_validation.py from the repository package.
+- Execution metadata now represents mcp_transport_started as a JSON boolean, not a string.

@@ -1,5 +1,5 @@
 {
-  "source_archive": "bedrock-samples-v1.26.50.4-full(1).zip",
+  "source_archive": "bedrock-samples-v1.26.50.4-full.zip",
   "source_url": "https://github.com/Mojang/bedrock-samples",
   "target_version": "1.26.50.4",
   "zip_sha256": "c0b6151f5f9a0c31ebe3c909dfc82d97f12473ed2c6e039aa7e22d667042026c",
@@ -29,5 +29,12 @@
     "other": 24
   },
   "license_notice": "(c) Mojang AB. All rights reserved. By downloading the files in this repository, you agree to the Minecraft End User License Agreement and that these files are subject to its terms.",
-  "method": "Archive CRC check and a no-extraction path/hash/identifier index. Strict JSON is parsed only where applicable. Runtime correctness was not tested."
+  "method": "Archive CRC check and a no-extraction path/hash/identifier index. Strict JSON is parsed only where applicable. Runtime correctness was not tested.",
+  "original_uploaded_filename": "bedrock-samples-v1.26.50.4-full(1).zip",
+  "source_release_tag": "v1.26.50.4",
+  "source_asset_name": "bedrock-samples-v1.26.50.4-full.zip",
+  "source_asset_url": "https://github.com/Mojang/bedrock-samples/releases/download/v1.26.50.4/bedrock-samples-v1.26.50.4-full.zip",
+  "plugin_creator_index_bytes": 1128413,
+  "index_file_bytes": 1128406,
+  "index_sha256": "48429d64391157553e6760b7f568e5e6d5d05fa6517427b5a1156c8bc18e61fc"
 }

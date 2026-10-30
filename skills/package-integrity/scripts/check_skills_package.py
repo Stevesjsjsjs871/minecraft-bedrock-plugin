@@ -31,6 +31,7 @@ REQUIRED = [
     "skills/package-integrity/scripts/test_check_skills_package.py",
     "skills/package-integrity/scripts/build_skills_package.py",
     "skills/package-integrity/scripts/test_build_skills_package.py",
+    "skills/audit-benchmark/requirements.txt",
 ]
 LEGACY_MCP_FILES = [".mcp.json", "mcp.json"]
 LEGACY_DEPLOYMENT_FILES = ["Dockerfile", "wrangler.toml", "package.json"]
@@ -229,6 +230,10 @@ def check(root: Path) -> dict:
     except Exception as exc:
         add("mojang-index-integrity", "FAIL", f"Sample index verification failed: {type(exc).__name__}: {exc}")
     add("png-engine-tests", "PASS" if png_test.is_file() else "FAIL", "Focused PNG validator test file present" if png_test.is_file() else "PNG validator tests are missing")
+
+    benchmark_requirements = (root / "skills/audit-benchmark/requirements.txt").read_text(encoding="utf-8")
+    benchmark_dependency_ok = re.search(r"(?m)^jsonschema==4\\.26\\.0\\s*$", benchmark_requirements) is not None
+    add("benchmark-schema-dependency", "PASS" if benchmark_dependency_ok else "FAIL", "Pinned jsonschema 4.26.0 dependency is declared for Draft 2020-12 validation" if benchmark_dependency_ok else "audit-benchmark requires a pinned jsonschema==4.26.0 dependency")
 
     provenance_ok, provenance_message = verify_provenance(root, records, versions[0] if isinstance(versions[0], str) else None)
     add("provenance-integrity", "PASS" if provenance_ok else "FAIL", provenance_message)

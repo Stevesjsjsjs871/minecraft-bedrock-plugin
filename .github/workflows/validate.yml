@@ -91,3 +91,7 @@ jobs:
               assert any("server/texture_link_audit_mcp.py" in arg.replace("\\", "/") for arg in audit.get("args", []))
           print("PASS: manifests, prompts, texture authoring/audit MCP tools, three MCP servers and both MCP configurations are synchronized at", expected)
           PY
+      - name: Test Plugin Creator archive parity checker
+        run: |
+          python -m py_compile .github/scripts/check_plugin_creator_parity.py .github/scripts/test_check_plugin_creator_parity.py
+          python -m unittest discover -s .github/scripts -p 'test_*.py' -v

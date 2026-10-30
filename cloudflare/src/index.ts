@@ -10,11 +10,13 @@ export class BedrockMcpContainer extends DurableObject {}
 interface Env {
   MCP_AUTH_TOKEN: string;
   GITHUB_BRANCH?: string;
+  MCP_BACKEND_URL?: string;
+  MCP_BACKEND_TOKEN?: string;
 }
 type Rpc = { jsonrpc?: string; id?: string | number | null; method?: string; params?: Record<string, unknown> };
 const REPO = "Stevesjsjsjs871/minecraft-bedrock-plugin";
 const DEFAULT_BRANCH = "feat/cloudflare-workers-mcp";
-const MAX_BODY = 1024 * 1024;
+const MAX_BODY = 8 * 1024 * 1024;
 
 const tools = [
   { name: "bedrock_generate_manifest", description: "Generate a valid Minecraft Bedrock BP or RP manifest (format_version 2) with fresh UUIDs. Returns JSON; does not write files.", inputSchema: { type: "object", properties: { pack_type: { type: "string", enum: ["behavior", "resource"] }, name: { type: "string", minLength: 1, maxLength: 64 }, description: { type: "string", minLength: 1, maxLength: 256 }, min_engine_version: { type: "array", items: { type: "integer", minimum: 0 }, minItems: 3, maxItems: 3 }, version: { type: "array", items: { type: "integer", minimum: 0 }, minItems: 3, maxItems: 3 }, dependency_uuid: { type: "string", description: "Optional BP header UUID for an RP dependency." }, dependency_version: { type: "array", items: { type: "integer", minimum: 0 }, minItems: 3, maxItems: 3 } }, required: ["pack_type", "name", "description", "min_engine_version"], additionalProperties: false } },
@@ -167,6 +169,26 @@ window.addEventListener("pagehide",()=>{token="";document.getElementById("token"
     let message: Rpc;
     try { message = JSON.parse(raw) as Rpc; } catch { return response(rpcError(null, -32700, "Parse error"), 400); }
     if (!message || message.jsonrpc !== "2.0" || typeof message.method !== "string" || (message.params !== undefined && (typeof message.params !== "object" || message.params === null || Array.isArray(message.params)))) return response(rpcError(message?.id ?? null, -32600, "Invalid Request"), 400);
+    if (env.MCP_BACKEND_URL) {
+      if (!env.MCP_BACKEND_TOKEN) return response({ error: "backend_not_configured" }, 503);
+      let backendUrl: URL;
+      try { backendUrl = new URL(env.MCP_BACKEND_URL); } catch { return response({ error: "backend_url_invalid" }, 503); }
+      if (backendUrl.protocol !== "https:") return response({ error: "backend_https_required" }, 503);
+      try {
+        const upstream = await fetch(backendUrl, {
+          method: "POST",
+          headers: { "content-type": "application/json", "authorization": `Bearer ${env.MCP_BACKEND_TOKEN}`, "accept": "application/json" },
+          body: raw,
+          signal: AbortSignal.timeout(30000)
+        });
+        return new Response(upstream.body, {
+          status: upstream.status,
+          headers: { "content-type": upstream.headers.get("content-type") || "application/json; charset=utf-8", "cache-control": "no-store" }
+        });
+      } catch (error) {
+        return response({ error: error instanceof Error && error.name === "TimeoutError" ? "backend_timeout" : "backend_unavailable" }, 502);
+      }
+    }
     if (message.method.startsWith("notifications/")) return new Response(null, { status: 202, headers: { "cache-control": "no-store" } });
     const id = message.id ?? null;
     if (message.method === "initialize") {

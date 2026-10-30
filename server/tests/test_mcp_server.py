@@ -695,7 +695,7 @@ class SchemaTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             archive = root / "source.zip"
-            sample_bytes = b'{"minecraft:item":{"description":{"identifier":"demo:thing"}}}\\n'
+            sample_bytes = b'{"minecraft:item":{"description":{"identifier":"demo:thing"}}}\n'
             with zipfile.ZipFile(archive, "w") as zf:
                 zf.writestr("behavior_pack/items/example.json", sample_bytes)
             index_path = root / "index.json.gz"

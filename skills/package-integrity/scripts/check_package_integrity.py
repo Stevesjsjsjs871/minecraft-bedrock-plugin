@@ -597,10 +597,10 @@ def audit_package(root: Path, *, deep_index: bool = True, strict_files: bool = T
             add("changelog-version", "WARN", "CHANGELOG.md could not be read")
 
 
-    return _report(root, checks, registry, index)
+    return _report(root, checks, registry, index, indices)
 
 
-def _report(root: Path, checks: list[dict[str, str]], registry: dict[str, Any], index: dict[str, Any] | None) -> dict[str, Any]:
+def _report(root: Path, checks: list[dict[str, str]], registry: dict[str, Any], index: dict[str, Any] | None, indices: dict[str, Any] | None = None) -> dict[str, Any]:
     fails = sum(c["status"] == "FAIL" for c in checks)
     warns = sum(c["status"] == "WARN" for c in checks)
     status = "FAIL" if fails else ("WARN" if warns else "PASS")
@@ -613,7 +613,7 @@ def _report(root: Path, checks: list[dict[str, str]], registry: dict[str, Any], 
         "checks": checks,
         "mcp_registry": registry,
         "mojang_samples_index": index,
-        "mojang_samples_indices": indices,
+        "mojang_samples_indices": indices or {},
         "runtime_status": "NOT RUN",
     }
 

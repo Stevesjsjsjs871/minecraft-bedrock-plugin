@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local stdio MCP server for Minecraft Bedrock Engineer. Creates new projects and item slices; analysis tools remain read-only."""
+"""Minecraft Bedrock Engineer core MCP server (STDIO-compatible, HTTP-gateway embeddable). Creates new projects and item slices; analysis tools remain read-only."""
 from __future__ import annotations
 
 import gzip
@@ -28,7 +28,7 @@ from archive_safety import (  # noqa: E402
 )
 
 VERSION_FILE = ROOT / "VERSION"
-SERVER_VERSION = VERSION_FILE.read_text(encoding="utf-8").strip()
+SERVER_VERSION = VERSION_FILE.read_text(encoding="utf-8").strip()\nMCP_SERVER_NAME = "minecraft-bedrock-engineer"\nMCP_TRANSPORTS = ("stdio", "http-gateway")
 MAX_MEMBERS_RETURNED = 2000
 SUPPORTED_SUFFIXES = {".mcaddon", ".mcpack", ".mcworld", ".zip"}
 AUDITOR = ROOT / "skills" / "automated-validation" / "scripts" / "bedrock_audit.py"
@@ -2756,7 +2756,7 @@ def handle_message(message: Any) -> dict[str, Any] | None:
         return {"jsonrpc": "2.0", "id": request_id, "result": {
             "protocolVersion": selected,
             "capabilities": {"tools": {"listChanged": False}},
-            "serverInfo": {"name": "minecraft-bedrock-engineer", "version": SERVER_VERSION},
+            "serverInfo": {"name": MCP_SERVER_NAME, "version": SERVER_VERSION},
             "instructions": WORKFLOW_INSTRUCTIONS,
         }}
     if method == "ping":

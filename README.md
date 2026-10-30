@@ -32,7 +32,7 @@ The GitHub source intentionally excludes retired server wrappers and their obsol
 Use skills/skills-only-maintenance/SKILL.md for plugin maintenance. First run the package-integrity regression tests:
 
 ```bash
-python -m unittest discover -s skills/package-integrity/scripts -p 'test_*.py' -v
+PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s skills/package-integrity/scripts -p 'test_*.py' -v
 ```
 
 Build a deterministic candidate outside the source tree, extract it into a fresh directory, and run the strict release gate:
@@ -42,7 +42,8 @@ set -euo pipefail
 mkdir -p dist
 source_dir="$(mktemp -d)"
 tmp_dir="$(mktemp -d)"
-trap 'rm -rf "$source_dir" "$tmp_dir"' EXIT
+extract_dir="$(mktemp -d)"
+trap 'rm -rf "$source_dir" "$tmp_dir" "$extract_dir"' EXIT
 archive="$tmp_dir/bedrock-samples-v1.26.50.4-full.zip"
 index="$tmp_dir/mojang-samples-index.json.gz"
 curl --fail --location --output "$archive" \
@@ -53,8 +54,8 @@ PYTHONDONTWRITEBYTECODE=1 python skills/bedrock-development/scripts/restore_moja
 git archive HEAD | tar -x -C "$source_dir"
 cp "$index" "$source_dir/skills/bedrock-development/references/mojang-samples-1.26.50.4/mojang-samples-index.json.gz"
 PYTHONDONTWRITEBYTECODE=1 python skills/package-integrity/scripts/build_skills_package.py "$source_dir" dist/minecraft-bedrock-engineer.tar.gz --source-commit "$(git rev-parse HEAD)" --source-date-epoch "$(git show -s --format=%ct HEAD)"
-tar -xzf dist/minecraft-bedrock-engineer.tar.gz -C "$tmp_dir"
-PYTHONDONTWRITEBYTECODE=1 python skills/package-integrity/scripts/check_skills_package.py "$tmp_dir"
+tar -xzf dist/minecraft-bedrock-engineer.tar.gz -C "$extract_dir"
+PYTHONDONTWRITEBYTECODE=1 python skills/package-integrity/scripts/check_skills_package.py "$extract_dir"
 (cd dist && sha256sum -c minecraft-bedrock-engineer.tar.gz.sha256)
 ```
 

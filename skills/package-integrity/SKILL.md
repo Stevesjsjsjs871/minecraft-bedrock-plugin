@@ -18,11 +18,21 @@ set -euo pipefail
 mkdir -p dist
 source_dir="$(mktemp -d)"
 tmp_dir="$(mktemp -d)"
-trap 'rm -rf "$source_dir" "$tmp_dir"' EXIT
+extract_dir="$(mktemp -d)"
+trap 'rm -rf "$source_dir" "$tmp_dir" "$extract_dir"' EXIT
+archive="$tmp_dir/bedrock-samples-v1.26.50.4-full.zip"
+index="$tmp_dir/mojang-samples-index.json.gz"
+curl --fail --location --output "$archive" \
+  https://github.com/Mojang/bedrock-samples/releases/download/v1.26.50.4/bedrock-samples-v1.26.50.4-full.zip
+PYTHONDONTWRITEBYTECODE=1 python skills/bedrock-development/scripts/restore_mojang_index.py "$archive" \
+  --metadata skills/bedrock-development/references/mojang-samples-1.26.50.4/INDEX_METADATA.json \
+  --indexer skills/bedrock-development/scripts/index_mojang_samples.py --output "$index"
 git archive HEAD | tar -x -C "$source_dir"
-python skills/package-integrity/scripts/build_skills_package.py "$source_dir" dist/minecraft-bedrock-engineer.tar.gz --source-commit "$(git rev-parse HEAD)" --source-date-epoch "$(git show -s --format=%ct HEAD)"
-tar -xzf dist/minecraft-bedrock-engineer.tar.gz -C "$tmp_dir"
-python skills/package-integrity/scripts/check_skills_package.py "$tmp_dir"
+cp "$index" "$source_dir/skills/bedrock-development/references/mojang-samples-1.26.50.4/mojang-samples-index.json.gz"
+PYTHONDONTWRITEBYTECODE=1 python skills/package-integrity/scripts/build_skills_package.py "$source_dir" dist/minecraft-bedrock-engineer.tar.gz --source-commit "$(git rev-parse HEAD)" --source-date-epoch "$(git show -s --format=%ct HEAD)"
+tar -xzf dist/minecraft-bedrock-engineer.tar.gz -C "$extract_dir"
+PYTHONDONTWRITEBYTECODE=1 python skills/package-integrity/scripts/check_skills_package.py "$extract_dir"
+(cd dist && sha256sum -c minecraft-bedrock-engineer.tar.gz.sha256)
 (cd dist && sha256sum -c minecraft-bedrock-engineer.tar.gz.sha256)
 ```
 

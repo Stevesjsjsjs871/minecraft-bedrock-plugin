@@ -70,3 +70,21 @@ The server contract test separately verifies that the original three create/audi
 ## Workflow version-source follow-up
 
 After the prompt validator fix, all test suites and the package-integrity audit passed, but the final workflow contract step still failed. Its inline script hard-coded `expected = "1.0.14"` even though the release synchronization had moved the repository to 1.3.0. The workflow now reads the expected version from the repository's `VERSION` marker, then checks both manifests and all three server version constants against that value. The package-integrity audit remains responsible for strict SemVer validation.
+
+
+## Final verification
+
+- Latest branch commit: `1abef321ed69e9a5f37668c7d6f3fcafddfa4c17`.
+- Final GitHub Actions run: [41041952864](https://github.com/Stevesjsjsjs871/minecraft-bedrock-plugin/actions/runs/41041952864) — **Success** on Ubuntu 24.04 / Python 3.12.15.
+- Server suite: 359/359.
+- PNG validator suite: 15/15.
+- Texture-link auditor suite: 20/20.
+- Benchmark evaluator: 12/12.
+- Mojang indexer: 6/6.
+- Procedural texture generator: 12/12.
+- Package-integrity tests: 11/11.
+- Package-integrity audit completed with a known WARN: full generated Stable gzip index is absent in this main-branch source snapshot; 14 curated files remain for fallback search. No FAIL was reported.
+- Final workflow manifest/config/server-version contract: PASS at version 1.3.0.
+- Python compilation: PASS.
+
+Local test execution, Minecraft runtime/import, Creator Tools CLI, Windows and macOS: NOT RUN.

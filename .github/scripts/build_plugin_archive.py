@@ -91,7 +91,8 @@ def validate(files: dict[str, tuple[bytes, int]]) -> str:
             raise BuildError(f"invalid JSON: {path}: {exc}") from exc
 
     version = files["VERSION"][0].decode("utf-8").strip()
-    if not re.fullmatch(r"(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?", version):
+    semver_pattern = r"(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?"
+    if not re.fullmatch(semver_pattern, version):
         raise BuildError(f"invalid SemVer in VERSION: {version!r}")
     root, compat = read_json("plugin.json"), read_json(".codex-plugin/plugin.json")
     if root.get("name") != "minecraft-bedrock-engineer" or compat.get("name") != root.get("name"):
@@ -104,23 +105,59 @@ def validate(files: dict[str, tuple[bytes, int]]) -> str:
     if any(not isinstance(x, str) or not x.strip() for x in prompts) or len(prompts) != len(set(prompts)):
         raise BuildError("default prompts must be unique, non-empty strings")
 
+    readme = files["README.md"][0].decode("utf-8-sig")
+    readme_lines = readme.splitlines()
+    readme_heading = readme_lines[0] if readme_lines else ""
+    readme_match = re.fullmatch(
+        r"#\s+Minecraft Bedrock Engineer\s+[—-]\s+(" + semver_pattern + r")",
+        readme_heading,
+    )
+    if not readme_match or readme_match.group(1) != version:
+        raise BuildError("README title version does not match VERSION")
+
+    changelog = files["CHANGELOG.md"][0].decode("utf-8-sig")
+    latest_heading = next((line for line in changelog.splitlines() if line.startswith("## ")), "")
+    changelog_match = re.match(r"^##\s+(" + semver_pattern + r")(?:\s|$)", latest_heading)
+    if not changelog_match or changelog_match.group(1) != version:
+        raise BuildError("latest CHANGELOG heading version does not match VERSION")
+
     configs = [read_json(p).get("mcpServers") for p in (".mcp.json", "mcp.json")]
     if not all(isinstance(x, dict) and x for x in configs) or set(configs[0]) != set(configs[1]):
         raise BuildError("MCP server registries are missing or have different names")
-    for name in configs[0]:
-        for field in ("type", "command", "args"):
-            if configs[0][name].get(field) != configs[1][name].get(field):
-                raise BuildError(f"MCP server {name!r} differs between configs ({field})")
-        for config in configs:
-            server = config[name]
-            if server.get("type") != "stdio" or not isinstance(server.get("args"), list):
-                raise BuildError(f"MCP server {name!r} must be stdio with args")
-            for arg in server["args"]:
-                if isinstance(arg, str) and "$" + "{PLUGIN_ROOT}/" in arg:
+    normalized_configs = []
+    for config in configs:
+        normalized = {}
+        for name, raw_server in config.items():
+            if not isinstance(raw_server, dict):
+                raise BuildError(f"MCP server {name!r} configuration must be an object")
+            server = dict(raw_server)
+            env = server.get("env", {})
+            if not isinstance(env, dict) or any(
+                not isinstance(key, str) or not isinstance(value, str)
+                for key, value in env.items()
+            ):
+                raise BuildError(f"MCP server {name!r} env must contain string keys and values")
+            server["env"] = env
+            if server.get("type") != "stdio":
+                raise BuildError(f"MCP server {name!r} must use stdio")
+            if not isinstance(server.get("command"), str) or not server["command"].strip():
+                raise BuildError(f"MCP server {name!r} must have a non-empty command")
+            args = server.get("args")
+            if not isinstance(args, list) or any(not isinstance(arg, str) for arg in args):
+                raise BuildError(f"MCP server {name!r} args must be a string array")
+            for arg in args:
+                if "$" + "{PLUGIN_ROOT}/" in arg:
                     rel = arg.split("$" + "{PLUGIN_ROOT}/", 1)[1].replace("\\", "/")
                     pure = PurePosixPath(rel)
                     if pure.is_absolute() or ".." in pure.parts or pure.as_posix() != rel or rel not in files:
                         raise BuildError(f"MCP server {name!r} references unsafe or missing path {rel!r}")
+            normalized[name] = server
+        normalized_configs.append(normalized)
+    if normalized_configs[0] != normalized_configs[1]:
+        for name in sorted(normalized_configs[0]):
+            if normalized_configs[0][name] != normalized_configs[1][name]:
+                raise BuildError(f"MCP server {name!r} differs between configs")
+        raise BuildError("MCP server registries differ between configs")
     return version
 
 

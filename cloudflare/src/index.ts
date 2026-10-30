@@ -102,7 +102,7 @@ async function callTool(name: string, args: Record<string, unknown>, env: Env): 
     const path = args.path;
     if (typeof path !== "string" || path.startsWith("/") || path.includes("..") || path.includes("\\") || !(path.startsWith("server/") || path.startsWith("skills/"))) throw new Error("Only safe relative paths under server/ or skills/ are allowed.");
     const branch = env.GITHUB_BRANCH || DEFAULT_BRANCH;
-    const url = `https://raw.githubusercontent.com/${REPO}/${encodeURIComponent(branch)}/${path.split("/").map(encodeURIComponent).join("/")}`;
+    const url = `https://raw.githubusercontent.com/${REPO}/${branch.split("/").map(encodeURIComponent).join("/")}/${path.split("/").map(encodeURIComponent).join("/")}`;
     const upstream = await fetch(url, { headers: { "accept": "text/plain" }, signal: AbortSignal.timeout(8000) });
     if (!upstream.ok) throw new Error(upstream.status === 404 ? "Source file not found." : `GitHub returned HTTP ${upstream.status}.`);
     const content = await upstream.text();

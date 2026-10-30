@@ -99,3 +99,14 @@
 - Tests: local execution NOT RUN. GitHub CI is expected to validate the new checker regressions after the Draft PR is opened; no PASS is claimed before that run.
 - Safety: no Plugin Creator update, no release, no merge, no deployment, no deletion of legacy server files, no MCP restoration and no Spatial GUI.
 - Next: review CI for this capability-contract PR, then establish a reproducible full source snapshot of the live Plugin Creator 1.6.1 package before reconciling version history or allocating a candidate.
+
+
+### CI follow-up — PR #26
+
+- GitHub Actions run #41140817989 succeeded on PR #26's merge ref 43c08feeeeb95c7cb9d18af6ac68b37926138519; source head at run time was 102d4689e1697288965582d3397d4db08779b9b6.
+- Exact Python runtime assertion and compileall passed. Focused suites: geometry/UV 18/18; PNG/texture 22/22; package integrity/provenance 70/70; Mojang indexer/restore 14/14; audit benchmark 12/12. Total: 136/136 tests.
+- Release metadata and Skills-only boundary check passed. The official Mojang Bedrock Samples v1.26.50.4 archive verification step passed.
+- Extracted Skills-only package gate: 23/23 PASS, 0 WARN, 0 FAIL.
+- Two independent clean snapshots produced byte-identical tar.gz archives and SHA-256 sidecars. The CI-built 1.5.11 source snapshot contains 135 payload files / 1,986,907 bytes; payload SHA-256 f77e333126f6fdeec5ba0a94a49ae56a2f4b7cbee4b4ff5583ad5dce84a8ec15; archive SHA-256 f225efb3ae102ab006860970fa5714b04dcbd3111ac9949322cfec1fe1d79c68.
+- This validates the PR's 1.5.11 GitHub source line only. It does not establish parity with Plugin Creator 1.6.1 and is not a published release or assigned 1.6.2 candidate. Minecraft, Blockbench and in-game rendering remain NOT RUN.
+- PR #26 remains Draft/open and unmerged. No Plugin Creator mutation, release, deployment or merge was performed.

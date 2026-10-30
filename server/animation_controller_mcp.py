@@ -53,7 +53,26 @@ _STATE_SCHEMA = {
     "properties": {
         "name": {"type": "string", "minLength": 1, "maxLength": 32},
         "animations": {"type": "array", "maxItems": _MAX_ANIMATIONS_PER_STATE, "items": {"type": "string", "minLength": 1, "maxLength": 64}},
-        "transitions": {"type": "object", "maxProperties": _MAX_TRANSITIONS_PER_STATE, "additionalProperties": {"type": "string", "minLength": 1, "maxLength": _MAX_MOLANG_LENGTH}},
+        "transitions": {
+            "description": "Preferred: ordered array of single-key target/condition objects, matching Bedrock transition priority. Legacy object maps are also accepted for compatibility.",
+            "anyOf": [
+                {
+                    "type": "array",
+                    "maxItems": _MAX_TRANSITIONS_PER_STATE,
+                    "items": {
+                        "type": "object",
+                        "minProperties": 1,
+                        "maxProperties": 1,
+                        "additionalProperties": {"type": "string", "minLength": 1, "maxLength": _MAX_MOLANG_LENGTH}
+                    }
+                },
+                {
+                    "type": "object",
+                    "maxProperties": _MAX_TRANSITIONS_PER_STATE,
+                    "additionalProperties": {"type": "string", "minLength": 1, "maxLength": _MAX_MOLANG_LENGTH}
+                }
+            ]
+        },
         "on_entry": {"type": "array", "maxItems": 16, "items": {"type": "string", "minLength": 1, "maxLength": _MAX_MOLANG_LENGTH}},
         "on_exit": {"type": "array", "maxItems": 16, "items": {"type": "string", "minLength": 1, "maxLength": _MAX_MOLANG_LENGTH}},
         "blend_transition": {"type": "number", "minimum": 0, "maximum": 10},
@@ -95,7 +114,7 @@ TOOL_BY_NAME = {tool["name"]: tool for tool in TOOLS}
 WORKFLOW_INSTRUCTIONS = (
     "Animation controller workflow: create_animation_controller creates a new RP controller and links it to an existing RP client entity. "
     "State animation names must be aliases already mapped in client_entity.description.animations. "
-    "Transition conditions are Molang strings; validate_animation_controller checks static structure and linkage only. "
+    "Prefer ordered transition arrays to preserve Bedrock transition priority; legacy object maps remain accepted. validate_animation_controller checks static structure and linkage only. "
     "Do not claim Molang execution or in-game animation behavior was tested."
 )
 
@@ -273,12 +292,24 @@ def _validate_states(raw_states: Any, initial_state: Any, available_animation_al
             state["animations"] = list(animations)
             animation_aliases.update(animations)
 
-        transitions = raw.get("transitions", {})
-        if not isinstance(transitions, dict) or len(transitions) > _MAX_TRANSITIONS_PER_STATE:
-            raise ValueError(f"{label}.transitions must be an object with at most {_MAX_TRANSITIONS_PER_STATE} entries")
-        if transitions:
+        # Prefer an ordered array so transition priority is explicit. Keep the
+        # original object-map shorthand for backward compatibility with 1.1.1 callers.
+        transitions = raw.get("transitions", [])
+        if isinstance(transitions, dict):
+            transition_items = list(transitions.items())
+        elif isinstance(transitions, list):
+            transition_items = []
+            for transition_index, entry in enumerate(transitions):
+                if not isinstance(entry, dict) or len(entry) != 1:
+                    raise ValueError(f"{label}.transitions[{transition_index}] must contain exactly one target state")
+                transition_items.append(next(iter(entry.items())))
+        else:
+            raise ValueError(f"{label}.transitions must be an ordered array or an object map")
+        if len(transition_items) > _MAX_TRANSITIONS_PER_STATE:
+            raise ValueError(f"{label}.transitions must contain at most {_MAX_TRANSITIONS_PER_STATE} entries")
+        if transition_items:
             state_transitions = []
-            for target, condition in transitions.items():
+            for target, condition in transition_items:
                 if not isinstance(target, str) or not _STATE.fullmatch(target):
                     raise ValueError(f"{label}.transitions contains an invalid target state name")
                 expression = _validate_molang(condition, f"{label}.transitions.{target}")

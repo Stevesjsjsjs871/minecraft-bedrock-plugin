@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Compare a Plugin Creator archive with the checked-out plugin source tree.
+"""Compare a Plugin Creator ZIP/tar.gz archive with checked-out plugin source.
 
-This is repository-side release QA. It never extracts the supplied archive and
-never mutates either the archive or the checkout.
+Repository-side release QA only: the archive is inspected in place, never
+extracted, and neither the archive nor the checkout is modified.
 """
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ import hashlib
 import json
 import os
 import stat
+import tarfile
 import zipfile
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -48,11 +49,6 @@ def _safe_relative_path(raw: str) -> str:
     return normalized
 
 
-def _is_symlink(info: zipfile.ZipInfo) -> bool:
-    mode = (info.external_attr >> 16) & 0xFFFF
-    return stat.S_ISLNK(mode)
-
-
 def _collect_repository_files(repo_root: Path) -> tuple[dict[str, Path], list[str]]:
     root = repo_root.resolve(strict=True)
     if not root.is_dir():
@@ -60,7 +56,6 @@ def _collect_repository_files(repo_root: Path) -> tuple[dict[str, Path], list[st
 
     files: dict[str, Path] = {}
     errors: list[str] = []
-
     for relative in PACKAGE_ROOT_FILES:
         candidate = root / relative
         if candidate.is_symlink():
@@ -94,65 +89,123 @@ def _collect_repository_files(repo_root: Path) -> tuple[dict[str, Path], list[st
                     errors.append(f"repository package file is a symlink: {relative}")
                 elif child.is_file():
                     files[relative] = child
-
     return files, errors
 
 
-def _archive_entries(archive: zipfile.ZipFile) -> tuple[dict[str, zipfile.ZipInfo], list[str]]:
-    infos = archive.infolist()
-    errors: list[str] = []
-    if len(infos) > MAX_ARCHIVE_ENTRIES:
-        raise ParityError(f"archive contains too many entries: {len(infos)} > {MAX_ARCHIVE_ENTRIES}")
+class ArchiveIndex:
+    """Read-only index for ZIP and tar archives with bounded member sizes."""
 
-    entries: dict[str, zipfile.ZipInfo] = {}
-    total_size = 0
-    for info in infos:
-        if info.is_dir():
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self.kind = ""
+        self.handle: zipfile.ZipFile | tarfile.TarFile
+        self.entries: dict[str, zipfile.ZipInfo | tarfile.TarInfo] = {}
+        self.errors: list[str] = []
+        self._open_and_index()
+
+    def _open_and_index(self) -> None:
+        if zipfile.is_zipfile(self.path):
+            self.kind = "zip"
+            self.handle = zipfile.ZipFile(self.path, "r")
+            members: list[zipfile.ZipInfo | tarfile.TarInfo] = self.handle.infolist()
+        elif tarfile.is_tarfile(self.path):
+            self.kind = "tar"
+            self.handle = tarfile.open(self.path, "r:*")
+            members = self.handle.getmembers()
+        else:
+            raise ParityError("archive is neither a supported ZIP nor tar archive")
+
+        if len(members) > MAX_ARCHIVE_ENTRIES:
+            self.close()
+            raise ParityError(f"archive contains too many entries: {len(members)} > {MAX_ARCHIVE_ENTRIES}")
+
+        total_size = 0
+        for member in members:
+            if self.kind == "zip":
+                assert isinstance(member, zipfile.ZipInfo)
+                name = member.filename
+                is_directory = member.is_dir()
+                mode = (member.external_attr >> 16) & 0xFFFF
+                if not is_directory and stat.S_ISLNK(mode):
+                    self.errors.append(f"archive entry is a symlink: {name}")
+                    continue
+                file_type = stat.S_IFMT(mode)
+                if not is_directory and file_type and file_type != stat.S_IFREG:
+                    self.errors.append(f"archive entry is not a regular file: {name}")
+                    continue
+                size = member.file_size
+            else:
+                assert isinstance(member, tarfile.TarInfo)
+                name = member.name
+                is_directory = member.isdir()
+                if not is_directory and not member.isreg():
+                    self.errors.append(f"archive entry is not a regular file: {name}")
+                    continue
+                size = member.size
+
             try:
-                _safe_relative_path(info.filename.rstrip("/"))
+                relative = _safe_relative_path(name.rstrip("/") if is_directory else name)
             except ParityError as exc:
-                errors.append(str(exc))
-            continue
-        path = _safe_relative_path(info.filename)
-        if path in entries:
-            errors.append(f"duplicate archive entry: {path}")
-            continue
-        if _is_symlink(info):
-            errors.append(f"archive entry is a symlink: {path}")
-            continue
-        if info.file_size < 0 or info.file_size > MAX_ARCHIVE_FILE_BYTES:
-            errors.append(f"archive entry exceeds size limit: {path}")
-            continue
-        total_size += info.file_size
-        if total_size > MAX_ARCHIVE_TOTAL_BYTES:
-            raise ParityError(
-                f"archive uncompressed size exceeds limit: {total_size} > {MAX_ARCHIVE_TOTAL_BYTES}"
-            )
-        entries[path] = info
-    return entries, errors
+                self.errors.append(str(exc))
+                continue
+            if is_directory:
+                continue
+            if relative in self.entries:
+                self.errors.append(f"duplicate archive entry: {relative}")
+                continue
+            if size < 0 or size > MAX_ARCHIVE_FILE_BYTES:
+                self.errors.append(f"archive entry exceeds size limit: {relative}")
+                continue
+            total_size += size
+            if total_size > MAX_ARCHIVE_TOTAL_BYTES:
+                self.close()
+                raise ParityError(
+                    f"archive uncompressed size exceeds limit: {total_size} > {MAX_ARCHIVE_TOTAL_BYTES}"
+                )
+            self.entries[relative] = member
+
+    def read(self, relative: str) -> bytes:
+        member = self.entries[relative]
+        if self.kind == "zip":
+            assert isinstance(self.handle, zipfile.ZipFile)
+            data = self.handle.read(member)
+        else:
+            assert isinstance(self.handle, tarfile.TarFile)
+            stream = self.handle.extractfile(member)
+            if stream is None:
+                raise ParityError(f"unable to read regular archive member: {relative}")
+            with stream:
+                data = stream.read(MAX_ARCHIVE_FILE_BYTES + 1)
+        if len(data) > MAX_ARCHIVE_FILE_BYTES:
+            raise ParityError(f"archive member exceeded read limit: {relative}")
+        return data
+
+    def close(self) -> None:
+        handle = getattr(self, "handle", None)
+        if handle is not None:
+            handle.close()
 
 
-def _read_archive_json(archive: zipfile.ZipFile, entries: dict[str, zipfile.ZipInfo], path: str) -> Any:
-    if path not in entries:
+def _read_archive_json(archive: ArchiveIndex, path: str) -> Any:
+    if path not in archive.entries:
         raise ParityError(f"required metadata file is missing from archive: {path}")
     try:
-        raw = archive.read(entries[path])
-        return json.loads(raw.decode("utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError, zipfile.BadZipFile) as exc:
+        return json.loads(archive.read(path).decode("utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError, zipfile.BadZipFile, tarfile.TarError) as exc:
         raise ParityError(f"invalid JSON metadata {path}: {exc}") from exc
 
 
-def _metadata_errors(archive: zipfile.ZipFile, entries: dict[str, zipfile.ZipInfo]) -> list[str]:
+def _metadata_errors(archive: ArchiveIndex) -> list[str]:
     errors: list[str] = []
     try:
-        root_manifest = _read_archive_json(archive, entries, "plugin.json")
-        compat_manifest = _read_archive_json(archive, entries, ".codex-plugin/plugin.json")
-        dot_mcp = _read_archive_json(archive, entries, ".mcp.json")
-        mcp = _read_archive_json(archive, entries, "mcp.json")
-        version = archive.read(entries["VERSION"]).decode("utf-8").strip() if "VERSION" in entries else ""
+        root_manifest = _read_archive_json(archive, "plugin.json")
+        compat_manifest = _read_archive_json(archive, ".codex-plugin/plugin.json")
+        dot_mcp = _read_archive_json(archive, ".mcp.json")
+        mcp = _read_archive_json(archive, "mcp.json")
+        version = archive.read("VERSION").decode("utf-8").strip() if "VERSION" in archive.entries else ""
     except ParityError as exc:
         return [str(exc)]
-    except (OSError, UnicodeDecodeError, KeyError, zipfile.BadZipFile) as exc:
+    except (OSError, UnicodeDecodeError, zipfile.BadZipFile, tarfile.TarError) as exc:
         return [f"unable to read release metadata: {exc}"]
 
     if not isinstance(root_manifest, dict) or not isinstance(compat_manifest, dict):
@@ -205,7 +258,7 @@ def _metadata_errors(archive: zipfile.ZipFile, entries: dict[str, zipfile.ZipInf
                 except ParityError:
                     errors.append(f"{config_path}: unsafe server script path for {server_name}: {arg}")
                     continue
-                if relative not in entries:
+                if relative not in archive.entries:
                     errors.append(f"{config_path}: server script is absent from archive: {relative}")
     if len(config_sets) == 2 and config_sets[0] != config_sets[1]:
         errors.append("MCP server names differ between .mcp.json and mcp.json")
@@ -218,6 +271,7 @@ def audit_archive(archive_path: Path, repo_root: Path) -> dict[str, Any]:
         "status": "FAIL",
         "archive": str(archive_path),
         "repository_root": str(repo_root),
+        "archive_type": None,
         "summary": {},
         "missing": [],
         "extra": [],
@@ -226,46 +280,42 @@ def audit_archive(archive_path: Path, repo_root: Path) -> dict[str, Any]:
     }
 
     try:
-        with zipfile.ZipFile(archive_path, "r") as archive:
-            entries, entry_errors = _archive_entries(archive)
-            report["errors"].extend(entry_errors)
-            if not entry_errors:
-                bad_entry = archive.testzip()
-                if bad_entry is not None:
-                    report["errors"].append(f"ZIP CRC/decompression check failed: {bad_entry}")
+        archive = ArchiveIndex(archive_path)
+        report["archive_type"] = archive.kind
+        report["errors"].extend(archive.errors)
+        expected_names = set(expected)
+        actual_names = set(archive.entries)
+        report["missing"] = sorted(expected_names - actual_names)
+        report["extra"] = sorted(actual_names - expected_names)
 
-            expected_names = set(expected)
-            actual_names = set(entries)
-            report["missing"] = sorted(expected_names - actual_names)
-            report["extra"] = sorted(actual_names - expected_names)
+        matched = 0
+        for relative in sorted(expected_names & actual_names):
+            try:
+                archive_bytes = archive.read(relative)
+                repository_bytes = expected[relative].read_bytes()
+            except (OSError, zipfile.BadZipFile, tarfile.TarError, RuntimeError, ParityError) as exc:
+                report["errors"].append(f"unable to compare {relative}: {exc}")
+                continue
+            if archive_bytes != repository_bytes:
+                report["mismatched"].append({
+                    "path": relative,
+                    "archive_sha256": hashlib.sha256(archive_bytes).hexdigest(),
+                    "repository_sha256": hashlib.sha256(repository_bytes).hexdigest(),
+                })
+            else:
+                matched += 1
 
-            matched = 0
-            for relative in sorted(expected_names & actual_names):
-                try:
-                    archive_bytes = archive.read(entries[relative])
-                    repository_bytes = expected[relative].read_bytes()
-                except (OSError, zipfile.BadZipFile, RuntimeError) as exc:
-                    report["errors"].append(f"unable to compare {relative}: {exc}")
-                    continue
-                if archive_bytes != repository_bytes:
-                    report["mismatched"].append({
-                        "path": relative,
-                        "archive_sha256": hashlib.sha256(archive_bytes).hexdigest(),
-                        "repository_sha256": hashlib.sha256(repository_bytes).hexdigest(),
-                    })
-                else:
-                    matched += 1
-
-            report["errors"].extend(_metadata_errors(archive, entries))
-            report["summary"] = {
-                "repository_files": len(expected),
-                "archive_files": len(entries),
-                "byte_identical_files": matched,
-                "missing_files": len(report["missing"]),
-                "extra_files": len(report["extra"]),
-                "mismatched_files": len(report["mismatched"]),
-            }
-    except (OSError, zipfile.BadZipFile, ParityError) as exc:
+        report["errors"].extend(_metadata_errors(archive))
+        report["summary"] = {
+            "repository_files": len(expected),
+            "archive_files": len(archive.entries),
+            "byte_identical_files": matched,
+            "missing_files": len(report["missing"]),
+            "extra_files": len(report["extra"]),
+            "mismatched_files": len(report["mismatched"]),
+        }
+        archive.close()
+    except (OSError, zipfile.BadZipFile, tarfile.TarError, ParityError) as exc:
         report["errors"].append(str(exc))
 
     if not any((report["missing"], report["extra"], report["mismatched"], report["errors"])):
@@ -275,7 +325,7 @@ def audit_archive(archive_path: Path, repo_root: Path) -> dict[str, Any]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--archive", required=True, type=Path, help="Plugin Creator ZIP archive")
+    parser.add_argument("--archive", required=True, type=Path, help="Plugin Creator .zip or .tar.gz archive")
     parser.add_argument("--repo-root", type=Path, default=Path.cwd(), help="checked-out plugin repository root")
     parser.add_argument("--json-output", type=Path, help="optional path for a machine-readable JSON report")
     args = parser.parse_args(argv)

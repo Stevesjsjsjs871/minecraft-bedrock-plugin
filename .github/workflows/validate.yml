@@ -81,8 +81,11 @@ jobs:
           assert entity_server["SERVER_VERSION"] == expected
           assert animation_server["SERVER_VERSION"] == expected
           entity_tools = {tool["name"]: tool for tool in entity_server["TOOLS"]}
-          assert "create_addon_entity" in entity_tools
-          assert entity_tools["create_addon_entity"]["annotations"]["readOnlyHint"] is False
+          assert "create_addon_entity_with_geometry" in entity_tools
+          assert entity_tools["create_addon_entity_with_geometry"]["annotations"]["readOnlyHint"] is False
+          core_tools = {tool["name"]: tool for tool in server["TOOLS"]}
+          assert "create_addon_entity" in core_tools
+          assert {"creator_tools_status", "creator_tools_catalog", "validate_with_mct", "create_entity_with_mct"} <= set(core_tools)
           animation_tools = {tool["name"]: tool for tool in animation_server["TOOLS"]}
           assert {"create_animation_controller", "validate_animation_controller"} <= set(animation_tools)
           assert animation_tools["validate_animation_controller"]["annotations"]["readOnlyHint"] is True
@@ -109,3 +112,23 @@ jobs:
               assert any("server/animation_controller_mcp.py" in arg.replace("\\", "/") for arg in animation.get("args", []))
           print("PASS: manifests, prompts, entity/animation authoring, texture authoring/audit and five MCP servers are synchronized at", expected)
           PY
+
+  entity-animation-portability:
+    name: Authoring tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test custom entity authoring
+        run: python -m unittest discover -s server/tests -p "test_entity_authoring_mcp.py" -v
+      - name: Test animation controller authoring
+        run: python -m unittest discover -s server/tests -p "test_animation_controller_mcp.py" -v
+      - name: Test five-server MCP registry
+        run: python -m unittest discover -s server/tests -p "test_mcp_registry.py" -v

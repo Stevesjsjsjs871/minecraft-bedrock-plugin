@@ -33,3 +33,10 @@ description: Use when creating or auditing Minecraft Bedrock animation controlle
 
 ## Required report
 Include target version, project/entity/controller identifiers, initial state, states and transitions count, referenced animation aliases, files created/updated, checks actually run, Molang/runtime caveats and in-game test plan. Mark Minecraft runtime behavior `NOT RUN` unless it was actually tested.
+
+
+## Transition ordering and input compatibility
+- Prefer an ordered array of one-key objects, for example `[{ "walking": "query.modified_move_speed > 0.01" }, { "idle": "query.is_sprinting" }]`. Bedrock evaluates transition entries in order and processes at most one transition per frame.
+- The tool still accepts the original object-map shorthand for backward compatibility; Python preserves the parsed insertion order, but an array is the explicit and recommended way to express priority.
+- The generated controller file always serializes `transitions` as an array of single-key objects.
+- Official reference: https://learn.microsoft.com/en-us/minecraft/creator/documents/animations/animationcontroller?view=minecraft-bedrock-stable

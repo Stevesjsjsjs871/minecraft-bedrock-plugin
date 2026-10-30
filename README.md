@@ -1,6 +1,6 @@
 # Minecraft Bedrock Engineer — 1.4.0
 
-## Release overview
+## 1.4.0: Release overview
 
 Version 1.4.0 adds an optional authenticated Cloudflare Workers HTTP MCP gateway backed by a Python container. The original local STDIO MCP configuration remains supported. See `cloudflare/README.md` for deployment instructions.
 

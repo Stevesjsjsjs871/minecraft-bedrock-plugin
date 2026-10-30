@@ -9,49 +9,48 @@ import struct
 import zlib
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 HERE = Path(__file__).resolve()
 SERVER = HERE.parents[1]
 sys.path.insert(0, str(SERVER))
-if 'png_validation' not in sys.modules:
-    validation = types.ModuleType('png_validation')
-    class PngValidationError(ValueError):
-        pass
-    def validate_png_bytes(payload, *, max_bytes=16 * 1024 * 1024, max_dimension=4096, max_pixels=16_777_216):
-        if not isinstance(payload, bytes) or len(payload) < 45 or len(payload) > max_bytes or not payload.startswith(b"\x89PNG\r\n\x1a\n"):
-            raise PngValidationError('invalid PNG signature or size')
-        offset = 8
-        chunks = []
-        while offset + 12 <= len(payload):
-            length = struct.unpack('>I', payload[offset:offset + 4])[0]
-            kind = payload[offset + 4:offset + 8]
-            end = offset + length + 12
-            if end > len(payload):
-                raise PngValidationError('truncated PNG chunk')
-            data = payload[offset + 8:offset + 8 + length]
-            crc = struct.unpack('>I', payload[offset + 8 + length:end])[0]
-            if zlib.crc32(kind + data) & 0xffffffff != crc:
-                raise PngValidationError('PNG CRC mismatch')
-            chunks.append((kind, data))
-            offset = end
-            if kind == b'IEND':
-                break
-        if offset != len(payload) or not chunks or chunks[0][0] != b'IHDR' or chunks[-1][0] != b'IEND':
-            raise PngValidationError('invalid PNG chunk order or trailing data')
-        width, height, depth, ctype, comp, filt, interlace = struct.unpack('>IIBBBBB', chunks[0][1])
-        if not (1 <= width <= max_dimension and 1 <= height <= max_dimension and width * height <= max_pixels):
-            raise PngValidationError('PNG dimensions exceed test limits')
-        if depth != 8 or ctype not in {0, 2, 3, 4, 6} or comp != 0 or filt != 0 or interlace != 0:
-            raise PngValidationError('PNG format is outside test-shim scope')
-        if not any(kind == b'IDAT' for kind, _ in chunks):
-            raise PngValidationError('PNG IDAT missing')
-        return width, height
-    validation.PngValidationError = PngValidationError
-    validation.validate_png_bytes = validate_png_bytes
-    sys.modules['png_validation'] = validation
-
-import texture_painting_mcp as painter
-import uv_mapping_assistant_mcp as assistant
+validation = types.ModuleType("png_validation")
+class PngValidationError(ValueError):
+    pass
+def validate_png_bytes(payload, *, max_bytes=16 * 1024 * 1024, max_dimension=4096, max_pixels=16_777_216):
+    if not isinstance(payload, bytes) or len(payload) < 45 or len(payload) > max_bytes or not payload.startswith(b"\x89PNG\r\n\x1a\n"):
+        raise PngValidationError('invalid PNG signature or size')
+    offset = 8
+    chunks = []
+    while offset + 12 <= len(payload):
+        length = struct.unpack('>I', payload[offset:offset + 4])[0]
+        kind = payload[offset + 4:offset + 8]
+        end = offset + length + 12
+        if end > len(payload):
+            raise PngValidationError('truncated PNG chunk')
+        data = payload[offset + 8:offset + 8 + length]
+        crc = struct.unpack('>I', payload[offset + 8 + length:end])[0]
+        if zlib.crc32(kind + data) & 0xffffffff != crc:
+            raise PngValidationError('PNG CRC mismatch')
+        chunks.append((kind, data))
+        offset = end
+        if kind == b'IEND':
+            break
+    if offset != len(payload) or not chunks or chunks[0][0] != b'IHDR' or chunks[-1][0] != b'IEND':
+        raise PngValidationError('invalid PNG chunk order or trailing data')
+    width, height, depth, ctype, comp, filt, interlace = struct.unpack('>IIBBBBB', chunks[0][1])
+    if not (1 <= width <= max_dimension and 1 <= height <= max_dimension and width * height <= max_pixels):
+        raise PngValidationError('PNG dimensions exceed test limits')
+    if depth != 8 or ctype not in {0, 2, 3, 4, 6} or comp != 0 or filt != 0 or interlace != 0:
+        raise PngValidationError('PNG format is outside test-shim scope')
+    if not any(kind == b'IDAT' for kind, _ in chunks):
+        raise PngValidationError('PNG IDAT missing')
+    return width, height
+validation.PngValidationError = PngValidationError
+validation.validate_png_bytes = validate_png_bytes
+with patch.dict(sys.modules, {"png_validation": validation}):
+    import texture_painting_mcp as painter
+    import uv_mapping_assistant_mcp as assistant
 
 
 class UvMappingAssistantTests(unittest.TestCase):

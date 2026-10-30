@@ -136,8 +136,15 @@ class SchemaTests(unittest.TestCase):
         self.assertIn(f"# Minecraft Bedrock Engineer — {server.SERVER_VERSION}", readme)
         self.assertRegex(readme, rf"(?m)^## {re.escape(server.SERVER_VERSION)}:")
         prompts = manifest["extensions"]["com.openai"]["interface"]["defaultPrompt"]
+        original_prompts = [
+            "Create a new Minecraft Bedrock add-on from scratch or implement a feature in my clean project. Search version-matched samples, make real project file changes only within the selected project, validate the generated BP/RP resources, and report what was and was not verified.",
+            "Audit this Bedrock add-on or candidate release. Check archive integrity, BP/RP manifests and dependency links, JSON/JavaScript, resource references, identifiers, and regressions against a baseline. Provide evidence and severity; do not delete resources.",
+            "Research this Minecraft Bedrock feature for the exact target version. Prioritize official documentation and matching Mojang samples, verify API and format compatibility, compare viable implementations, cite sources, then implement if I asked for implementation.",
+        ]
         self.assertEqual(prompts, compat["interface"]["defaultPrompt"])
-        self.assertEqual(len(prompts), 3)
+        self.assertGreaterEqual(len(prompts), len(original_prompts))
+        self.assertEqual(prompts[:len(original_prompts)], original_prompts)
+        self.assertEqual(len(prompts), len(set(prompts)))
         self.assertLessEqual(len(server.WORKFLOW_INSTRUCTIONS), 512)
         self.assertIn("inspect_archive", server.WORKFLOW_INSTRUCTIONS)
         self.assertIn("compare_baseline", server.WORKFLOW_INSTRUCTIONS)

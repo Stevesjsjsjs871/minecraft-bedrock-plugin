@@ -9,6 +9,7 @@ from pathlib import Path
 SERVER_DIR = Path(__file__).resolve().parents[1]
 if str(SERVER_DIR) not in __import__("sys").path:
     __import__("sys").path.insert(0, str(SERVER_DIR))
+import png_validation
 from png_validation import PngValidationError, validate_png_bytes, validate_png_file
 
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
@@ -138,3 +139,11 @@ class PngValidationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PngValidationImportIsolationTests(unittest.TestCase):
+    def test_import_resolves_to_repository_validator_not_test_stub(self):
+        self.assertEqual(
+            Path(png_validation.__file__).resolve(),
+            (SERVER_DIR / "png_validation.py").resolve(),
+        )

@@ -117,6 +117,35 @@ TOOLS = [
             report = checker.audit_package(root)
             self.assertEqual(self.check_by_id(report, "default-prompts")["status"], "FAIL")
 
+    def test_additional_workflow_prompts_are_allowed_when_manifests_match(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "package"
+            self.make_package(root)
+            manifest_path = root / "plugin.json"
+            compat_path = root / ".codex-plugin/plugin.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            compat = json.loads(compat_path.read_text(encoding="utf-8"))
+            prompts = manifest["extensions"]["com.openai"]["interface"]["defaultPrompt"]
+            prompts.extend([f"Workflow prompt {index}." for index in range(1, 10)])
+            compat["interface"]["defaultPrompt"] = list(prompts)
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            compat_path.write_text(json.dumps(compat), encoding="utf-8")
+            report = checker.audit_package(root)
+            self.assertEqual(self.check_by_id(report, "default-prompts")["status"], "PASS")
+
+    def test_duplicate_default_prompt_is_rejected(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "package"
+            self.make_package(root)
+            manifest_path = root / "plugin.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            prompts = manifest["extensions"]["com.openai"]["interface"]["defaultPrompt"]
+            prompts.append(prompts[0])
+            manifest["extensions"]["com.openai"]["interface"]["defaultPrompt"] = prompts
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            report = checker.audit_package(root)
+            self.assertEqual(self.check_by_id(report, "default-prompts")["status"], "FAIL")
+
     def test_duplicate_tool_name_fails_registry_audit(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td) / "package"

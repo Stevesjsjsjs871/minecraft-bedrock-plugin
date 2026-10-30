@@ -394,11 +394,19 @@ def audit_package(root: Path, *, deep_index: bool = True, strict_files: bool = T
     root_prompt = _prompt(root_manifest, compatibility=False)
     compat_prompt = _prompt(compat_manifest, compatibility=True)
     def valid_prompt(value: Any) -> bool:
-        if isinstance(value, str): return bool(value.strip())
-        if isinstance(value, list): return 1 <= len(value) <= 3 and all(isinstance(p, str) and p.strip() for p in value)
+        if isinstance(value, str):
+            return bool(value.strip())
+        if isinstance(value, list):
+            # Keep a bounded, non-empty prompt list without treating the three
+            # historical defaults as a maximum. Later workflows may append prompts.
+            return (
+                1 <= len(value) <= 32
+                and all(isinstance(prompt, str) and prompt.strip() for prompt in value)
+                and len(value) == len(set(value))
+            )
         return False
     if not valid_prompt(root_prompt) or not valid_prompt(compat_prompt):
-        add("default-prompts", "FAIL", "Both manifests need a string prompt or an array of 1–3 non-empty strings")
+        add("default-prompts", "FAIL", "Both manifests need a non-empty string or an array of 1–32 unique non-empty strings")
     elif root_prompt != compat_prompt:
         add("default-prompts", "FAIL", "Root and compatibility default prompts differ in type, value or order")
     else:

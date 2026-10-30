@@ -14,7 +14,7 @@ from unittest.mock import patch
 # The published base package supplies the full validator; this overlay-only
 # test process injects a small bounded PNG structure shim. The painter's PNG
 # decoder below still independently checks IDAT decompression and scanlines.
-validation = sys.modules.get("png_validation") or types.ModuleType("png_validation")
+validation = types.ModuleType("png_validation")
 if not hasattr(validation, "PngValidationError"):
     class PngValidationError(ValueError):
         pass
@@ -50,10 +50,13 @@ if not hasattr(validation, "validate_png_bytes"):
             raise validation.PngValidationError("required PNG chunks missing")
         return width, height
     validation.validate_png_bytes = validate_png_bytes
-sys.modules["png_validation"] = validation
+SERVER_DIR = Path(__file__).resolve().parents[1]
+if str(SERVER_DIR) not in sys.path:
+    sys.path.insert(0, str(SERVER_DIR))
 
-import texture_painting_mcp as painter
-import visual_reference_analyzer_mcp as analyzer
+with patch.dict(sys.modules, {"png_validation": validation}):
+    import texture_painting_mcp as painter
+    import visual_reference_analyzer_mcp as analyzer
 
 
 class VisualReferenceAnalyzerTests(unittest.TestCase):

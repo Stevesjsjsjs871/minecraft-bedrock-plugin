@@ -84,6 +84,8 @@ _SAMPLE_PATH = {
 }
 MOJANG_SAMPLE_INDEX = ROOT / "skills" / "bedrock-development" / "references" / "mojang-samples-1.26.50.4" / "mojang-samples-index.json.gz"
 MOJANG_SAMPLE_REFERENCE_ROOT = ROOT / "skills" / "bedrock-development" / "references" / "mojang-samples-1.26.50.4"
+MOJANG_SAMPLE_PREVIEW_REFERENCE_ROOT = ROOT / "skills" / "bedrock-development" / "references" / "mojang-samples-1.26.60.30-preview"
+MOJANG_SAMPLE_PREVIEW_INDEX = MOJANG_SAMPLE_PREVIEW_REFERENCE_ROOT / "mojang-samples-index.json.gz"
 MAX_SAMPLE_OUTPUT_CHARS = 12000
 MAX_SAMPLE_READ_BYTES = 2 * 1024 * 1024
 _BUNDLED_SAMPLE_FILES = {
@@ -108,13 +110,20 @@ MOJANG_SAMPLE_SOURCE_CATALOG = {
         "channel": "stable",
         "release_url": "https://github.com/Mojang/bedrock-samples/releases/tag/v1.26.50.4",
         "source_commit": "46ba6ea985fb5a92d79a9419198f10dda14c199d",
+        "source_asset_id": 567172887,
+        "source_asset_size_bytes": 169385576,
+        "source_asset_sha256": "c0b6151f5f9a0c31ebe3c909dfc82d97f12473ed2c6e039aa7e22d667042026c",
         "indexed": True,
     },
     "1.26.60.30-preview": {
         "channel": "preview",
         "release_url": "https://github.com/Mojang/bedrock-samples/releases/tag/v1.26.60.30-preview",
         "source_commit": "4d30ae63750467771b6eccda105f732c6cb77ff7",
-        "indexed": False,
+        "source_asset_id": 677229806,
+        "source_asset_size_bytes": 169961030,
+        "source_asset_sha256": "b7e66ccb64370d345d898ac92cf5a524866657d5aad6ff2655ce1dc6a8d102b9",
+        "source_commit_signature_verified": False,
+        "indexed": True,
     },
 }
 MOJANG_SAMPLE_CORPORA = {
@@ -123,6 +132,12 @@ MOJANG_SAMPLE_CORPORA = {
         "index_path": MOJANG_SAMPLE_INDEX,
         "reference_root": MOJANG_SAMPLE_REFERENCE_ROOT,
         "bundled_files": _BUNDLED_SAMPLE_FILES,
+    },
+    "1.26.60.30-preview": {
+        "channel": "preview",
+        "index_path": MOJANG_SAMPLE_PREVIEW_INDEX,
+        "reference_root": MOJANG_SAMPLE_PREVIEW_REFERENCE_ROOT,
+        "bundled_files": {},
     },
 }
 TOOLS = [
@@ -248,10 +263,10 @@ TOOLS = [
     _tool("inspect_archive", "List archive metadata and unsafe/duplicate path indicators without extracting files or reading file payloads.", {"archive_path": _PATH}, ["archive_path"]),
     _tool(
         "search_mojang_samples",
-        "Search a selected version-labelled Mojang Bedrock Samples corpus by path, category and indexed identifiers. sample_version selects the source corpus, not the add-on target game version; omitted means stable 1.26.50.4. Known but not yet indexed sources return an explicit error and are never silently mapped to another version. Offline only; no network calls or extraction.",
+        "Search a selected version-labelled Mojang Bedrock Samples corpus by path, category and indexed identifiers. sample_version selects the source corpus, not the add-on target game version; omitted means stable 1.26.50.4. Stable and Preview sources use separate pinned indexes; unavailable indexes return an explicit error and are never silently mapped to another version. Offline only; no network calls or extraction.",
         {
             "query": {"type": "string", "minLength": 1, "maxLength": 160, "description": "Search resource paths, categories and indexed identifiers; examples: geometry goat, minecraft:apple, recipe emerald."},
-            "sample_version": {"type": "string", "enum": ["1.26.50.4", "1.26.60.30-preview"], "default": "1.26.50.4", "description": "Source corpus version, distinct from target_game_version. Stable 1.26.50.4 is indexed; preview 1.26.60.30-preview is known but not indexed yet."},
+            "sample_version": {"type": "string", "enum": ["1.26.50.4", "1.26.60.30-preview"], "default": "1.26.50.4", "description": "Source corpus version, distinct from target_game_version. Stable 1.26.50.4 and Preview 1.26.60.30-preview are separately indexed."},
             "category": {"type": "string", "enum": _SAMPLE_CATEGORIES, "description": "Optional resource type filter; defaults to all."},
             "limit": {"type": "integer", "minimum": 1, "maximum": 20, "description": "Maximum number of matches to return; defaults to 10."},
         },
@@ -259,10 +274,10 @@ TOOLS = [
     ),
     _tool(
         "read_mojang_sample",
-        "Read a curated bundled Mojang sample/documentation file, or an indexed text file from a user-supplied ZIP located inside the configured workspace. sample_version selects the source corpus, not the target game version. Known but unindexed sources fail explicitly; no cross-version fallback occurs. Output is capped and read-only; no files are extracted.",
+        "Read a curated bundled Mojang sample/documentation file, or an indexed text file from a user-supplied ZIP located inside the configured workspace. sample_version selects the source corpus, not the target game version. Each source version is read only from its own verified index; no cross-version fallback occurs. Output is capped and read-only; no files are extracted.",
         {
             "sample_path": _SAMPLE_PATH,
-            "sample_version": {"type": "string", "enum": ["1.26.50.4", "1.26.60.30-preview"], "default": "1.26.50.4", "description": "Source corpus version, distinct from target_game_version. Stable 1.26.50.4 is indexed; preview 1.26.60.30-preview is known but not indexed yet."},
+            "sample_version": {"type": "string", "enum": ["1.26.50.4", "1.26.60.30-preview"], "default": "1.26.50.4", "description": "Source corpus version, distinct from target_game_version. Stable 1.26.50.4 and Preview 1.26.60.30-preview are separately indexed."},
             "archive_path": {"type": "string", "minLength": 1, "maxLength": 4096, "description": "Optional path to the original source ZIP inside the configured workspace. Its SHA-256 must exactly match the selected sample_version index. If omitted, only curated bundled examples can be read."},
         },
         ["sample_path"],
@@ -617,7 +632,7 @@ def _load_mojang_sample_index(sample_version: str = DEFAULT_MOJANG_SAMPLE_VERSIO
     corpus = MOJANG_SAMPLE_CORPORA.get(sample_version)
     if corpus is None:
         return None
-    index_path = MOJANG_SAMPLE_INDEX if sample_version == DEFAULT_MOJANG_SAMPLE_VERSION else corpus["index_path"]
+    index_path = corpus["index_path"]
     if not index_path.is_file():
         if sample_version == DEFAULT_MOJANG_SAMPLE_VERSION:
             return _build_curated_mojang_sample_index()
@@ -637,7 +652,10 @@ def _load_mojang_sample_index(sample_version: str = DEFAULT_MOJANG_SAMPLE_VERSIO
 
 def _sample_version_not_indexed(sample_version: str) -> dict[str, Any]:
     source = MOJANG_SAMPLE_SOURCE_CATALOG.get(sample_version, {})
-    indexed_versions = sorted(MOJANG_SAMPLE_CORPORA)
+    indexed_versions = sorted(
+        version for version, corpus in MOJANG_SAMPLE_CORPORA.items()
+        if corpus["index_path"].is_file() or version == DEFAULT_MOJANG_SAMPLE_VERSION
+    )
     return _error(
         "SAMPLE_VERSION_NOT_INDEXED",
         f"Mojang sample source {sample_version!r} is known but has no verified bundled index; no other version was searched.",
@@ -734,6 +752,8 @@ def _search_mojang_samples(args: dict[str, Any]) -> dict[str, Any]:
         "category": category,
         "sample_version": sample_version,
         "source_channel": corpus["channel"],
+        "source_release_url": MOJANG_SAMPLE_SOURCE_CATALOG.get(sample_version, {}).get("release_url"),
+        "source_commit": MOJANG_SAMPLE_SOURCE_CATALOG.get(sample_version, {}).get("source_commit"),
         "target_version": payload.get("target_version"),
         "source": payload.get("source"),
         "source_archive_sha256": payload.get("archive_sha256"),
@@ -851,6 +871,8 @@ def _read_mojang_sample(args: dict[str, Any]) -> dict[str, Any]:
         "target_version": payload.get("target_version"),
         "sample_version": sample_version,
         "source_channel": corpus["channel"],
+        "source_release_url": MOJANG_SAMPLE_SOURCE_CATALOG.get(sample_version, {}).get("release_url"),
+        "source_commit": MOJANG_SAMPLE_SOURCE_CATALOG.get(sample_version, {}).get("source_commit"),
         "source_archive_sha256": payload.get("archive_sha256"),
         "index_mode": payload.get("index_mode", "full_index"),
         "content_sha256": digest,

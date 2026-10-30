@@ -115,6 +115,37 @@ TOOLS = [
         }
         metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
 
+    def add_preview_index(self, root: Path) -> None:
+        stable_base = root / "skills/bedrock-development/references/mojang-samples-1.26.50.4"
+        with gzip.open(stable_base / "mojang-samples-index.json.gz", "rt", encoding="utf-8") as stream:
+            index = json.load(stream)
+        preview_base = root / "skills/bedrock-development/references/mojang-samples-1.26.60.30-preview"
+        preview_base.mkdir(parents=True, exist_ok=True)
+        preview_index_path = preview_base / "mojang-samples-index.json.gz"
+        preview_metadata_path = preview_base / "INDEX_METADATA.json"
+        source_archive = "bedrock-samples-v1.26.60.30-preview-full.zip"
+        source_sha = "d" * 64
+        index["target_version"] = "1.26.60.30-preview"
+        index["archive_file_name"] = source_archive
+        index["archive_sha256"] = source_sha
+        with gzip.open(preview_index_path, "wt", encoding="utf-8") as stream:
+            json.dump(index, stream, ensure_ascii=False, separators=(",", ":"))
+        preview_bytes = preview_index_path.read_bytes()
+        metadata = {
+            "source_archive": source_archive,
+            "target_version": "1.26.60.30-preview",
+            "zip_sha256": source_sha,
+            "source_asset_sha256": source_sha,
+            "entry_count": index["archive_stats"]["entry_count"],
+            "indexed_count": index["archive_stats"]["indexed_count"],
+            "declared_uncompressed_bytes": index["archive_stats"]["declared_uncompressed_bytes"],
+            "category_counts": dict(checker.Counter(entry["category"] for entry in index["entries"])),
+            "index_file": preview_index_path.name,
+            "index_sha256": hashlib.sha256(preview_bytes).hexdigest(),
+            "index_size_bytes": len(preview_bytes),
+        }
+        preview_metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+
     def check_by_id(self, report, code):
         return next(check for check in report["checks"] if check["id"] == code)
 
@@ -291,6 +322,32 @@ TOOLS = [
             with self.assertRaises(ValueError):
                 checker.fix_readme_heading(root)
             self.assertEqual((root / "README.md").read_text(encoding="utf-8"), original)
+
+
+
+    def test_multiple_versioned_sample_indices_are_audited_independently(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "package"
+            self.make_package(root)
+            self.add_preview_index(root)
+            report = checker.audit_package(root)
+            self.assertEqual(report["status"], "PASS", report["checks"])
+            self.assertEqual(set(report["mojang_samples_indices"]), {"1.26.50.4", "1.26.60.30-preview"})
+            self.assertEqual(report["mojang_samples_indices"]["1.26.60.30-preview"]["target_version"], "1.26.60.30-preview")
+            self.assertEqual(self.check_by_id(report, "sample-index-content:1.26.60.30-preview")["status"], "PASS")
+
+    def test_preview_index_directory_and_metadata_version_must_match(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "package"
+            self.make_package(root)
+            self.add_preview_index(root)
+            metadata_path = root / "skills/bedrock-development/references/mojang-samples-1.26.60.30-preview/INDEX_METADATA.json"
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            metadata["target_version"] = "1.26.60.29-preview"
+            metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+            report = checker.audit_package(root)
+            self.assertEqual(self.check_by_id(report, "sample-index-metadata:1.26.60.30-preview")["status"], "FAIL")
+            self.assertEqual(report["status"], "FAIL")
 
 
 if __name__ == "__main__":

@@ -110,5 +110,39 @@ class IndexMojangSamplesTests(unittest.TestCase):
             self.assertEqual(data["archive_stats"]["indexed_count"], 1)
             self.assertTrue(data["entries"][0]["json_parsed"])
 
+
+    def test_accepts_preview_target_version_label(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            archive = root / "samples.zip"
+            output = root / "preview-index.json"
+            with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as z:
+                z.writestr("behavior_pack/items/example.json", json.dumps({
+                    "minecraft:item": {"description": {"identifier": "demo:preview_item"}}
+                }))
+            old_argv = __import__("sys").argv
+            try:
+                __import__("sys").argv = [
+                    str(SCRIPT), str(archive), "--output", str(output),
+                    "--target-version", "1.26.60.30-preview",
+                ]
+                self.assertEqual(mod.main(), 0)
+            finally:
+                __import__("sys").argv = old_argv
+            data = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(data["target_version"], "1.26.60.30-preview")
+
+    def test_rejects_malformed_target_version_label_before_opening_archive(self):
+        old_argv = __import__("sys").argv
+        try:
+            __import__("sys").argv = [
+                str(SCRIPT), "missing.zip", "--output", "unused.json",
+                "--target-version", "../1.26.60.30-preview",
+            ]
+            self.assertEqual(mod.main(), 2)
+        finally:
+            __import__("sys").argv = old_argv
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1295,6 +1295,16 @@ class CreateAddonRecipeTests(unittest.TestCase):
 
 
 class MojangSampleVersionSelectionTests(unittest.TestCase):
+    PREVIEW_VERSION = "1.26.60.30-preview"
+
+    def _preview_payload(self):
+        payload = server._load_mojang_sample_index(self.PREVIEW_VERSION)
+        self.assertIsInstance(payload, dict)
+        self.assertEqual(payload.get("target_version"), self.PREVIEW_VERSION)
+        self.assertEqual(payload.get("index_mode"), "full_index")
+        self.assertGreater(len(payload.get("entries", [])), 0)
+        return payload
+
     def test_search_omitted_source_version_preserves_stable_default(self):
         result = server.call_tool("search_mojang_samples", {
             "query": "minecraft:apple", "category": "item", "limit": 5
@@ -1313,25 +1323,84 @@ class MojangSampleVersionSelectionTests(unittest.TestCase):
         self.assertEqual(result["sample_version"], "1.26.50.4")
         self.assertTrue(any(row["path"] == "behavior_pack/items/apple.json" for row in result["results"]))
 
-    def test_preview_search_fails_closed_without_cross_version_fallback(self):
+    def test_preview_search_uses_separate_full_index_and_provenance(self):
         result = server.call_tool("search_mojang_samples", {
-            "query": "minecraft:apple", "sample_version": "1.26.60.30-preview"
+            "query": "behavior_pack/items", "category": "item",
+            "sample_version": self.PREVIEW_VERSION, "limit": 5
         })
-        self.assertEqual(result["status"], "error")
-        self.assertEqual(result["error"]["code"], "SAMPLE_VERSION_NOT_INDEXED")
-        details = result["error"]["details"]
-        self.assertEqual(details["requested_version"], "1.26.60.30-preview")
-        self.assertEqual(details["source_channel"], "preview")
-        self.assertEqual(details["indexed_versions"], ["1.26.50.4"])
-        self.assertIn("v1.26.60.30-preview", details["source_release_url"])
+        self.assertEqual(result["status"], "completed", result)
+        self.assertEqual(result["sample_version"], self.PREVIEW_VERSION)
+        self.assertEqual(result["source_channel"], "preview")
+        self.assertEqual(result["target_version"], self.PREVIEW_VERSION)
+        self.assertEqual(result["index_mode"], "full_index")
+        self.assertEqual(result["source_commit"], "4d30ae63750467771b6eccda105f732c6cb77ff7")
+        self.assertIn(self.PREVIEW_VERSION, result["source_release_url"])
+        self.assertGreater(len(result["results"]), 0)
 
-    def test_preview_read_fails_closed_without_cross_version_fallback(self):
+    def test_preview_read_without_source_archive_reports_not_bundled(self):
+        payload = self._preview_payload()
+        entry = next(item for item in payload["entries"] if item.get("category") == "item" and str(item.get("path", "")).endswith(".json"))
         result = server.call_tool("read_mojang_sample", {
-            "sample_path": "behavior_pack/items/apple.json",
-            "sample_version": "1.26.60.30-preview",
+            "sample_path": entry["path"], "sample_version": self.PREVIEW_VERSION,
         })
+        self.assertEqual(result["status"], "not_bundled")
+        self.assertEqual(result["sample_version"], self.PREVIEW_VERSION)
+        self.assertEqual(result["source_channel"], "preview")
+
+    def test_preview_archive_digest_mismatch_is_rejected(self):
+        import tempfile
+        from unittest.mock import patch
+        payload = self._preview_payload()
+        entry = next(item for item in payload["entries"] if item.get("category") == "item" and str(item.get("path", "")).endswith(".json"))
+        with tempfile.TemporaryDirectory() as td:
+            workspace = Path(td)
+            archive = workspace / "wrong-preview-source.zip"
+            with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+                zf.writestr(entry["path"], '{"not":"the pinned preview archive"}')
+            with patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": str(workspace)}):
+                result = server.call_tool("read_mojang_sample", {
+                    "sample_path": entry["path"], "sample_version": self.PREVIEW_VERSION,
+                    "archive_path": str(archive),
+                })
+        self.assertEqual(result["status"], "error")
+        self.assertEqual(result["error"]["code"], "SAMPLE_ARCHIVE_VERSION_MISMATCH")
+
+    def test_preview_missing_index_fails_closed_without_stable_fallback(self):
+        import tempfile
+        from unittest.mock import patch
+        preview_corpus = dict(server.MOJANG_SAMPLE_CORPORA[self.PREVIEW_VERSION])
+        with tempfile.TemporaryDirectory() as td:
+            preview_corpus["index_path"] = Path(td) / "missing-preview-index.json.gz"
+            with patch.dict(server.MOJANG_SAMPLE_CORPORA, {self.PREVIEW_VERSION: preview_corpus}):
+                result = server.call_tool("search_mojang_samples", {
+                    "query": "minecraft:apple", "sample_version": self.PREVIEW_VERSION
+                })
         self.assertEqual(result["status"], "error")
         self.assertEqual(result["error"]["code"], "SAMPLE_VERSION_NOT_INDEXED")
+        self.assertEqual(result["error"]["details"]["indexed_versions"], ["1.26.50.4"])
+
+    def test_preview_real_archive_member_roundtrip_when_ci_supplies_source(self):
+        archive_text = os.environ.get("MOJANG_PREVIEW_ARCHIVE")
+        if not archive_text:
+            self.skipTest("real Mojang Preview archive is supplied only by the pinned index-build workflow")
+        archive = Path(archive_text).resolve(strict=True)
+        payload = self._preview_payload()
+        entry = next(
+            item for item in payload["entries"]
+            if item.get("category") == "item"
+            and str(item.get("path", "")).endswith(".json")
+            and 0 < item.get("size_bytes", 0) <= server.MAX_SAMPLE_READ_BYTES
+            and item.get("sha256")
+        )
+        from unittest.mock import patch
+        with patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": str(archive.parent)}):
+            result = server.call_tool("read_mojang_sample", {
+                "sample_path": entry["path"], "sample_version": self.PREVIEW_VERSION,
+                "archive_path": str(archive),
+            })
+        self.assertEqual(result["status"], "completed", result)
+        self.assertEqual(result["source"], "user_supplied_archive")
+        self.assertTrue(result["content_hash_matches_index"])
 
     def test_unknown_sample_version_is_rejected_by_closed_tool_schema(self):
         with self.assertRaisesRegex(ValueError, "sample_version must be one of"):
@@ -1346,6 +1415,7 @@ class MojangSampleVersionSelectionTests(unittest.TestCase):
         self.assertEqual(result["status"], "completed")
         self.assertEqual(result["sample_version"], "1.26.50.4")
         self.assertEqual(result["source_channel"], "stable")
+
 
 if __name__ == "__main__":
     unittest.main()

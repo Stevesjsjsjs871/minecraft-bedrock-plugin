@@ -54,6 +54,7 @@ IDENTIFIER_FIELDS = {
     "animation_controllers", "render_controllers", "particle_effect", "sound"
 }
 ID_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,160}$")
+VERSION_RE = re.compile(r"^\d+\.\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$")
 
 
 def safe_member_path(name: str) -> bool:
@@ -130,6 +131,9 @@ def main() -> int:
     parser.add_argument("--target-version", default="1.26.50.4")
     parser.add_argument("--max-files", type=int, default=MAX_INDEX_FILES)
     args = parser.parse_args()
+    if not VERSION_RE.fullmatch(args.target_version):
+        print(json.dumps({"status": "error", "error": "target-version must be a four-part numeric version with an optional prerelease suffix"}))
+        return 2
     archive_path = __import__("pathlib").Path(args.archive).expanduser().resolve()
     output_path = __import__("pathlib").Path(args.output).expanduser().resolve()
     if args.max_files < 1 or args.max_files > MAX_INDEX_FILES:

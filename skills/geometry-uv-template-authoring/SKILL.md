@@ -37,4 +37,15 @@ Use `minecraft-bedrock-geometry-uv-template` and `generate_geometry_uv_template`
 4. Run `audit_geometry_uvs` again with the resulting PNG explicitly supplied.
 5. Run the texture-link auditor where block/item atlas links apply, then import the packs into the target Bedrock build for visual verification.
 
-Official reference: [Bedrock geometry format 1.26.40](https://learn.microsoft.com/en-us/minecraft/creator/reference/content/visualreference/geometry.v1.26.40?view=minecraft-bedrock-stable) and [Entity Modeling and Animation](https://learn.microsoft.com/en-us/minecraft/creator/documents/entitymodelingandanimation?view=minecraft-bedrock-stable).
+Official reference: [Bedrock geometry format 1.26.40](https://learn.microsoft.com/en-us/minecraft/creator/reference/content/visualreference/geometry.v1.21.0?view=minecraft-bedrock-stable) and [Entity Modeling and Animation](https://learn.microsoft.com/en-us/minecraft/creator/documents/entitymodelingandanimation?view=minecraft-bedrock-stable).
+
+
+## Local CLI alternative
+
+When the MCP server is unavailable but a real local Python executor can access the package and project, use the geometry UV engine adapter:
+
+    python skills/geometry-uv-engine/scripts/geometry_uv_cli.py --workspace <workspace> template --project <project-name> --geometry-path resource_packs/<project-name>_RP/models/entity/example.geo.json --output-path resource_packs/<project-name>_RP/textures/uv_templates/example.png --geometry-id geometry.example
+
+The adapter calls the preserved template function directly, validates the generated PNG and verifies its SHA-256. It is a transitional adapter, not a complete extraction of the UV algorithms into a pure standalone library. Existing MCP tools remain unchanged.
+
+Official reference: https://learn.microsoft.com/en-us/minecraft/creator/reference/content/visualreference/geometry.v1.21.0?view=minecraft-bedrock-stable

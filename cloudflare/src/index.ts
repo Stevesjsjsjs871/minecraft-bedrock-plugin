@@ -10,6 +10,8 @@ export class BedrockMcpContainer extends DurableObject {}
 interface Env {
   MCP_AUTH_TOKEN: string;
   GITHUB_BRANCH?: string;
+  MCP_BACKEND_URL?: string;
+  MCP_BACKEND_TOKEN?: string;
 }
 type Rpc = { jsonrpc?: string; id?: string | number | null; method?: string; params?: Record<string, unknown> };
 const REPO = "Stevesjsjsjs871/minecraft-bedrock-plugin";
@@ -130,7 +132,7 @@ function authorized(request: Request, token: string): boolean {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    if (url.pathname === "/health" && request.method === "GET") return response({ status: "ok", service: "minecraft-bedrock-engineer", gateway: "workers-free", containers: false, version: "1.4.1-free-gateway" });
+    if (url.pathname === "/health" && request.method === "GET") return response({ status: "ok", service: "minecraft-bedrock-engineer", gateway: "authenticated-python-backend-proxy", backend_configured: Boolean(env.MCP_BACKEND_URL && env.MCP_BACKEND_TOKEN), version: "1.5.0-unified-mcp-proxy" });
     if (url.pathname === "/tester" && request.method === "GET") {
       const html = `<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Bedrock Engineer MCP Tester</title>
 <style>
@@ -162,8 +164,35 @@ window.addEventListener("pagehide",()=>{token="";document.getElementById("token"
     if (request.method !== "POST") return response({ error: "method_not_allowed", allowed: ["POST"] }, 405, { allow: "POST" });
     if (!env.MCP_AUTH_TOKEN) return response({ error: "server_not_configured", message: "MCP_AUTH_TOKEN secret is missing." }, 503);
     if (!authorized(request, env.MCP_AUTH_TOKEN)) return response({ error: "unauthorized" }, 401, { "www-authenticate": "Bearer" });
+    if (!env.MCP_BACKEND_URL || !env.MCP_BACKEND_TOKEN) {
+      return response({ error: "backend_not_configured", message: "The unified Python MCP backend URL and token must be configured before remote tools can run." }, 503);
+    }
+    let backendUrl: URL;
+    try {
+      backendUrl = new URL(env.MCP_BACKEND_URL);
+      if (backendUrl.protocol !== "https:" || backendUrl.username || backendUrl.password) throw new Error("Invalid backend URL");
+      backendUrl.pathname = backendUrl.pathname.replace(/\\/$/, "") + "/mcp";
+      backendUrl.search = "";
+      backendUrl.hash = "";
+    } catch {
+      return response({ error: "invalid_backend_configuration" }, 503);
+    }
     const raw = await request.text();
     if (raw.length > MAX_BODY) return response({ error: "request_too_large" }, 413);
+    try {
+      const upstream = await fetch(backendUrl.toString(), {
+        method: "POST",
+        headers: { "content-type": "application/json", "authorization": `Bearer ${env.MCP_BACKEND_TOKEN}`, "accept": "application/json" },
+        body: raw,
+        signal: AbortSignal.timeout(30000)
+      });
+      const headers = new Headers();
+      headers.set("content-type", upstream.headers.get("content-type") || "application/json; charset=utf-8");
+      headers.set("cache-control", "no-store");
+      return new Response(upstream.body, { status: upstream.status, headers });
+    } catch {
+      return response({ error: "backend_unavailable", message: "The unified Python MCP backend did not respond." }, 502);
+    }
     let message: Rpc;
     try { message = JSON.parse(raw) as Rpc; } catch { return response(rpcError(null, -32700, "Parse error"), 400); }
     if (!message || message.jsonrpc !== "2.0" || typeof message.method !== "string" || (message.params !== undefined && (typeof message.params !== "object" || message.params === null || Array.isArray(message.params)))) return response(rpcError(message?.id ?? null, -32600, "Invalid Request"), 400);

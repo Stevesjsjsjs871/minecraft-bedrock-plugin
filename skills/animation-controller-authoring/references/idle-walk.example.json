@@ -1,0 +1,30 @@
+{
+  "controller_identifier": "controller.animation.forest_addon.forest_guardian",
+  "animation_alias": "forest_guardian_controller",
+  "initial_state": "idle",
+  "states": [
+    {
+      "name": "idle",
+      "animations": [
+        "idle"
+      ],
+      "transitions": [
+        {
+          "walking": "query.modified_move_speed > 0.01"
+        }
+      ],
+      "blend_transition": 0.2
+    },
+    {
+      "name": "walking",
+      "animations": [
+        "walk"
+      ],
+      "transitions": [
+        {
+          "idle": "query.modified_move_speed <= 0.01"
+        }
+      ]
+    }
+  ]
+}

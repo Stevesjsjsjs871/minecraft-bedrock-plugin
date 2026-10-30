@@ -263,7 +263,7 @@ TOOLS = [
         {
             "sample_path": _SAMPLE_PATH,
             "sample_version": {"type": "string", "enum": ["1.26.50.4", "1.26.60.30-preview"], "default": "1.26.50.4", "description": "Source corpus version, distinct from target_game_version. Stable 1.26.50.4 is indexed; preview 1.26.60.30-preview is known but not indexed yet."},
-            "archive_path": {"type": "string", "minLength": 1, "maxLength": 4096, "description": "Optional path to the original source ZIP inside the configured workspace. It must correspond to the selected sample_version. If omitted, only curated bundled examples can be read."},
+            "archive_path": {"type": "string", "minLength": 1, "maxLength": 4096, "description": "Optional path to the original source ZIP inside the configured workspace. Its SHA-256 must exactly match the selected sample_version index. If omitted, only curated bundled examples can be read."},
         },
         ["sample_path"],
     ),

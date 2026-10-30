@@ -242,6 +242,9 @@ class UVTemplateTests(unittest.TestCase):
     def test_line_clipping_rejects_parallel_outside_segment(self):
         self.assertIsNone(_clip_line(-100, -20, -50, -20, 16, 16))
 
+    def test_line_clipping_handles_vertical_crossing_segment(self):
+        self.assertEqual(_clip_line(3, -1e100, 3, 1e100, 16, 16), (3, 0, 3, 15))
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

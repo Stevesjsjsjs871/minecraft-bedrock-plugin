@@ -52,3 +52,12 @@ The first PR CI run (GitHub Actions run 41079643776) completed successfully, inc
 The validator now requires the bounded decompress call itself to reach the exact expected output and the zlib end marker; it no longer calls flush. The caller-supplied max_pixels argument is also constrained by the same hard 4,194,304-pixel cap. Added regression cases cover decompression overrun, truncated zlib streams, hard-cap override attempts, and line clipping across / outside the canvas.
 
 The workflow must be rerun on the updated HEAD before this follow-up can be called verified.
+
+
+## CI failure and correction
+
+The first CI run against the post-review commit (41079873258) failed one newly added extreme horizontal-line test. The general floating-point Liang-Barsky implementation lost the right endpoint through catastrophic cancellation for a segment spanning -1e100 to +1e100.
+
+The renderer only draws axis-aligned rectangle edges, so the general clipper was unnecessary. It was replaced with bounded horizontal/vertical interval clipping. The clipped endpoints are now clamped directly to the finite output canvas before Bresenham rasterization. Regression tests cover extreme horizontal and vertical crossings and parallel segments outside the canvas.
+
+The failed run was not hidden; a fresh CI run on the corrected HEAD is required.

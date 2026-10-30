@@ -253,15 +253,14 @@ def validate_png_bytes(payload, *, max_pixels=MAX_OUTPUT_PIXELS):
     width, height, depth, color, compression, filtering, interlace = struct.unpack(
         ">IIBBBBB", chunks[0][1]
     )
-    if width < 1 or height < 1 or width * height > max_pixels:
-        raise TemplateError("PNG dimensions exceed the pixel safety limit")
-    if (depth, color, compression, filtering, interlace) != (8, 6, 0, 0, 0):
-        raise TemplateError("PNG must use non-interlaced 8-bit RGBA encoding")
-
     if isinstance(max_pixels, bool) or not isinstance(max_pixels, int):
         raise TemplateError("PNG max_pixels must be an integer")
     if not 1 <= max_pixels <= MAX_OUTPUT_PIXELS:
         raise TemplateError(f"PNG max_pixels must be between 1 and {MAX_OUTPUT_PIXELS}")
+    if width < 1 or height < 1 or width * height > max_pixels:
+        raise TemplateError("PNG dimensions exceed the pixel safety limit")
+    if (depth, color, compression, filtering, interlace) != (8, 6, 0, 0, 0):
+        raise TemplateError("PNG must use non-interlaced 8-bit RGBA encoding")
     expected = height * (width * 4 + 1)
     decoder = zlib.decompressobj()
     try:
@@ -336,43 +335,22 @@ def _set_pixel(pixels, width, height, x, y, color):
 
 
 def _clip_line(x0, y0, x1, y1, width, height):
-    """Liang-Barsky clipping bounds raster work to the output canvas."""
-    dx, dy = x1 - x0, y1 - y0
-    if not math.isfinite(dx) or not math.isfinite(dy):
-        return None
-    lower, upper = 0.0, 1.0
-    for p, q in (
-        (-dx, x0), (dx, width - 1 - x0),
-        (-dy, y0), (dy, height - 1 - y0),
-    ):
-        if p == 0:
-            if q < 0:
-                return None
-            continue
-        ratio = q / p
-        if p < 0:
-            if ratio > upper:
-                return None
-            lower = max(lower, ratio)
-        else:
-            if ratio < lower:
-                return None
-            upper = min(upper, ratio)
-    if lower > upper:
-        return None
-    points = (
-        (x0 + lower * dx, y0 + lower * dy),
-        (x0 + upper * dx, y0 + upper * dy),
-    )
-    if not all(math.isfinite(value) for point in points for value in point):
-        return None
-    (left, top), (right, bottom) = points
-    return (
-        max(0, min(width - 1, round(left))),
-        max(0, min(height - 1, round(top))),
-        max(0, min(width - 1, round(right))),
-        max(0, min(height - 1, round(bottom))),
-    )
+    """Clip the axis-aligned rectangle edges drawn by this renderer."""
+    if y0 == y1:
+        if y0 < 0 or y0 > height - 1 or max(x0, x1) < 0 or min(x0, x1) > width - 1:
+            return None
+        y = max(0, min(height - 1, round(y0)))
+        left = max(0, min(width - 1, round(min(x0, x1))))
+        right = max(0, min(width - 1, round(max(x0, x1))))
+        return (left, y, right, y) if left <= right else None
+    if x0 == x1:
+        if x0 < 0 or x0 > width - 1 or max(y0, y1) < 0 or min(y0, y1) > height - 1:
+            return None
+        x = max(0, min(width - 1, round(x0)))
+        top = max(0, min(height - 1, round(min(y0, y1))))
+        bottom = max(0, min(height - 1, round(max(y0, y1))))
+        return (x, top, x, bottom) if top <= bottom else None
+    return None
 
 
 def _line(pixels, width, height, x0, y0, x1, y1, color):

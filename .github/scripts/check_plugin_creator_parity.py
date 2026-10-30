@@ -49,6 +49,20 @@ def _safe_relative_path(raw: str) -> str:
     return normalized
 
 
+def _repository_path_issue(root: Path, relative: str) -> str | None:
+    """Reject symlinks in every component of a package-root file path."""
+    current = root
+    for part in PurePosixPath(relative).parts:
+        current = current / part
+        if current.is_symlink():
+            return f"repository package path contains a symlink: {current.relative_to(root).as_posix()}"
+    try:
+        current.resolve(strict=False).relative_to(root)
+    except (OSError, ValueError):
+        return f"repository package path escapes repository root: {relative}"
+    return None
+
+
 def _collect_repository_files(repo_root: Path) -> tuple[dict[str, Path], list[str]]:
     root = repo_root.resolve(strict=True)
     if not root.is_dir():
@@ -58,8 +72,9 @@ def _collect_repository_files(repo_root: Path) -> tuple[dict[str, Path], list[st
     errors: list[str] = []
     for relative in PACKAGE_ROOT_FILES:
         candidate = root / relative
-        if candidate.is_symlink():
-            errors.append(f"repository package path is a symlink: {relative}")
+        issue = _repository_path_issue(root, relative)
+        if issue:
+            errors.append(issue)
         elif not candidate.is_file():
             errors.append(f"repository package file is missing: {relative}")
         else:
@@ -129,13 +144,18 @@ class ArchiveIndex:
                 name = member.filename
                 is_directory = member.is_dir()
                 mode = (member.external_attr >> 16) & 0xFFFF
-                if not is_directory and stat.S_ISLNK(mode):
-                    self.errors.append(f"archive entry is a symlink: {name}")
-                    continue
                 file_type = stat.S_IFMT(mode)
-                if not is_directory and file_type and file_type != stat.S_IFREG:
-                    self.errors.append(f"archive entry is not a regular file: {name}")
-                    continue
+                if is_directory:
+                    if file_type not in (0, stat.S_IFDIR):
+                        self.errors.append(f"archive directory entry is not a directory: {name}")
+                        continue
+                else:
+                    if file_type == stat.S_IFLNK:
+                        self.errors.append(f"archive entry is a symlink: {name}")
+                        continue
+                    if file_type and file_type != stat.S_IFREG:
+                        self.errors.append(f"archive entry is not a regular file: {name}")
+                        continue
                 size = member.file_size
             else:
                 assert isinstance(member, tarfile.TarInfo)

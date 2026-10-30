@@ -114,3 +114,52 @@ Add a deterministic package-integrity gate for shared root/compatibility manifes
 ### Risks and next step
 - Metadata parity is now enforced inside the GitHub package, but it does not prove parity with the separately stored Plugin Creator release. The latter is a separately versioned source and must be updated only with an explicitly authorized, expected-release-ID-guarded operation.
 - Next: prepare a precise Plugin Creator-to-GitHub synchronization diff without applying it; then review PR #1's divergent history and propose safe supersession/closure rather than merging it. Keep all runtime and Creator Tools claims marked `NOT RUN` until actually exercised.
+
+
+## 2026-10-30 — Plugin Creator/GitHub manifest synchronization audit
+
+### Recovered state
+- Plugin Creator current private release: `1.0.11`, plugin ID `plugins_6ae33ff6e8d8819182f246d8d3d97323`, current release ID `pluginrel_6ae3d2b1b6888191bf4727998f694e48`. The current source was re-read before this work. Plugin Creator was not modified.
+- GitHub `main`: `1.0.11`, commit `4eb35503095c735d725597bdb2f517f4bf188803`; latest main validation run #103 succeeded.
+- PR #2 is open, Draft, unmerged, based on `main`; pre-stage head `3ca91b3129c030f491a135185f09f1b46a42d76e`, 16 commits ahead and 0 behind. Its latest pre-stage PR checks were run #117 and portability run #8; both succeeded. No PR reviews or inline review threads are recorded.
+- PR #1 remains open Draft and unmerged on the older `automation/mcp-generate-texture-1-0-10-20261029b` branch. It has 18 commits and is based on an older implementation; it must not be merged without a fresh compatibility review.
+- No open GitHub Issues were returned by the repository issue search.
+
+### Package inventory and parity findings
+- Plugin Creator contains 83 files; GitHub `main` contains 85; PR #2 contains 87.
+- The only Plugin-Creator-only path is `skills/bedrock-development/references/mojang-samples-1.26.50.4/mojang-samples-index.json.gz` (1,128,413 bytes in the Plugin Creator file listing). It is absent from GitHub `main` and PR #2. The matching `INDEX_METADATA.json` exists in both and is byte-for-byte identical. The gzip is binary and is not returned by the UTF-8 `get_plugin_files(read_paths)` operation; the archive download URL could not be materialized in this run, so no binary transfer was attempted.
+- GitHub-only files on `main`: `.github/workflows/validate.yml`, `.gitignore`, `ROADMAP.md`. PR #2 additionally contains `.github/workflows/atlas-locking-portability.yml` and `DEVELOPMENT_LOG.md`.
+- Exact matches confirmed for `.mcp.json`, `VERSION`, `server/texture_generator_mcp.py`, `server/tests/test_texture_generator_mcp.py`, `skills/package-integrity/scripts/test_check_package_integrity.py`, and `INDEX_METADATA.json`.
+- `mcp.json` is semantically equivalent after JSON parsing, but formatting/schema-key text differs.
+- GitHub `README.md` and `CHANGELOG.md` are substantially more complete than the Plugin Creator copies (31,236 vs 1,541 characters; 8,640 vs 3,893 characters respectively). Keep the richer GitHub documentation; do not replace it with the shorter package copies.
+- GitHub's `visual-resource-pipeline/SKILL.md` and `bedrock-development/SKILL.md` are also richer than their Plugin Creator counterparts. The package-integrity skill/checker differ because PR #2 contains the newer metadata/changelog integrity work; retain those candidate improvements.
+
+### Selected task and acceptance criteria
+Synchronize the two GitHub manifests to the current Plugin Creator 1.0.11 manifests without touching the Plugin Creator release. Acceptance: exact shared metadata parity, stable plugin identity/version, and all three original default prompts byte-for-byte unchanged in both manifest forms.
+
+### Changes
+- Re-read current Plugin Creator `plugin.json` and `.codex-plugin/plugin.json`; confirmed their shared metadata and three prompts are consistent.
+- Replaced GitHub PR #2 `plugin.json` with the exact current Plugin Creator 1.0.11 root manifest.
+- Replaced GitHub PR #2 `.codex-plugin/plugin.json` with the exact current Plugin Creator 1.0.11 compatibility manifest.
+- The Plugin Creator metadata has 77 keywords; GitHub `main` previously had 52 root keywords and 46 compatibility keywords, while the PR branch had aligned both to 52. The exact current Plugin Creator manifests now supply the same 77-keyword metadata to both GitHub manifests.
+- Preserved all three default prompts; no plugin/App ID, version, MCP server, tool registration, skill or project behavior was changed.
+- Retained the richer GitHub README/CHANGELOG/skills and GitHub-specific CI/development files intentionally; these are source-repository documentation/workflows, not release-package copies.
+
+### Commits
+- `0ce6803e038192a24dac9cec680159ae8a1b15f2` — synchronize root manifest.
+- `1763c39532c157ff3b5ade1eb3cdd4dca2827c1f` — synchronize compatibility manifest.
+- Development log update follows this entry; final CI results are recorded after the run completes.
+
+### Verification before final CI
+- Exact manifest parity against current Plugin Creator: PASS for both files.
+- GitHub root/compatibility shared metadata parity: PASS.
+- Default prompts: 3/3 in each manifest; both GitHub arrays exactly match current Plugin Creator: PASS.
+- `.mcp.json`: byte-for-byte match: PASS.
+- `mcp.json`: semantic JSON equivalence: PASS.
+- `VERSION`: byte-for-byte match: PASS.
+- Full GitHub Actions validation for the two new manifest commits: PENDING at log creation time.
+- Minecraft import/rendering and real Creator Tools CLI: NOT RUN.
+
+### Risks and next step
+- The full compressed Mojang sample index is present in Plugin Creator but absent from GitHub source. The current tool path could list the binary but not materialize its bytes. Next: add a reproducible, pinned-source workflow that obtains the official Mojang v1.26.50.4 full release asset, verifies provenance and regenerates the metadata-only index, or use an authorized binary transfer route. Do not substitute the text-only/min archive while claiming full texture/sound path coverage.
+- Keep Plugin Creator at 1.0.11 and its current release ID; no update or public release was made. Any future Plugin Creator mutation still requires an explicit user confirmation and the current expected release ID.

@@ -485,7 +485,7 @@ def audit_package(root: Path, *, deep_index: bool = True, strict_files: bool = T
     else:
         try:
             latest_heading = next((line.strip() for line in changelog_path.read_text(encoding="utf-8").splitlines() if line.startswith("## ")), None)
-            heading_match = re.match(r"^##\\s+(\\S+)", latest_heading or "")
+            heading_match = re.match(r"^##\s+(\S+)", latest_heading or "")
             if heading_match is None:
                 add("changelog-version", "WARN", "CHANGELOG.md has no versioned release heading")
             elif heading_match.group(1) != versions[0]:

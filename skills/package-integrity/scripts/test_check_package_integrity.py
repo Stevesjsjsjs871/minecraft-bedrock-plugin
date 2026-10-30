@@ -25,24 +25,39 @@ class PackageIntegrityTests(unittest.TestCase):
             p.parent.mkdir(parents=True, exist_ok=True)
             if not p.exists():
                 p.write_text("{}\n", encoding="utf-8")
-        prompt = ["Create a feature.", "Audit an add-on."]
+        prompt = ["Create a feature.", "Audit an add-on.", "Research a versioned feature."]
+        shared_metadata = {
+            "name": checker.EXPECTED_PLUGIN_NAME,
+            "version": "1.0.5",
+            "description": "A test package for Bedrock add-on development.",
+            "author": {"name": "Test author"},
+            "keywords": ["minecraft", "bedrock", "addons"],
+        }
+        interface = {
+            "displayName": "Minecraft Bedrock Engineer",
+            "shortDescription": "Create & audit Bedrock add-ons",
+            "longDescription": "A sufficiently detailed test interface description.",
+            "developerName": "Test project",
+            "category": "Developer tools",
+            "capabilities": ["Code", "Research"],
+            "defaultPrompt": prompt,
+        }
         root_manifest = {
             "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
-            "name": checker.EXPECTED_PLUGIN_NAME,
-            "version": "1.0.5",
-            "extensions": {"com.openai": {"interface": {"defaultPrompt": prompt}}},
+            **shared_metadata,
+            "extensions": {"com.openai": {"interface": interface}},
         }
         compatibility_manifest = {
-            "name": checker.EXPECTED_PLUGIN_NAME,
-            "version": "1.0.5",
+            **shared_metadata,
             "skills": "./skills",
             "mcpServers": "./.mcp.json",
-            "interface": {"defaultPrompt": prompt},
+            "interface": interface,
         }
         (root / "plugin.json").write_text(json.dumps(root_manifest), encoding="utf-8")
         (root / ".codex-plugin/plugin.json").write_text(json.dumps(compatibility_manifest), encoding="utf-8")
         (root / "VERSION").write_text("1.0.5\n", encoding="utf-8")
         (root / "README.md").write_text("# Minecraft Bedrock Engineer — 1.0.5\n\nPreserved history.\n", encoding="utf-8")
+        (root / "CHANGELOG.md").write_text("# Changelog\n\n## 1.0.5 — Synthetic fixture\n- Test entry.\n", encoding="utf-8")
         config = {"mcpServers": {checker.EXPECTED_PLUGIN_NAME: {"type": "stdio", "command": "python3", "args": ["${PLUGIN_ROOT}/server/mcp_server.py"]}}}
         (root / ".mcp.json").write_text(json.dumps(config), encoding="utf-8")
         (root / "mcp.json").write_text(json.dumps({"$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json", **config}), encoding="utf-8")
@@ -95,6 +110,8 @@ TOOLS = [
             report = checker.audit_package(root)
             self.assertEqual(report["status"], "PASS", report["checks"])
             self.assertEqual(report["mcp_registry"]["tool_count"], 5)
+            self.assertEqual(self.check_by_id(report, "manifest-metadata")["status"], "PASS")
+            self.assertEqual(self.check_by_id(report, "changelog-version")["status"], "PASS")
             self.assertEqual(report["mojang_samples_index"]["indexed_count"], 1)
             self.assertEqual(report["runtime_status"], "NOT RUN")
 
@@ -116,6 +133,34 @@ TOOLS = [
             (root / ".codex-plugin/plugin.json").write_text(json.dumps(compat), encoding="utf-8")
             report = checker.audit_package(root)
             self.assertEqual(self.check_by_id(report, "default-prompts")["status"], "FAIL")
+
+    def test_shared_manifest_metadata_mismatch_fails(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "package"
+            self.make_package(root)
+            compat = json.loads((root / ".codex-plugin/plugin.json").read_text(encoding="utf-8"))
+            compat["keywords"].append("unexpected-drift")
+            (root / ".codex-plugin/plugin.json").write_text(json.dumps(compat), encoding="utf-8")
+            report = checker.audit_package(root)
+            self.assertEqual(self.check_by_id(report, "manifest-metadata")["status"], "FAIL")
+
+    def test_interface_metadata_mismatch_fails(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "package"
+            self.make_package(root)
+            compat = json.loads((root / ".codex-plugin/plugin.json").read_text(encoding="utf-8"))
+            compat["interface"]["longDescription"] = "A different interface description."
+            (root / ".codex-plugin/plugin.json").write_text(json.dumps(compat), encoding="utf-8")
+            report = checker.audit_package(root)
+            self.assertEqual(self.check_by_id(report, "manifest-metadata")["status"], "FAIL")
+
+    def test_stale_changelog_entry_warns(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "package"
+            self.make_package(root)
+            (root / "CHANGELOG.md").write_text("# Changelog\n\n## 1.0.4 — Stale entry\n", encoding="utf-8")
+            report = checker.audit_package(root)
+            self.assertEqual(self.check_by_id(report, "changelog-version")["status"], "WARN")
 
     def test_duplicate_tool_name_fails_registry_audit(self):
         with tempfile.TemporaryDirectory() as td:

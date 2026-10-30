@@ -25,6 +25,10 @@ Build an artifact when requested and the tools allow it. Do not publicly publish
 - Compare candidate files to baseline and explain unexpected deltas.
 
 ## Release gate
+- Require `VERSION`, both plugin manifest versions, the README title version, and the newest CHANGELOG heading version to agree exactly.
+- Compare `.mcp.json` and `mcp.json` as complete server configurations. Treat an omitted `env` as an empty object for compatibility; reject other configuration drift, invalid environment maps, missing server scripts, and unsafe project-relative paths.
+- Build from a committed Git tree, reject tracked bytecode/cache files, and include `BUILD_PROVENANCE.json` with the source commit, per-file SHA-256 values, payload digest, and a separate archive checksum.
+- Do not treat a manifest-only automatic patch bump as a complete release update; update `VERSION`, README, and CHANGELOG in the same source snapshot.
 Block a ready-to-release recommendation when there are unexplained deletions, broken manifest dependencies, broken resource references, syntax errors, missing critical resources, or unaddressed high-confidence regressions. If runtime tests were not available, label the candidate `static checks passed; runtime not verified` rather than fully tested.
 
 ## Changelog and report

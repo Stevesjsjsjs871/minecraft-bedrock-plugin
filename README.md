@@ -1,6 +1,6 @@
 # Minecraft Bedrock Engineer — 1.3.0
 
-## Release overview
+## 1.3.0: Release overview
 
 Minecraft Bedrock Engineer 1.3.0 consolidates the internal 1.2.0 release-candidate work into one release. It extends the existing Bedrock add-on authoring and auditing toolkit with animation authoring, end-to-end entity animation validation, geometry-aware UV inspection, UV template creation, deterministic texture painting, reference-image transfer, UV mapping plans, bounded reference analysis and a human-reviewed mapping gate.
 

@@ -1,5 +1,29 @@
 # Minecraft Bedrock Engineer — 1.0.14
 
+## Unreleased: entity geometry and animation-controller authoring
+
+This branch adds two dedicated stdio MCP servers while retaining the existing core MCP server and all of its tools, including the Minecraft Creator Tools bridge.
+
+- `create_addon_entity` remains available with its original core-server contract.
+- `create_addon_entity_with_geometry` creates a coordinated BP entity, RP client entity, geometry and render controller from explicit bounded bone/cube input.
+- `create_animation_controller` creates an RP animation-controller state machine and binds it to an existing client entity.
+- `validate_animation_controller` performs read-only structural and client-entity linkage checks.
+- The animation authoring input prefers ordered transition arrays. The legacy object-map shorthand remains accepted; generated Bedrock JSON always uses the ordered array form.
+
+### Scope and limitations
+
+- Entity geometry currently supports classic box UV only. Per-face UV maps, poly meshes and Blockbench project files are not accepted by this first implementation.
+- The entity tool does not create a texture PNG or animation clips. It reports the expected texture path; supply and validate the actual PNG separately.
+- Animation transition strings receive bounded text validation only. Molang is not parsed or executed.
+- Static JSON/reference checks do not prove pack import, spawning, rendering or animation behavior. Minecraft runtime remains `NOT RUN` until tested in the target game build.
+
+Official references:
+- [Creating New Entity Types](https://learn.microsoft.com/en-us/minecraft/creator/documents/introductiontoaddentity?view=minecraft-bedrock-stable)
+- [Animation Controllers Reference](https://learn.microsoft.com/en-us/minecraft/creator/documents/animations/animationcontroller?view=minecraft-bedrock-stable)
+- [Geometry Reference](https://learn.microsoft.com/en-us/minecraft/creator/reference/content/visualreference/geometry.v1.19.30?view=minecraft-bedrock-stable)
+
+---
+
 ## 1.0.14: full PNG stream audit and bounded scan budgets
 
 - The read-only `audit_texture_links` tool now validates the decompressed PNG scanline stream, not only chunk CRCs and IHDR metadata. It checks legal color/depth combinations, PLTE/tRNS placement, consecutive IDAT chunks, bounded zlib output, exact scanline sizes, filter bytes and Adam7 passes.

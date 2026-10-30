@@ -43,3 +43,16 @@
 - If failures remain, inspect the exact test module import order and avoid replacing the production validator with a test shim.
 - The separate Plugin Creator parity work in PR #9 remains open and unmerged; this branch does not alter it.
 - The current Plugin Creator 1.4.0 release and Release ID are recorded above; no Plugin Creator update or new release was performed in this run.
+
+
+## Follow-up CI finding
+
+The first PR run (`41041619223`) confirmed that the two PNG import errors were fixed: the full server suite reached 359 tests. One assertion remained too strict: it required exactly three default prompts, while the 1.3.0 manifests contain 11 prompts. The first three are the original create/audit/research prompts and match the compatibility manifest exactly.
+
+The version contract now asserts:
+- the two manifests have identical prompt arrays;
+- the original three prompts remain unchanged and in their original order;
+- additional prompts are allowed;
+- prompt entries remain unique.
+
+This preserves the user's three original defaults without blocking later workflow-specific prompts.

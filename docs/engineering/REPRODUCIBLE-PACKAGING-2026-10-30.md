@@ -66,3 +66,8 @@ The workflow builds a candidate archive on pull requests for validation. It uplo
 ## Next step
 
 Confirm CI on this PR, then use the main-branch candidate artifact as the first reproducible package. Extend the archive parity checker to validate BUILD_PROVENANCE.json before preparing any guarded Plugin Creator update.
+
+
+### Final branch-head verification
+
+After the prerequisite branch log was synchronized, GitHub Actions run [41046415190](https://github.com/Stevesjsjsjs871/minecraft-bedrock-plugin/actions/runs/41046415190) passed on the final PR13 head. It again passed the complete server/registry checks and all 11 package-builder tests. The candidate archive was built from the PR merge tree with 134 payload files, provenance commit `f48ce272c5dc588671e764413be6b726c61bb2e5`, and SHA-256 `af58234eedfff05a27bf33b7b650fc182085552fd812dca16a8f454cdfe5925e`. The artifact upload step remained skipped because the run was a pull-request event.

@@ -168,6 +168,22 @@ class PluginCreatorParityTests(unittest.TestCase):
         report = audit_archive(self.archive, self.repo)
         self.assertTrue(any("server script is absent" in item for item in report["errors"]))
 
+    def test_windows_drive_path_fails(self) -> None:
+        self._write_zip({"C:/outside.txt": b"no"})
+        report = audit_archive(self.archive, self.repo)
+        self.assertTrue(any("unsafe archive path" in item for item in report["errors"]))
+
+    def test_case_insensitive_collision_fails(self) -> None:
+        with zipfile.ZipFile(self.archive, "a") as archive:
+            archive.writestr("readme.md", "case collision")
+        report = audit_archive(self.archive, self.repo)
+        self.assertTrue(any("case-insensitive archive path collision" in item for item in report["errors"]))
+
+    def test_missing_repository_root_fails_closed(self) -> None:
+        report = audit_archive(self.archive, self.root / "missing")
+        self.assertEqual(report["status"], "FAIL")
+        self.assertTrue(any("unable to inspect repository root" in item for item in report["errors"]))
+
     def test_invalid_archive_fails_closed(self) -> None:
         self.archive.write_bytes(b"not an archive")
         report = audit_archive(self.archive, self.repo)

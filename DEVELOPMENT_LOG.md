@@ -265,3 +265,14 @@ Add a backward-compatible source-version selector to both existing sample MCP to
 
 ### Next step
 Build a separate `1.26.60.30-preview` metadata-only corpus only after verifying the official full asset metadata/digest and tag provenance. Extend the package-integrity checker to validate multiple corpus metadata/index pairs, then run full CI and the real MCP search/read contract tests. Keep preview and stable channels separate; do not claim a new stable release until Mojang publishes one.
+
+
+### Final verification update — PR validation run #128
+- The initial status check returned no workflow runs; after the PR event propagated, GitHub Actions run #128 (`41003817679`) completed successfully on code head `53cd4fbe2b6c741e13e925d0393eaecf05704663`.
+- Unit tests: **154/154** across five suites: MCP/server 108/108 (including all six new source-version tests), benchmark evaluator 12/12, sample indexer 6/6, texture generator 12/12, package integrity 16/16.
+- Python compilation passed.
+- Deep package-integrity audit: **17 PASS, 0 WARN, 0 FAIL**.
+- Analyzer regression cases: **18/18 passed**; report-schema validation and package/version/manifest/default-prompt/MCP configuration checks passed.
+- All 13 job steps completed successfully. No lint/type-check, macOS, Minecraft runtime/import/rendering or real Creator Tools CLI test was run.
+- A local clone attempt still fails because this execution environment cannot resolve `github.com`; GitHub-hosted CI supplied the actual test execution.
+- PR #3 remains Draft/open/unmerged and stacked on PR #2. Plugin Creator remains 1.0.11 with the same release ID; no release or main-branch update occurred.

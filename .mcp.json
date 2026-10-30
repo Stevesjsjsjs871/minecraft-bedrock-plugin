@@ -15,6 +15,14 @@
         "${PLUGIN_ROOT}/server/texture_generator_mcp.py"
       ],
       "env": {}
+    },
+    "minecraft-bedrock-texture-link-auditor": {
+      "type": "stdio",
+      "command": "python3",
+      "args": [
+        "${PLUGIN_ROOT}/server/texture_link_audit_mcp.py"
+      ],
+      "env": {}
     }
   }
 }

@@ -1,4 +1,11 @@
-# Minecraft Bedrock Engineer — 1.0.12
+# Minecraft Bedrock Engineer — 1.0.13
+
+## 1.0.13: read-only BP/RP texture-link audit
+
+- Adds `audit_texture_links`, a dedicated read-only MCP tool that follows texture references from BP block/item definitions to the matching RP atlas and then to the actual PNG files.
+- Checks `minecraft:material_instances` block texture keys, both supported item icon forms (`texture` and `textures.default`), atlas key presence, texture-path containment, PNG signatures/chunk CRCs and dimensions.
+- Reports malformed/duplicate-key JSON, missing atlas keys, missing/corrupt PNGs, unsafe symlinks and unused atlas entries as structured findings with file paths and severity.
+- Uses bounded scans and file sizes, skips symlinked directories, and never edits project files. Runtime/import/rendering remains `NOT RUN`.
 
 ## 1.0.12: deeper PNG validation and safer atlas updates
 

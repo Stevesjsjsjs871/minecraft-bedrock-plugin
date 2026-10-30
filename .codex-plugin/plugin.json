@@ -17,7 +17,7 @@
     ]
   },
   "name": "minecraft-bedrock-engineer",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "description": "Minecraft Bedrock Engineer \u2014 safe BP/RP authoring, Creator Tools coordination, resource auditing, project continuity and reproducible validation.",
   "author": {
     "name": "Plugin owner"
@@ -99,7 +99,10 @@
     "wood-grain",
     "mcp-texture-generator",
     "project-confined-textures",
-    "png-generation"
+    "png-generation",
+    "texture-link-audit",
+    "atlas-integrity",
+    "bp-rp-texture-validation"
   ],
   "skills": "./skills",
   "mcpServers": "./.mcp.json"

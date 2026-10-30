@@ -24,6 +24,7 @@ jobs:
           python -m py_compile archive_safety.py
           python -m py_compile server/mcp_server.py server/tests/test_mcp_server.py
           python -m py_compile server/texture_generator_mcp.py server/tests/test_texture_generator_mcp.py
+          python -m py_compile server/texture_link_audit_mcp.py server/tests/test_texture_link_audit_mcp.py
           python -m py_compile skills/automated-validation/scripts/bedrock_audit.py
           python -m py_compile skills/automated-validation/scripts/validate_report.py
           python -m py_compile skills/regression-evals/scripts/regression_tests.py
@@ -36,6 +37,8 @@ jobs:
           python -m py_compile skills/visual-resource-pipeline/scripts/generate_texture.py skills/visual-resource-pipeline/scripts/test_generate_texture.py
       - name: Test MCP server schemas, protocol, diff tool and safety
         run: python -m unittest discover -s server/tests -v
+      - name: Test read-only BP/RP texture-link auditor
+        run: python -m unittest discover -s server/tests -p 'test_texture_link_audit_mcp.py' -v
       - name: Test benchmark evaluator safety and metrics
         run: python -m unittest discover -s skills/audit-benchmark/scripts -p 'test_*.py' -v
       - name: Test Mojang sample-index safety and fallback
@@ -55,7 +58,7 @@ jobs:
           import runpy
           from pathlib import Path
 
-          expected = "1.0.12"
+          expected = "1.0.13"
           assert Path("VERSION").read_text(encoding="utf-8").strip() == expected
           root = json.loads(Path("plugin.json").read_text(encoding="utf-8"))
           compat = json.loads(Path(".codex-plugin/plugin.json").read_text(encoding="utf-8"))
@@ -64,15 +67,24 @@ jobs:
           assert root["extensions"]["com.openai"]["interface"]["defaultPrompt"] == compat["interface"]["defaultPrompt"]
           server = runpy.run_path("server/mcp_server.py")
           texture_server = runpy.run_path("server/texture_generator_mcp.py")
+          texture_auditor = runpy.run_path("server/texture_link_audit_mcp.py")
           assert server["SERVER_VERSION"] == expected
           assert texture_server["SERVER_VERSION"] == expected
+          assert texture_auditor["SERVER_VERSION"] == expected
           texture_tools = {tool["name"]: tool for tool in texture_server["TOOLS"]}
           assert {"generate_texture", "register_texture_atlas"} <= set(texture_tools)
           assert texture_tools["register_texture_atlas"]["annotations"]["idempotentHint"] is True
+          audit_tools = {tool["name"]: tool for tool in texture_auditor["TOOLS"]}
+          assert "audit_texture_links" in audit_tools
+          assert audit_tools["audit_texture_links"]["annotations"]["readOnlyHint"] is True
           for config_path in (".mcp.json", "mcp.json"):
               config = json.loads(Path(config_path).read_text(encoding="utf-8"))
-              texture = config.get("mcpServers", {}).get("minecraft-bedrock-texture-generator")
+              servers = config.get("mcpServers", {})
+              texture = servers.get("minecraft-bedrock-texture-generator")
+              audit = servers.get("minecraft-bedrock-texture-link-auditor")
               assert texture and texture.get("type") == "stdio"
               assert any("server/texture_generator_mcp.py" in arg.replace("\\", "/") for arg in texture.get("args", []))
-          print("PASS: manifests, prompts, texture-generation/atlas tools, both MCP servers and both MCP configurations are synchronized at", expected)
+              assert audit and audit.get("type") == "stdio"
+              assert any("server/texture_link_audit_mcp.py" in arg.replace("\\", "/") for arg in audit.get("args", []))
+          print("PASS: manifests, prompts, texture authoring/audit MCP tools, three MCP servers and both MCP configurations are synchronized at", expected)
           PY

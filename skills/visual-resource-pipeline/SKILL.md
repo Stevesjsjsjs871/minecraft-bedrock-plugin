@@ -18,7 +18,28 @@ The separate `minecraft-bedrock-texture-generator` stdio MCP server exposes two 
 
 Atlas registration serializes this tool's read/modify/write cycles with a per-atlas exclusive lock. A lock already present causes an `ATLAS_BUSY` result. A possible stale lock is deliberately not removed automatically: inspect it and remove it only after confirming no texture-tool process is still running. Atlas JSON is atomically replaced after validation.
 
-Example texture-generation MCP arguments:
+## Texture-link auditor
+
+The separate `minecraft-bedrock-texture-link-auditor` stdio MCP server exposes the read-only `audit_texture_links` tool. Pass one existing project directory directly under `MINECRAFT_BEDROCK_WORKSPACE` (the same project layout created by `create_addon_project`). It scans:
+
+- `behavior_packs/<project>_BP/blocks/**/*.json` for `minecraft:material_instances` texture keys.
+- `behavior_packs/<project>_BP/items/**/*.json` for `minecraft:icon` in string, `texture`, or `textures.default` form.
+- `resource_packs/<project>_RP/textures/terrain_texture.json` and `item_texture.json` for the corresponding atlas entries.
+- The PNG file paths referenced by each atlas entry, including existence, project containment, PNG signature, IHDR dimensions, chunk boundaries and CRCs.
+
+The report identifies missing atlas keys, missing/corrupt PNG files, malformed or duplicate-key JSON, unsafe symlinks and unused atlas entries. Unused entries are warnings because content may be referenced dynamically or outside the scanned BP block/item folders. The scan is bounded and never edits, repairs or deletes any project files.
+
+Example audit MCP arguments:
+
+```json
+{
+  "project_directory": "ruby-addon"
+}
+```
+
+The auditor follows the documented static link shapes; it cannot infer runtime-generated references or guarantee Minecraft rendering. It reports `runtime_status: "NOT RUN"`.
+
+## Example texture generation
 
 ```json
 {
@@ -33,19 +54,6 @@ Example texture-generation MCP arguments:
 }
 ```
 
-Example atlas-registration arguments:
-
-```json
-{
-  "project_directory": "ruby-addon",
-  "texture_type": "blocks",
-  "texture_identifier": "ruby_ore",
-  "texture_path": "resource_packs/ruby-addon_RP/textures/blocks/ruby_ore.png"
-}
-```
-
-Texture generation remains procedural starter art, not AI image synthesis or UV-aware entity texture painting. Atlas registration does not create or edit the BP/RP block or item definitions that consume the key. Runtime/import/rendering checks remain `NOT RUN` unless executed in-game.
-
 ## Asset workflow
 
 1. Inventory existing geometry, animation, animation-controller, render-controller, material and texture files. Locate definitions and references rather than guessing.
@@ -53,7 +61,8 @@ Texture generation remains procedural starter art, not AI image synthesis or UV-
 3. Use supported Creator Tools capabilities only when actually exposed by the host; do not fabricate a successful delegation.
 4. Validate identifier/path consistency, geometry structure, bones, UVs, animation names and controller transitions with available static checks.
 5. Compare against the baseline and report unresolved links, changed definitions, resource removals and severity changes.
-6. Import into the target game when possible. Check missing textures, rendering, animation transitions and behavior; record the exact build/scenario.
+6. Run `audit_texture_links` after adding or changing item/block textures and atlas entries. Resolve errors before packaging; treat unused entries as review warnings, not automatic deletion candidates.
+7. Import into the target game when possible. Check missing textures, rendering, animation transitions and behavior; record the exact build/scenario.
 
 ## Asset discipline
 

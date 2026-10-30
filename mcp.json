@@ -4,16 +4,17 @@
     "minecraft-bedrock-engineer": {
       "type": "stdio",
       "command": "python3",
-      "args": [
-        "${PLUGIN_ROOT}/server/mcp_server.py"
-      ]
+      "args": ["${PLUGIN_ROOT}/server/mcp_server.py"]
     },
     "minecraft-bedrock-texture-generator": {
       "type": "stdio",
       "command": "python3",
-      "args": [
-        "${PLUGIN_ROOT}/server/texture_generator_mcp.py"
-      ]
+      "args": ["${PLUGIN_ROOT}/server/texture_generator_mcp.py"]
+    },
+    "minecraft-bedrock-texture-link-auditor": {
+      "type": "stdio",
+      "command": "python3",
+      "args": ["${PLUGIN_ROOT}/server/texture_link_audit_mcp.py"]
     }
   }
 }

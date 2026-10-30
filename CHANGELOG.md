@@ -1,3 +1,14 @@
+## 1.4.0 — Cloudflare Workers MCP transport
+
+- Adds an authenticated Cloudflare Worker HTTP MCP gateway backed by a Python container, preserving the existing Python tool handlers.
+- Keeps local STDIO MCP configurations available; Cloudflare is an additional remote transport, not a replacement.
+- Registers the UV texture retarget server in both MCP registries.
+- Updates plugin metadata and release documentation to 1.4.0.
+- Deployment requires Cloudflare Workers Paid with Containers enabled and a configured `MCP_AUTH_TOKEN` secret.
+- Static checks do not constitute Cloudflare deployment or Minecraft runtime verification.
+
+---
+
 # Plugin package changelog
 
 ## 1.3.0 — Consolidated animation, geometry and visual-resource engineering release

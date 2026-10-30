@@ -62,7 +62,7 @@ class ContractTests(unittest.TestCase):
 
     def test_initialize_and_tools_list_protocol(self):
         init = server.handle_message({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-03-26"}})
-        self.assertEqual(init["result"]["serverInfo"]["version"], "1.1.1")
+        self.assertEqual(init["result"]["serverInfo"]["version"], server.SERVER_VERSION)
         listing = server.handle_message({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}})
         self.assertEqual(len(listing["result"]["tools"]), 2)
 

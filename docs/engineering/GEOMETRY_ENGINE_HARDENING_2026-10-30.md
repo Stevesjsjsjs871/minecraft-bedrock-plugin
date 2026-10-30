@@ -81,4 +81,4 @@ No Plugin Creator files were changed and no release was created by this run. The
 - No executable files changed after the code-tested commit; the final run confirms the documentation update did not disturb CI.
 
 
-Final note: CI run 41075774511 passed on code-bearing commit b5ecd687658b8646f0f5456abda7dad566c0200c. The latest branch commit 492927f0c0bee1fb180c57150a5ef9a887eefd88 changes only this report; CI was not re-run after that documentation-only commit. No executable files changed after the passing run.
+Final note: CI run 41075774511 passed on code-bearing commit b5ecd687658b8646f0f5456abda7dad566c0200c. Subsequent commits update only this engineering report; CI was not re-run after those documentation-only changes. No executable files changed after the passing run.

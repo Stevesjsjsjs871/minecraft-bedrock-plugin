@@ -670,7 +670,7 @@ class SchemaTests(unittest.TestCase):
                 zf.writestr("behavior_pack/items/example.json", sample_bytes)
             index_path = root / "index.json.gz"
             payload = {
-                "target_version": "1.26.50.4", "archive_sha256": "source-hash",
+                "target_version": "1.26.50.4", "archive_sha256": __import__("hashlib").sha256(archive.read_bytes()).hexdigest(),
                 "entries": [{"path": "behavior_pack/items/example.json", "category": "item",
                              "size_bytes": len(sample_bytes), "sha256": __import__("hashlib").sha256(sample_bytes).hexdigest(),
                              "identifiers": ["demo:thing"], "json_parsed": True}]
@@ -686,6 +686,36 @@ class SchemaTests(unittest.TestCase):
             self.assertTrue(result["content_hash_matches_index"])
             self.assertIn("demo:thing", result["content_excerpt"])
 
+
+
+
+    def test_read_mojang_sample_rejects_archive_with_wrong_source_digest(self):
+        from unittest.mock import patch
+        import gzip
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            archive = root / "source.zip"
+            sample_bytes = b'{"minecraft:item":{"description":{"identifier":"demo:thing"}}}\n'
+            with zipfile.ZipFile(archive, "w") as zf:
+                zf.writestr("behavior_pack/items/example.json", sample_bytes)
+            index_path = root / "index.json.gz"
+            payload = {
+                "target_version": "1.26.50.4",
+                "archive_sha256": "a" * 64,
+                "entries": [{"path": "behavior_pack/items/example.json", "category": "item",
+                             "size_bytes": len(sample_bytes), "sha256": __import__("hashlib").sha256(sample_bytes).hexdigest(),
+                             "identifiers": ["demo:thing"], "json_parsed": True}],
+            }
+            with gzip.open(index_path, "wt", encoding="utf-8") as out:
+                json.dump(payload, out)
+            with patch.object(server, "MOJANG_SAMPLE_INDEX", index_path), patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": td}):
+                result = server.call_tool("read_mojang_sample", {
+                    "sample_path": "behavior_pack/items/example.json", "archive_path": "source.zip"
+                })
+            self.assertEqual(result["status"], "error")
+            self.assertEqual(result["error"]["code"], "SAMPLE_ARCHIVE_VERSION_MISMATCH")
+            self.assertEqual(result["error"]["details"]["expected_archive_sha256"], "a" * 64)
+            self.assertNotEqual(result["error"]["details"]["actual_archive_sha256"], "a" * 64)
 
 
 class CreatorToolsIntegrationTests(unittest.TestCase):
@@ -1261,6 +1291,61 @@ class CreateAddonRecipeTests(unittest.TestCase):
         self.assertEqual(normalized["result_count"],1)
         self.assertIn("create_addon_recipe",server.WORKFLOW_INSTRUCTIONS)
 
+
+
+
+class MojangSampleVersionSelectionTests(unittest.TestCase):
+    def test_search_omitted_source_version_preserves_stable_default(self):
+        result = server.call_tool("search_mojang_samples", {
+            "query": "minecraft:apple", "category": "item", "limit": 5
+        })
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(result["sample_version"], "1.26.50.4")
+        self.assertEqual(result["source_channel"], "stable")
+        self.assertEqual(result["target_version"], "1.26.50.4")
+
+    def test_search_accepts_explicit_indexed_stable_version(self):
+        result = server.call_tool("search_mojang_samples", {
+            "query": "minecraft:apple", "category": "item",
+            "sample_version": "1.26.50.4", "limit": 5
+        })
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(result["sample_version"], "1.26.50.4")
+        self.assertTrue(any(row["path"] == "behavior_pack/items/apple.json" for row in result["results"]))
+
+    def test_preview_search_fails_closed_without_cross_version_fallback(self):
+        result = server.call_tool("search_mojang_samples", {
+            "query": "minecraft:apple", "sample_version": "1.26.60.30-preview"
+        })
+        self.assertEqual(result["status"], "error")
+        self.assertEqual(result["error"]["code"], "SAMPLE_VERSION_NOT_INDEXED")
+        details = result["error"]["details"]
+        self.assertEqual(details["requested_version"], "1.26.60.30-preview")
+        self.assertEqual(details["source_channel"], "preview")
+        self.assertEqual(details["indexed_versions"], ["1.26.50.4"])
+        self.assertIn("v1.26.60.30-preview", details["source_release_url"])
+
+    def test_preview_read_fails_closed_without_cross_version_fallback(self):
+        result = server.call_tool("read_mojang_sample", {
+            "sample_path": "behavior_pack/items/apple.json",
+            "sample_version": "1.26.60.30-preview",
+        })
+        self.assertEqual(result["status"], "error")
+        self.assertEqual(result["error"]["code"], "SAMPLE_VERSION_NOT_INDEXED")
+
+    def test_unknown_sample_version_is_rejected_by_closed_tool_schema(self):
+        with self.assertRaisesRegex(ValueError, "sample_version must be one of"):
+            server._validate_arguments("search_mojang_samples", {
+                "query": "minecraft:apple", "sample_version": "1.26.60.5"
+            })
+
+    def test_read_omitted_source_version_preserves_stable_default(self):
+        result = server.call_tool("read_mojang_sample", {
+            "sample_path": "behavior_pack/items/apple.json"
+        })
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(result["sample_version"], "1.26.50.4")
+        self.assertEqual(result["source_channel"], "stable")
 
 if __name__ == "__main__":
     unittest.main()

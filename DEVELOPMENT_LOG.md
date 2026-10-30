@@ -226,3 +226,72 @@ Synchronize the two GitHub manifests to the current Plugin Creator 1.0.11 manife
 - The latest non-preview Mojang Bedrock Samples release listed by the official GitHub Releases API is `v1.26.60.5`, published 2026-10-28.
 - Its full asset is `bedrock-samples-v1.26.60.5-full.zip`, asset ID `685756898`, size `169569258` bytes, SHA-256 `d93dea9aa1fb241a3184cc9f9a074a2ff34bd1b3c00d859b09c24b4b9e4e9adf`, tag commit `15701fa9c13923f12662984c32c124327e40e3d3`.
 - Next priority: add this as a **separate versioned corpus**, preserve the 1.26.50.4 index and default target `1.26.50`, and extend MCP sample search with an explicit source-version selector. Do not mix preview assets into the stable corpus.
+
+
+## 2026-10-30 — explicit Mojang sample source-version selection
+
+### Recovered state and source correction
+- Started from PR #2 head `3a728972f134752a8f7552b3bab4b3e89d1ad842`; PR #2 remained open, Draft and unmerged.
+- Plugin Creator remained private at 1.0.11 with plugin ID `plugins_6ae33ff6e8d8819182f246d8d3d97323` and release ID `pluginrel_6ae3d2b1b6888191bf4727998f694e48`. No Plugin Creator mutation was made.
+- Rechecked Mojang's official Releases page. The latest stable tag shown is `v1.26.50.4`; `v1.26.60.30-preview` is a separate prerelease published 2026-10-26. The preview tag resolves to commit `4d30ae63750467771b6eccda105f732c6cb77ff7`.
+- The previous log's claim that `v1.26.60.5` was a stable release (with a pinned full asset) could not be corroborated and conflicts with the official release list checked in this run. It is explicitly withdrawn; it is not used as a source pin.
+- Microsoft Creator documentation confirms the 2026 calendar-versioning scheme, but sample archive patch labels remain distinct from a project's target game version.
+
+### Selected task and acceptance
+Add a backward-compatible source-version selector to both existing sample MCP tools. Acceptance: omitted selector preserves stable 1.26.50.4; explicit stable selector returns the same corpus; a known preview source that is not indexed fails closed with provenance; no preview request silently falls back to stable data; unknown versions are rejected by the closed tool schema.
+
+### Changes
+- Added `sample_version` to `search_mojang_samples` and `read_mojang_sample`; omission defaults to `1.26.50.4`.
+- Added a source catalog distinguishing stable `1.26.50.4` from preview `1.26.60.30-preview`. Only the stable corpus is currently indexed.
+- Added structured `SAMPLE_VERSION_NOT_INDEXED` results with requested version, channel, official release URL, source commit and indexed versions. No cross-version fallback is permitted.
+- Added `sample_version` and `source_channel` to successful search/read results while retaining the existing `target_version` field for compatibility.
+- Updated Bedrock development skill and README to explain source-vs-target version semantics and the preview limitation.
+- Added six MCP regression tests for defaulting, explicit stable selection, preview search/read fail-closed behavior and unknown-version rejection.
+- Changed files: `server/mcp_server.py`, `server/tests/test_mcp_server.py`, `skills/bedrock-development/SKILL.md`, `README.md`, and this log.
+
+### Commits and PR
+- `b9116d5170ce9ba8ee7113139d3dfa822141488e` — MCP source-version selector.
+- `68c66eb77a6eff516dfb6bdeb8e722a0cebd07fd` — six version-selection regression tests.
+- `bb94b5c4cc2d00a247986fe8d63fe8d5955c6879` — Bedrock workflow documentation.
+- `53cd4fbe2b6c741e13e925d0393eaecf05704663` — README source-version documentation (pre-log head).
+- Draft stacked PR #3: `https://github.com/Stevesjsjsjs871/minecraft-bedrock-plugin/pull/3`, based on PR #2 branch `hardening/png-decoder-validation-1-0-11-20261030`. PR #3 is open, Draft, unmerged. PR #2 remains open, Draft, unmerged; main is unchanged.
+
+### Verification and limitations
+- Reviewed the full PR #3 diff: tool schemas remain closed, tool names and dispatch handlers are unchanged, and the default stable corpus path is preserved.
+- Six new tests are committed but **NOT RUN** in this turn. GitHub's workflow-run lookup for head `53cd4fbe2b6c741e13e925d0393eaecf05704663` returned no runs; combined status returned no statuses. A local shallow clone was attempted but failed because the execution environment could not resolve `github.com`. No test pass is claimed.
+- Minecraft import/rendering, MCT CLI execution, dedicated lint/type-check and macOS/network-filesystem checks remain `NOT RUN`.
+- The preview source is catalogued, not indexed. Its full ZIP asset ID/size/digest have not been pinned in this run, and no preview archive or generated index was added.
+- Three default prompts, plugin identity, manifests, MCP transport and Plugin Creator release were not modified by this PR.
+
+### Next step
+Build a separate `1.26.60.30-preview` metadata-only corpus only after verifying the official full asset metadata/digest and tag provenance. Extend the package-integrity checker to validate multiple corpus metadata/index pairs, then run full CI and the real MCP search/read contract tests. Keep preview and stable channels separate; do not claim a new stable release until Mojang publishes one.
+
+
+### Final verification update — PR validation run #128
+- The initial status check returned no workflow runs; after the PR event propagated, GitHub Actions run #128 (`41003817679`) completed successfully on code head `53cd4fbe2b6c741e13e925d0393eaecf05704663`.
+- Unit tests: **154/154** across five suites: MCP/server 108/108 (including all six new source-version tests), benchmark evaluator 12/12, sample indexer 6/6, texture generator 12/12, package integrity 16/16.
+- Python compilation passed.
+- Deep package-integrity audit: **17 PASS, 0 WARN, 0 FAIL**.
+- Analyzer regression cases: **18/18 passed**; report-schema validation and package/version/manifest/default-prompt/MCP configuration checks passed.
+- All 13 job steps completed successfully. No lint/type-check, macOS, Minecraft runtime/import/rendering or real Creator Tools CLI test was run.
+- A local clone attempt still fails because this execution environment cannot resolve `github.com`; GitHub-hosted CI supplied the actual test execution.
+- PR #3 remains Draft/open/unmerged and stacked on PR #2. Plugin Creator remains 1.0.11 with the same release ID; no release or main-branch update occurred.
+
+
+### Follow-up hardening — bind supplied ZIP bytes to selected source version
+- A final contract review found that `archive_path` was described as belonging to the selected `sample_version`, but the server previously checked only that the requested path existed in the supplied ZIP. That could allow a caller to read a same-path file from a different archive.
+- Added streaming SHA-256 verification of the supplied ZIP against the selected index's `archive_sha256` before opening any member for content. Mismatches return `SAMPLE_ARCHIVE_VERSION_MISMATCH`; an index without a valid digest returns `SAMPLE_ARCHIVE_DIGEST_UNAVAILABLE`. The archive remains workspace-confined and ZIP-bounded by the existing resolver.
+- Updated the synthetic read fixture to use its actual archive digest and added a negative regression test proving a different archive is refused.
+- Updated MCP schema description, Bedrock skill and README to document the exact-digest requirement.
+- Added one more test to the prior six source-version tests. Expected full-suite count is now 155 (MCP/server 109, benchmark 12, sample index 6, texture 12, package integrity 16).
+- CI for the new head is pending at the time of this log entry; do not treat these changes as verified until the final run completes.
+
+
+### Final CI verification — run #136
+- GitHub Actions run #136 (`41004083790`) completed with **success** on the source-archive-binding changes.
+- Unit tests: **155/155** — MCP/server 109/109 (including the new archive-digest mismatch case), benchmark evaluator 12/12, sample indexer 6/6, texture generator 12/12, package integrity 16/16.
+- Python compilation passed.
+- Deep package-integrity audit: **17 PASS, 0 WARN, 0 FAIL**.
+- Analyzer regression cases: **18/18 passed**; report-schema, package/version, manifest, three-prompt and MCP configuration checks passed.
+- All workflow steps completed successfully. Runtime Minecraft import/rendering, real Creator Tools CLI, macOS, network-filesystem, lint and dedicated type-check remain `NOT RUN`.
+- Current source-version branch remains Draft PR #3, stacked on PR #2; neither PR is merged. `main` and Plugin Creator are unchanged.

@@ -65,3 +65,8 @@ After the PNG import fixes, the full server suite passed (359/359). The package-
 The package-integrity validator now accepts 1–32 unique, non-empty prompt strings and still requires exact ordered equality between root and compatibility manifests. Added regression coverage for an 11-entry prompt list and duplicate rejection.
 
 The server contract test separately verifies that the original three create/audit/research prompts remain unchanged and are the ordered prefix of the current list.
+
+
+## Workflow version-source follow-up
+
+After the prompt validator fix, all test suites and the package-integrity audit passed, but the final workflow contract step still failed. Its inline script hard-coded `expected = "1.0.14"` even though the release synchronization had moved the repository to 1.3.0. The workflow now reads the expected version from the repository's `VERSION` marker, then checks both manifests and all three server version constants against that value. The package-integrity audit remains responsible for strict SemVer validation.

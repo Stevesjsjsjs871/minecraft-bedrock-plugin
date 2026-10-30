@@ -124,12 +124,10 @@ def inspect_package_metadata(root: Path) -> dict[str, Any]:
     elif len(set(markers.values())) != 1:
         errors.append("VERSION, both manifests, README and CHANGELOG versions differ")
 
-    root_interface = (
-        root_manifest.get("extensions", {})
-        .get("com.openai", {})
-        .get("interface", {})
-    )
-    compatibility_interface = compatibility_manifest.get("interface", {})
+    extensions = root_manifest.get("extensions")
+    com_openai = extensions.get("com.openai") if isinstance(extensions, dict) else None
+    root_interface = com_openai.get("interface") if isinstance(com_openai, dict) else None
+    compatibility_interface = compatibility_manifest.get("interface")
     root_prompts = root_interface.get("defaultPrompt") if isinstance(root_interface, dict) else None
     compatibility_prompts = (
         compatibility_interface.get("defaultPrompt")

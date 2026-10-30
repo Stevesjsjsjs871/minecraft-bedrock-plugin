@@ -1,5 +1,9 @@
 # Plugin package changelog
 
+## Unreleased
+- Fixes texture-link audit completeness reporting when atlas files are missing, unsafe or malformed, atlas entries cannot be validated, or scanned definition JSON is unrecognized.
+- Adds regression coverage for late atlas findings and unsupported definition files; static audit findings remain read-only and do not imply Minecraft runtime validation.
+
 ## 1.0.14 — Full PNG stream validation and bounded texture audit
 - Adds shared `server/png_validation.py` to validate PNG chunks/CRCs, legal IHDR/PLTE/tRNS rules, consecutive IDAT chunks, bounded zlib decompression, exact scanline sizes/filter bytes and Adam7 passes.
 - Upgrades `audit_texture_links` from header/chunk checks to full decoded scanline validation, catching files with valid chunk CRCs but broken or inconsistent compressed image data.

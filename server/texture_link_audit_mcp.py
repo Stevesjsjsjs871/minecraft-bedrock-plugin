@@ -386,6 +386,7 @@ def audit_texture_links(raw_args: Any) -> dict[str, Any]:
     incomplete_codes = {
         "UNSAFE_DEFINITION_DIRECTORY", "UNSAFE_DEFINITION_FILE", "DEFINITION_SCAN_LIMIT",
         "BLOCK_DEFINITION_FOLDER_MISSING", "ITEM_DEFINITION_FOLDER_MISSING", "UNSAFE_TEXTURES_DIRECTORY",
+        "UNSAFE_ATLAS_PATH", "UNRECOGNIZED_DEFINITION",
         "INVALID_DEFINITION_JSON", "INVALID_ATLAS_JSON", "INVALID_ATLAS_SHAPE", "INVALID_ATLAS_ENTRY", "ATLAS_MISSING",
     }
     analysis_complete = not any(item["code"] in incomplete_codes for item in findings)
@@ -498,6 +499,13 @@ def audit_texture_links(raw_args: Any) -> dict[str, Any]:
                     "message": f"atlas entry {key!r} was not referenced by scanned BP {kind} definitions; it may be intentionally shared or dynamically referenced",
                 })
 
+    # Atlas findings are collected after the initial directory/definition scan.
+    # Re-evaluate the complete set here so late missing/unsafe/invalid atlas findings
+    # cannot leave a false-positive analysis_complete=true result.
+    analysis_complete = analysis_complete and not any(
+        item["code"] in incomplete_codes for item in findings
+    )
+
     errors = sum(item["severity"] == "error" for item in findings)
     warnings = sum(item["severity"] == "warning" for item in findings)
     info = sum(item["severity"] == "info" for item in findings)
@@ -525,7 +533,7 @@ def audit_texture_links(raw_args: Any) -> dict[str, Any]:
         },
         "references": references,
         "findings": findings,
-        "scope_note": "Audits BP block/item material and icon links to matching RP atlases and deeply validates PNG image streams. analysis_complete=false means a safety scan budget or an unsafe/missing scan directory prevented full coverage. It does not infer runtime-only texture usage or validate rendering in Minecraft.",
+        "scope_note": "Audits BP block/item material and icon links to matching RP atlases and deeply validates PNG image streams. analysis_complete=false means a safety scan budget, unsafe/missing directory or atlas, invalid atlas entry, or unrecognized definition prevented full coverage. It does not infer runtime-only texture usage or validate rendering in Minecraft.",
     }
 
 

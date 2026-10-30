@@ -163,6 +163,7 @@ class TextureLinkAuditTests(unittest.TestCase):
         atlas.write_text('{"texture_name":"atlas.terrain","texture_data":{},"texture_data":{}}', encoding="utf-8")
         result = self._payload()
         self.assertTrue(any(x["code"] == "INVALID_ATLAS_JSON" and "duplicate" in x["message"] for x in result["findings"]))
+        self.assertFalse(result["summary"]["analysis_complete"])
 
     def test_detects_duplicate_json_keys_in_definition(self):
         path = self.bp / "blocks" / "ruby_ore.block.json"
@@ -227,6 +228,7 @@ class TextureLinkAuditTests(unittest.TestCase):
         atlas.unlink()
         result = self._payload()
         self.assertTrue(any(x["code"] == "ATLAS_MISSING" for x in result["findings"]))
+        self.assertFalse(result["summary"]["analysis_complete"])
         self.assertFalse(atlas.exists())
         self.assertEqual(before, json.dumps(self.terrain).encode("utf-8"))
 
@@ -250,6 +252,35 @@ class TextureLinkAuditTests(unittest.TestCase):
         atlas.write_text(json.dumps({"texture_name": "wrong", "texture_data": {}}), encoding="utf-8")
         result = self._payload()
         self.assertTrue(any(x["code"] == "INVALID_ATLAS_SHAPE" and "atlas.items" in x["message"] for x in result["findings"]))
+        self.assertFalse(result["summary"]["analysis_complete"])
+
+    def test_symlinked_atlas_marks_analysis_incomplete(self):
+        atlas = self.rp / "textures" / "terrain_texture.json"
+        outside = self.workspace / "outside-terrain.json"
+        outside.write_text(json.dumps(self.terrain), encoding="utf-8")
+        atlas.unlink()
+        try:
+            atlas.symlink_to(outside)
+        except (OSError, NotImplementedError) as exc:
+            self.skipTest(f"symlinks unavailable: {exc}")
+        result = self._payload()
+        self.assertTrue(any(x["code"] == "UNSAFE_ATLAS_PATH" for x in result["findings"]))
+        self.assertFalse(result["summary"]["analysis_complete"])
+
+    def test_invalid_atlas_entry_marks_analysis_incomplete_without_references(self):
+        (self.bp / "blocks" / "ruby_ore.block.json").unlink()
+        (self.bp / "items" / "ruby_gem.json").unlink()
+        self.terrain["texture_data"]["broken"] = {"unexpected": "value"}
+        (self.rp / "textures" / "terrain_texture.json").write_text(json.dumps(self.terrain), encoding="utf-8")
+        result = self._payload()
+        self.assertTrue(any(x["code"] == "INVALID_ATLAS_ENTRY" for x in result["findings"]))
+        self.assertFalse(result["summary"]["analysis_complete"])
+
+    def test_unrecognized_definition_marks_analysis_incomplete(self):
+        (self.bp / "blocks" / "unrecognized.json").write_text(json.dumps({"not_a_block": {}}), encoding="utf-8")
+        result = self._payload()
+        self.assertTrue(any(x["code"] == "UNRECOGNIZED_DEFINITION" for x in result["findings"]))
+        self.assertFalse(result["summary"]["analysis_complete"])
 
     def test_jsonrpc_notifications_and_unknown_tool(self):
         notification = audit_mcp.handle_message({"jsonrpc": "2.0", "method": "notifications/initialized"})

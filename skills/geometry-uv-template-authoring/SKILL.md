@@ -37,4 +37,11 @@ Use `minecraft-bedrock-geometry-uv-template` and `generate_geometry_uv_template`
 4. Run `audit_geometry_uvs` again with the resulting PNG explicitly supplied.
 5. Run the texture-link auditor where block/item atlas links apply, then import the packs into the target Bedrock build for visual verification.
 
-Official reference: [Bedrock geometry format 1.26.40](https://learn.microsoft.com/en-us/minecraft/creator/reference/content/visualreference/geometry.v1.26.40?view=minecraft-bedrock-stable) and [Entity Modeling and Animation](https://learn.microsoft.com/en-us/minecraft/creator/documents/entitymodelingandanimation?view=minecraft-bedrock-stable).
+Official reference: [Bedrock geometry format 1.26.40](https://learn.microsoft.com/en-us/minecraft/creator/reference/content/visualreference/geometry.v1.21.0?view=minecraft-bedrock-stable) and [Entity Modeling and Animation](https://learn.microsoft.com/en-us/minecraft/creator/documents/entitymodelingandanimation?view=minecraft-bedrock-stable).
+
+
+## Geometry-only static analysis
+
+The standalone analyzer is available at skills/geometry-uv-engine/scripts/geometry_engine.py. It does not rasterize a UV template. The existing template renderer remains available through the configured MCP server; its migration to a pure standalone utility is not complete.
+
+Official format reference: https://learn.microsoft.com/en-us/minecraft/creator/reference/content/visualreference/geometry.v1.21.0?view=minecraft-bedrock-stable

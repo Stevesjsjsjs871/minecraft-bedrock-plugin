@@ -36,6 +36,7 @@ jobs:
           python -m py_compile skills/package-integrity/scripts/check_package_integrity.py
           python -m py_compile skills/package-integrity/scripts/test_check_package_integrity.py
           python -m py_compile skills/visual-resource-pipeline/scripts/generate_texture.py skills/visual-resource-pipeline/scripts/test_generate_texture.py cloudflare/tests/test_capability_contract.py
+          python -m py_compile skills/geometry-uv-engine/scripts/geometry_engine.py skills/geometry-uv-engine/scripts/test_geometry_engine.py
       - name: Test MCP server schemas, protocol, diff tool and safety
         run: python -m unittest discover -s server/tests -v
       - name: Test shared PNG stream validator
@@ -50,6 +51,8 @@ jobs:
         run: python -m unittest discover -s skills/visual-resource-pipeline/scripts -p 'test_*.py' -v
       - name: Test package-integrity checker
         run: python -m unittest discover -s skills/package-integrity/scripts -p 'test_*.py' -v
+      - name: Test standalone geometry UV analyzer
+        run: python -m unittest discover -s skills/geometry-uv-engine/scripts -p 'test_*.py' -v
       - name: Test local and remote MCP capability profiles
         run: python -m unittest discover -s cloudflare/tests -p 'test_*.py' -v
       - name: Run package-integrity audit

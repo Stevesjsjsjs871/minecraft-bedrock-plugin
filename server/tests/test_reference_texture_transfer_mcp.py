@@ -55,6 +55,11 @@ validation.validate_png_bytes = _validate_png_bytes
 with patch.dict(sys.modules, {"png_validation": validation}):
     import texture_painting_mcp as painter
     import reference_texture_transfer_mcp as transfer
+    # These modules retain references to the temporary PNG shim. Keep them in
+    # local variables for this test module, but do not poison later imports.
+    sys.modules.pop("reference_texture_transfer_mcp", None)
+    sys.modules.pop("texture_painting_mcp", None)
+    sys.modules.pop("geometry_uv_template_mcp", None)
 
 
 class ReferenceTextureTransferTests(unittest.TestCase):

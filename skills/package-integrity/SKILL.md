@@ -1,6 +1,6 @@
 ---
 name: package-integrity
-description: Use before publishing a Minecraft Bedrock Engineer package or diagnosing version, MCP configuration, prompt, skill inventory, tool registry, or Mojang sample-index drift.
+description: Use before publishing a Minecraft Bedrock Engineer package or diagnosing version, shared manifest metadata, changelog, MCP configuration, prompt, skill inventory, tool registry, or Mojang sample-index drift.
 ---
 
 # Package Integrity Audit
@@ -16,7 +16,7 @@ python skills/package-integrity/scripts/check_package_integrity.py .
 python skills/package-integrity/scripts/test_check_package_integrity.py -v
 ```
 
-The script emits a JSON evidence report and a non-zero exit code for failures. The default audit checks required files, strict SemVer agreement across both manifests and `VERSION`, plugin identity, exact default-prompt parity, compatibility/MCP configuration references, skill frontmatter uniqueness, statically discoverable MCP tool names and dispatch comparisons, writer annotations, README version heading, and the Mojang sample-index metadata. If the generated gzip index is absent but the curated version-labelled sample files exist, it reports an explicit `WARN` for curated fallback rather than claiming the full index was verified.
+The script emits a JSON evidence report and a non-zero exit code for failures. The default audit checks required files, strict SemVer agreement across both manifests and `VERSION`, plugin identity, shared root/compatibility manifest metadata and interface parity, exact default-prompt parity, compatibility/MCP configuration references, skill frontmatter uniqueness, statically discoverable MCP tool names and dispatch comparisons, writer annotations, README version heading, latest changelog version, and the Mojang sample-index metadata. If the generated gzip index is absent but the curated version-labelled sample files exist, it reports an explicit `WARN` for curated fallback rather than claiming the full index was verified.
 
 To skip decompression of the sample index for a quick check, pass `--skip-deep-index`. This produces a warning, not a full pass for the index-content gate.
 

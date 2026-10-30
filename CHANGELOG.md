@@ -38,3 +38,8 @@
 ## 1.0.10 — Dedicated procedural texture MCP tool
 - Adds the separate `minecraft-bedrock-texture-generator` stdio MCP server with `generate_texture`.
 - Generates bounded RGBA PNG starter textures using deterministic procedural styles; it is not AI image synthesis or UV-aware painting.
+
+## Follow-up compatibility hardening
+- Renames the geometry-first entity tool to `create_addon_entity_with_geometry` while preserving the existing core `create_addon_entity` contract.
+- Adds ordered transition-array input to animation-controller authoring; the legacy object-map shorthand remains accepted and generated Bedrock JSON retains ordered arrays.
+- Adds cross-server MCP registry tests to guard against tool-name collisions and accidental removal of Creator Tools bridge tools.

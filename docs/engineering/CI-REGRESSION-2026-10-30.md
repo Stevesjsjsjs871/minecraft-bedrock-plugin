@@ -56,3 +56,12 @@ The version contract now asserts:
 - prompt entries remain unique.
 
 This preserves the user's three original defaults without blocking later workflow-specific prompts.
+
+
+## Package-integrity follow-up
+
+After the PNG import fixes, the full server suite passed (359/359). The package-integrity audit then exposed a second obsolete assumption: its prompt validator allowed only 1–3 entries, while the 1.3.0 manifests contain 11 unique entries and the current Plugin Creator 1.4.0 contains 12. This contradicted the project requirement to preserve the original three prompts while permitting later workflow prompts.
+
+The package-integrity validator now accepts 1–32 unique, non-empty prompt strings and still requires exact ordered equality between root and compatibility manifests. Added regression coverage for an 11-entry prompt list and duplicate rejection.
+
+The server contract test separately verifies that the original three create/audit/research prompts remain unchanged and are the ordered prefix of the current list.

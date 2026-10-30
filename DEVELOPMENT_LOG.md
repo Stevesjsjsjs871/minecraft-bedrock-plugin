@@ -47,3 +47,15 @@
 ## Risks and next step
 - Plugin Creator 1.4.1 remains unchanged; its metadata drift and bytecode files require a separately approved update using the current expected release ID.
 - After CI passes, review PR #14 as a dependent change on PR #13. Do not merge automatically.
+
+
+## 2026-10-30 — Plugin Creator 1.4.2 source audit
+
+- Re-read current Plugin Creator metadata and file inventory; current Release ID is `pluginrel_6ae4979a4ad081918bcae25fe4dabad3`, version 1.4.2.
+- Inventory: 150 files, 2,901,131 bytes by listed metadata. Two generated `.pyc` files remain; `BUILD_PROVENANCE.json` and `cloudflare/deploy-with-secrets.mjs` are absent.
+- Both plugin manifests report 1.4.2 and contain 12 identical prompts, preserving the original first three. `VERSION`, README title and latest CHANGELOG heading remain 1.4.0.
+- Current Plugin Creator MCP configs each register one remote Streamable HTTP server. Bundled Cloudflare code is Container-based and its adapter imports 16 Python MCP modules. GitHub `feat/cloudflare-workers-mcp` is a different profile: 16 local STDIO servers plus a stateless four-tool Worker.
+- Full archive download and live Worker smoke test were NOT RUN because the environment could not resolve the signed archive host or Worker hostname. No byte-for-byte archive parity or live remote tool catalog is claimed.
+- Added `docs/engineering/PLUGIN_CREATOR_1.4.2_SOURCE_AUDIT.md` with evidence, limitations and a profile-contract remediation plan.
+- No Plugin Creator mutation, GitHub merge or public release was performed.
+- Next: define and test explicit local-STDIO vs remote-HTTP packaging profiles, then align release metadata and provenance to one exact source commit.

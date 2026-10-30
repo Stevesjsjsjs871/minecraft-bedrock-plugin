@@ -43,17 +43,25 @@ mkdir -p dist
 source_dir="$(mktemp -d)"
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$source_dir" "$tmp_dir"' EXIT
+archive="$tmp_dir/bedrock-samples-v1.26.50.4-full.zip"
+index="$tmp_dir/mojang-samples-index.json.gz"
+curl --fail --location --output "$archive" \
+  https://github.com/Mojang/bedrock-samples/releases/download/v1.26.50.4/bedrock-samples-v1.26.50.4-full.zip
+PYTHONDONTWRITEBYTECODE=1 python skills/bedrock-development/scripts/restore_mojang_index.py "$archive" \
+  --metadata skills/bedrock-development/references/mojang-samples-1.26.50.4/INDEX_METADATA.json \
+  --indexer skills/bedrock-development/scripts/index_mojang_samples.py --output "$index"
 git archive HEAD | tar -x -C "$source_dir"
-python skills/package-integrity/scripts/build_skills_package.py "$source_dir" dist/minecraft-bedrock-engineer.tar.gz --source-commit "$(git rev-parse HEAD)" --source-date-epoch "$(git show -s --format=%ct HEAD)"
+cp "$index" "$source_dir/skills/bedrock-development/references/mojang-samples-1.26.50.4/mojang-samples-index.json.gz"
+PYTHONDONTWRITEBYTECODE=1 python skills/package-integrity/scripts/build_skills_package.py "$source_dir" dist/minecraft-bedrock-engineer.tar.gz --source-commit "$(git rev-parse HEAD)" --source-date-epoch "$(git show -s --format=%ct HEAD)"
 tar -xzf dist/minecraft-bedrock-engineer.tar.gz -C "$tmp_dir"
-python skills/package-integrity/scripts/check_skills_package.py "$tmp_dir"
+PYTHONDONTWRITEBYTECODE=1 python skills/package-integrity/scripts/check_skills_package.py "$tmp_dir"
 (cd dist && sha256sum -c minecraft-bedrock-engineer.tar.gz.sha256)
 ```
 
-The checker requires BUILD_PROVENANCE.json and rejects symlinks, special files, Python bytecode/cache directories, mismatched metadata, changed default prompts and altered payload hashes. A failed check blocks packaging; do not bypass it.
+The checker requires BUILD_PROVENANCE.json and rejects symlinks, special files, Python bytecode/cache directories, mismatched metadata, changed default prompts and altered payload hashes. Run the builder and extracted checker with \`PYTHONDONTWRITEBYTECODE=1\`; the package gate still rejects any cache directory that is present. A failed check blocks packaging; do not bypass it.
 
 The provenance file and SHA-256 sidecar provide integrity metadata, not a digital signature or independent identity attestation. Verify the recorded Git commit and successful CI run against a trusted repository before distributing a candidate.
 
-The current GitHub mirror is missing the exact binary Mojang Samples index included in Plugin Creator 1.5.12. Until that pinned file is restored, the extracted-package release gate is expected to fail and no release candidate may be published. Do not fabricate or partially regenerate the index.
+The generated Mojang Samples index is restored from the official v1.26.50.4 full release asset. The upstream ZIP SHA-256 is pinned as \`c0b6151f5f9a0c31ebe3c909dfc82d97f12473ed2c6e039aa7e22d667042026c\`; the deterministic regenerated gzip is pinned as 1,128,406 bytes with SHA-256 \`48429d64391157553e6760b7f568e5e6d5d05fa6517427b5a1156c8bc18e61fc\`. It contains 22,252 indexed entries from 22,859 ZIP entries, with all category totals checked. Plugin Creator 1.5.12's stored gzip is 1,128,413 bytes; its bytes were not retrieved for direct comparison, so byte-for-byte parity is not claimed. The GitHub candidate is independently pinned to the deterministic generated index hash.
 
 Run only current standalone utilities and their corresponding tests. Historical changelog entries may mention retired architecture; they are retained as release history, not as active implementation. Runtime, multiplayer and Blockbench checks must be reported as NOT RUN unless actually performed.

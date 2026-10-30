@@ -47,9 +47,9 @@ BUILD_PROVENANCE.json uses schema version 1. It records the full Git object ID, 
 
 The provenance file and SHA-256 sidecar provide integrity metadata, not a digital signature or independent identity attestation. Verify the recorded Git commit and successful CI run against a trusted repository before distributing a candidate.
 
-The builder excludes repository-only .git, .github, docs/engineering, dist, GITHUB_SYNC_NOTES.md and DEVELOPMENT_LOG.md. It does not silently remove bytecode or symlinks: it refuses to package them.
+The builder excludes repository-only .git, .github, docs/engineering, dist, GITHUB_SYNC_NOTES.md and DEVELOPMENT_LOG.md. Run the builder and extracted checker with \`PYTHONDONTWRITEBYTECODE=1\` so their imports do not create a cache inside the package snapshot; the checker must still reject any cache that is present. It does not silently remove bytecode or symlinks: it refuses to package them.
 
-The current GitHub mirror is known to be missing the binary mojang-samples-index.json.gz asset that exists in Plugin Creator 1.5.12. The builder can be unit-tested with synthetic fixtures, but a release candidate from this mirror must remain blocked until that exact pinned binary index is restored and the extracted-package checker passes. Do not replace it with a fabricated or partial index.
+The generated mojang-samples-index.json.gz is intentionally not committed. CI restores it from the exact official Mojang v1.26.50.4 full release asset, verifies the ZIP SHA-256, regenerates the index, and checks source archive name/hash, target version, ZIP totals, indexed count, category counts, compressed size and generated index SHA-256. The current deterministic index is 1,128,406 bytes with SHA-256 \`48429d64391157553e6760b7f568e5e6d5d05fa6517427b5a1156c8bc18e61fc\`. Plugin Creator 1.5.12's stored index is 1,128,413 bytes; direct byte comparison was unavailable, so byte-identical parity is not claimed.
 
 The checker is standard-library-only and read-only. The builder writes only a new archive and its sidecar, outside the package root, and never overwrites existing paths. Static package checks do not prove Minecraft import, rendering, gameplay, multiplayer, Blockbench interoperability or Script API runtime behavior; report those as NOT RUN unless actually tested.
 

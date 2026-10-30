@@ -55,7 +55,10 @@ Harden the texture-atlas read/merge/write transaction so concurrent instances of
 - Update the visual-resource-pipeline skill to document structural PNG validation, cross-process locking and the timeout response.
 
 ### Verification
-- Pending CI on the updated branch. Do not claim Windows behavior verified until the Windows job completes.
+- Dedicated portability workflow push run 40978756333 and PR run 40978761725 both succeeded. Ubuntu 24.04 / Python 3.12 passed 26/26 tests in 0.379s; Windows / Python 3.12 passed 26/26 tests in 0.813s. The concurrent-registration, lock-timeout and replaced-parent tests passed on both systems; no skips or failures were reported.
+- Main PR validation run #111 (40978761714) succeeded: 140 unit tests across five suites (101 MCP/server, 12 benchmark evaluator, 6 Mojang sample index, 12 procedural texture generator, 9 package-integrity). Python compilation, package-integrity audit, all 18 analyzer regression cases, report-schema checks, version/manifest consistency, default-prompt preservation and MCP configuration checks passed. No failing test/error lines were present in the job log.
+- GitHub Actions emitted non-failing Node.js 20 deprecation and Node punycode warnings. No dedicated linter/type-check step is configured; lint/type-check: NOT RUN. macOS and network-filesystem locking: NOT RUN.
+- Minecraft import/rendering and Creator Tools CLI runtime: NOT RUN.
 - Existing Plugin Creator release 1.0.11, manifests, MCP server definitions and the three original default prompts remain unchanged.
 
 ### Residual risks

@@ -42,12 +42,12 @@ Make package integrity a fail-closed release gate and add a deterministic Skills
 Local isolated fixture results:
 
 - python -m compileall -q . — PASS.
-- python -m unittest discover -s . -p 'test_*.py' -v — 30/30 PASS.
+- python -m unittest discover -s . -p 'test_*.py' -v — 32/32 PASS.
 - Deterministic archive smoke test — PASS.
 - Two builds with identical source, commit and epoch produced identical tar.gz bytes.
 - Tampered sidecar, bytecode cache, symlink, Windows drive/traversal paths, invalid Git SHA, overwrite and output-inside-source cases were rejected.
 
-The repository's GitHub Actions workflow automatically discovers both package-integrity test files. A PR-triggered CI run is pending.
+The repository's GitHub Actions workflow discovers both package-integrity test files. Initial PR CI #41089549833 passed the package-integrity step but failed 10/12 audit-benchmark tests because jsonschema was not installed. Added a pinned jsonschema==4.26.0 requirements file and workflow install step; rerun #41090000560 was queued at log update time.
 
 ## Not run / blockers
 

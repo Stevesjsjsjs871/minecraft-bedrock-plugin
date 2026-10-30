@@ -1,15 +1,20 @@
 ---
 name: skills-first-execution
-description: Mandatory execution and capability-routing contract for Minecraft Bedrock Engineer. Use at the start of every task to make the Skills-only architecture operational, select real host capabilities, edit files safely, run bundled scripts honestly, and report evidence.
+description: Mandatory execution and capability-routing contract for Minecraft Bedrock Engineer. Use at the start of every task to route through real Skills, local STDIO MCP servers, the separate remote gateway, native host tools and safe validation.
 ---
 
 # Skills-first execution contract
 
-## 1. Architecture is intentional
+## 1. Architecture and execution boundaries
 
-Minecraft Bedrock Engineer operates entirely through skills, instructions, bundled references and optional local scripts. It does not depend on MCP servers, MCP registries, remote MCP endpoints or a plugin-owned backend. Do not attempt to call old server tools or describe their absence as a malfunction. Historical skill text that names old MCP tools is obsolete; use the procedure in this skill and the current specialist workflow instead.
+Minecraft Bedrock Engineer combines specialist Skills, versioned references, standalone validation scripts, **16 local STDIO MCP server processes**, a Creator Tools CLI bridge and a separately connected Cloudflare Streamable HTTP gateway.
 
-A skill is not an executable tool. It cannot by itself open a user's filesystem, edit a project, run Python, invoke a CLI, install dependencies, create a remote workspace or continue working in the background.
+- Local MCP servers are declared in root `mcp.json` and the Codex compatibility `.mcp.json`. Their working directory and `MINECRAFT_BEDROCK_WORKSPACE` are scoped to `${PLUGIN_DATA}`; they must not write outside the configured workspace.
+- The core local server exposes 19 tools, including `creator_tools_status`, `creator_tools_catalog`, `validate_with_mct` and `create_entity_with_mct`. Specialist servers cover textures, entities, animations, geometry/UV and reference transfer.
+- Local STDIO servers are usable only in a host that actually starts them, provides Python 3 and exposes their tools. Do not assume ChatGPT web can access a local filesystem or launch a local process.
+- The separately connected remote Worker is `https://minecraft-bedrock-plugin.msg2026.workers.dev/mcp`. It exposes four remote tools for manifest generation/validation, bounded public source reads and capability reporting. It does **not** run the local Python handlers, write local project files, invoke MCT CLI, or perform geometry/texture/animation authoring.
+- The remote Bearer credential is client-managed. Never place it in source, `mcp.json`, headers, logs or chat.
+- Skills describe workflows; they do not themselves create tools, grant filesystem access, run code or work in the background. A server listed in a file is not proof it is connected: verify the live tool list first.
 
 ## 2. Select a real execution route
 
@@ -19,7 +24,8 @@ At the beginning of each task, identify which of these routes is actually availa
 2. **Connected file/workspace capability** — use only when a real connected tool is listed and the user has selected or authorized the workspace. Inspect paths and permissions before writing.
 3. **Code execution** — use a real Python/terminal executor only when the plugin scripts and project files are accessible in that environment. Confirm the working directory, interpreter, dependencies and script arguments before running.
 4. **Creator Tools** — use only an actual connected Creator Tools capability or an explicitly authorized local CLI. Check the installed version and command help first. Do not install packages, download executables, accept EULAs or deploy to a live world without explicit authorization.
-5. **No execution route** — do not pretend. Produce a complete patch, full file contents, a safe file tree or exact commands the user can run. Mark the result `NOT APPLIED` and tests `NOT RUN`.
+5. **MCP route** — inspect the live tool list. Use local STDIO only when the host actually started the relevant server and the workspace is configured; use the remote Worker only for its four declared remote capabilities. Do not confuse remote source reads with local file access.
+6. **No execution route** — do not pretend. Produce a complete patch, full file contents, a safe file tree or exact commands the user can run. Mark the result `NOT APPLIED` and tests `NOT RUN.
 
 Never infer a tool's availability from a skill name, README, old changelog or historical source code.
 

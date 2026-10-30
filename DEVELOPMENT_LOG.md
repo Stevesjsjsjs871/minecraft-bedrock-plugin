@@ -86,3 +86,14 @@
 - The PR merge-ref candidate contained 134 payload files / 1,994,338 bytes. Two independent clean snapshots produced byte-identical tar.gz files and sidecars; archive SHA-256 `c824d81a277660b4633236fe0f05f1e76620e85c92f35ee36c5ba405c8cedb57`.
 - CI warnings remain for Node.js 20-targeting actions/checkout@v4 and actions/setup-python@v5, plus Node's deprecated `punycode` module. They did not fail the run.
 - PR #24 remains Draft/open and is not merged. PR #20, #21 and #23 remain the dependency chain; PR #22 remains an alternate-base duplicate and must not be independently merged. No Plugin Creator update or public release.
+
+
+## 2026-10-30 — Restore active MCP and Creator Tools bridge (source candidate)
+
+- Baseline: PR #24 is Draft/open at `97dad600d999ade795eaffd2db456ef4389826a7`, stacked on PR #23. Plugin Creator remains 1.5.12 with Release ID `pluginrel_6ae4b2ea22f88191a00187713b7e9b91`; no Plugin Creator mutation.
+- Finding: the Skills-only migration removed `mcp.json`, `.mcp.json`, active server registration and Cloudflare Worker source despite the explicit requirement to preserve MCP. The installed package retained specialized server source, but its core `mcp_server.py` exposed only 14 tools and no Creator Tools bridge. The earlier 19-tool core contains `creator_tools_status`, `creator_tools_catalog`, `validate_with_mct` and `create_entity_with_mct`.
+- Changes in this candidate: restore 16 local STDIO server registrations and all server modules/tests; restore the 19-tool core and MCT bridge; scope local processes to `${PLUGIN_DATA}` via `MINECRAFT_BEDROCK_WORKSPACE`; restore the separately connected four-tool Cloudflare Worker source and contract tests; add 16-process MCP initialize/tools/list tests and a package-level registry validator; update execution, maintenance, Creator Tools and package documentation.
+- Remote Worker endpoint previously confirmed by the user: `https://minecraft-bedrock-plugin.msg2026.workers.dev/mcp`. Current health/connectivity was NOT RUN in this environment; a network DNS attempt did not resolve the host. No deployment was attempted.
+- Tests/CI: pending for this new PR at log creation. The new acceptance gate runs Python 3.12.16, all local MCP server tests, 16 process-level handshakes, remote Worker capability contract, package/provenance tests and TypeScript typecheck.
+- Risks/NOT RUN: local Python command resolution on the user's Windows host; live ChatGPT Worker authentication; Creator Tools CLI availability; Minecraft import/render/gameplay; Blockbench runtime.
+- Safety: new Draft PR stacked on PR #24; no merge, Plugin Creator update, Worker deployment or public release. All 12 prompts and plugin identity are preserved. No Spatial GUI.

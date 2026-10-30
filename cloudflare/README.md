@@ -1,0 +1,57 @@
+# Minecraft Bedrock Engineer — Cloudflare Workers Free MCP Gateway
+
+## Architecture
+
+The remote endpoint is a stateless Cloudflare Worker. It does **not** use Cloudflare Containers, Durable Objects, paid storage, a Docker runtime, or a paid external API.
+
+- MCP HTTP endpoint: `POST /mcp`
+- Health endpoint: `GET /health`
+- Authentication: `Authorization: Bearer <MCP_AUTH_TOKEN>`
+- Source reference reads: public GitHub repository, restricted to `server/` and `skills/` paths.
+- Local MCP: the existing Python STDIO servers remain unchanged and retain the full local toolset.
+
+## Free remote toolset (current phase)
+
+- `bedrock_generate_manifest` — generate a BP/RP manifest with fresh UUIDs.
+- `bedrock_validate_manifest` — static manifest structure/UUID/version checks.
+- `bedrock_read_plugin_source` — read bounded source/reference files from this repository.
+- `bedrock_plugin_capabilities` — report the preserved local modules and remote limitations.
+
+The remote Worker does not execute the existing Python filesystem, archive, MCT CLI, texture, geometry, or animation audit handlers. Those remain available through the local Python MCP runtime. The remote gateway is being expanded in small TypeScript-native steps rather than pretending Python containers run on the Free plan.
+
+## Deploy
+
+Cloudflare Workers Free is sufficient for this gateway's current feature set.
+
+1. In Workers & Pages, keep the GitHub-connected project and production branch `feat/cloudflare-workers-mcp`.
+2. In Workers Builds → Settings → Variables and secrets, add a **Secret** named `MCP_AUTH_TOKEN` with a long random value (at least 32 characters). Workers Builds secrets are build-time only and are not automatically available to the running Worker.
+3. Set the Workers Builds **Deploy command** to `node cloudflare/deploy-with-secrets.mjs`. This helper creates a temporary secrets file outside the repository, invokes `wrangler deploy --secrets-file`, and removes the temporary file.
+4. Trigger a new deployment from the latest commit.
+
+Do not commit or share the secret in chat. The deploy helper fails before deployment if `MCP_AUTH_TOKEN` is absent or shorter than 32 characters.
+
+Endpoint after deployment: `https://<worker-subdomain>.workers.dev/mcp`
+
+Health check: `GET https://<worker-subdomain>.workers.dev/health`
+
+MCP requests use JSON-RPC over HTTP POST with the Bearer token. This implementation is stateless and does not require session storage.
+
+## Legacy files
+
+`Dockerfile` and `cloudflare/container/app.py` are retained for reference only; the Free Worker deployment does not build or invoke them.
+
+
+## Capability contract
+
+The machine-readable profile is in `cloudflare/capabilities.json`. The contract tests compare the TypeScript Worker catalog with the declared four-tool remote profile and verify that both local MCP configuration files continue to register all 16 Python STDIO servers.
+
+Do not infer remote availability from the presence of a Python module in the package: the Free Worker is TypeScript-native and does not execute the local Python handlers or write into a user's project. Use the local STDIO profile for the full filesystem, texture, geometry, animation, archive and Creator Tools workflows.
+
+
+## Previously deployed endpoint
+
+MCP endpoint: `https://minecraft-bedrock-plugin.msg2026.workers.dev/mcp`
+
+Health endpoint: `https://minecraft-bedrock-plugin.msg2026.workers.dev/health`
+
+This endpoint was confirmed in the earlier setup. This source change does not re-deploy or re-verify its live availability.

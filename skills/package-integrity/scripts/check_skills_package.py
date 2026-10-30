@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Strict, offline integrity checks for a packaged Skills-only Minecraft Bedrock Engineer release."""
+"""Strict, offline integrity checks for a packaged Skills + MCP Minecraft Bedrock Engineer release."""
 from __future__ import annotations
 
 import argparse
@@ -13,24 +13,60 @@ from pathlib import Path
 from typing import Any
 
 from package_provenance import PackageSafetyError, scan_package, verify_provenance
+from mcp_package_contract import LOCAL_MCP_SERVERS, validate_mcp_package
 
 EXPECTED_NAME = "minecraft-bedrock-engineer"
 PROVENANCE_NAME = "BUILD_PROVENANCE.json"
 SEMVER = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$")
 
+LOCAL_MCP_SERVERS = {
+    "minecraft-bedrock-engineer": "mcp_server.py",
+    "minecraft-bedrock-texture-generator": "texture_generator_mcp.py",
+    "minecraft-bedrock-texture-link-auditor": "texture_link_audit_mcp.py",
+    "minecraft-bedrock-entity-authoring": "entity_authoring_mcp.py",
+    "minecraft-bedrock-animation-controller-authoring": "animation_controller_mcp.py",
+    "minecraft-bedrock-animation-clip-authoring": "animation_clip_mcp.py",
+    "minecraft-bedrock-animation-pipeline-audit": "animation_pipeline_audit_mcp.py",
+    "minecraft-bedrock-animated-entity-authoring": "animated_entity_bundle_mcp.py",
+    "minecraft-bedrock-geometry-uv-auditor": "geometry_uv_audit_mcp.py",
+    "minecraft-bedrock-geometry-uv-template": "geometry_uv_template_mcp.py",
+    "minecraft-bedrock-texture-painter": "texture_painting_mcp.py",
+    "minecraft-bedrock-reference-texture-transfer": "reference_texture_transfer_mcp.py",
+    "minecraft-bedrock-uv-mapping-assistant": "uv_mapping_assistant_mcp.py",
+    "minecraft-bedrock-visual-reference-analyzer": "visual_reference_analyzer_mcp.py",
+    "minecraft-bedrock-reference-mapping-review": "reference_mapping_review_mcp.py",
+    "minecraft-bedrock-uv-texture-retarget": "uv_texture_retarget_mcp.py",
+}
+SERVER_TESTS = [
+    "test_animated_entity_bundle_mcp.py", "test_animation_clip_mcp.py",
+    "test_animation_controller_mcp.py", "test_animation_pipeline_audit_mcp.py",
+    "test_entity_authoring_mcp.py", "test_geometry_uv_audit_mcp.py",
+    "test_geometry_uv_template_mcp.py", "test_mcp_server.py", "test_mcp_registry.py",
+    "test_png_validation.py", "test_reference_mapping_review_mcp.py",
+    "test_reference_texture_transfer_mcp.py", "test_texture_generator_mcp.py",
+    "test_texture_link_audit_mcp.py", "test_texture_painting_mcp.py",
+    "test_uv_mapping_assistant_mcp.py", "test_uv_texture_retarget_mcp.py",
+    "test_visual_reference_analyzer_mcp.py",
+]
+MCP_SCHEMA = "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json"
 REQUIRED = [
-    "VERSION", "README.md", "CHANGELOG.md", "plugin.json", ".codex-plugin/plugin.json",
+    "VERSION", "README.md", "CHANGELOG.md", "RELEASE_NOTES_1.5.13.md", "plugin.json",
+    ".codex-plugin/plugin.json", "mcp.json", ".mcp.json", "archive_safety.py",
     "skills/bedrock-engineer-core/SKILL.md", "skills/skills-first-execution/SKILL.md",
-    "skills/skills-only-maintenance/SKILL.md", "skills/geometry-uv-engine/SKILL.md",
-    "skills/geometry-uv-engine/scripts/geometry_engine.py",
+    "skills/skills-only-maintenance/SKILL.md", "skills/plugin-maintenance/SKILL.md",
+    "skills/mcp-integration/SKILL.md", "skills/creator-tools-bridge/SKILL.md",
+    "skills/geometry-uv-engine/SKILL.md", "skills/geometry-uv-engine/scripts/geometry_engine.py",
     "skills/geometry-uv-engine/scripts/test_geometry_engine.py",
     "skills/geometry-uv-engine/scripts/uv_template_engine.py",
     "skills/geometry-uv-engine/scripts/test_uv_template_engine.py",
     "skills/visual-resource-pipeline/scripts/png_engine.py",
     "skills/visual-resource-pipeline/scripts/test_png_engine.py",
+    "skills/package-integrity/SKILL.md",
     "skills/package-integrity/scripts/package_provenance.py",
     "skills/package-integrity/scripts/check_skills_package.py",
     "skills/package-integrity/scripts/test_check_skills_package.py",
+    "skills/package-integrity/scripts/mcp_package_contract.py",
+    "skills/package-integrity/scripts/test_mcp_package_contract.py",
     "skills/package-integrity/scripts/build_skills_package.py",
     "skills/package-integrity/scripts/test_build_skills_package.py",
     "skills/package-integrity/scripts/compare_plugin_sources.py",
@@ -38,13 +74,13 @@ REQUIRED = [
     "skills/bedrock-development/scripts/restore_mojang_index.py",
     "skills/bedrock-development/scripts/test_restore_mojang_index.py",
     "skills/audit-benchmark/requirements.txt",
-]
-LEGACY_MCP_FILES = [".mcp.json", "mcp.json"]
-LEGACY_DEPLOYMENT_FILES = ["Dockerfile", "wrangler.toml", "package.json"]
-FORBIDDEN_ACTIVE_CALLS = [
-    "create_addon_project", "create_addon_item", "create_addon_block", "create_addon_recipe",
-    "create_addon_entity", "search_mojang_samples", "read_mojang_sample", "audit_texture_links", "diff_packs",
-]
+    "cloudflare/src/index.ts", "cloudflare/README.md", "cloudflare/capabilities.json",
+    "cloudflare/deploy-with-secrets.mjs", "cloudflare/tests/test_capability_contract.py",
+    "package.json", "wrangler.toml", "tsconfig.json",
+] + ["server/" + filename for filename in LOCAL_MCP_SERVERS.values()] + [
+    "server/png_validation.py"
+] + ["server/tests/" + filename for filename in SERVER_TESTS]
+LEGACY_DEPLOYMENT_FILES = ["Dockerfile"]
 ORIGINAL_DEFAULT_PROMPTS = [
     "Create a Minecraft Bedrock add-on from scratch or extend my existing project. Work from files I provide or an actually connected workspace, preserve existing mechanics and assets, and produce complete BP/RP files with validation evidence.",
     "Audit this Bedrock add-on or candidate release. Check archive integrity, BP/RP manifests and dependency links, JSON/JavaScript, resource references, identifiers, and regressions. Provide exact paths, evidence and severity; do not delete resources.",
@@ -156,17 +192,13 @@ def check(root: Path) -> dict:
     skill_paths = [root_manifest.get("skills"), compat_manifest.get("skills")]
     add("skills-path", "PASS" if skill_paths == ["./skills", "./skills"] and (root / "skills").is_dir() else "FAIL", f"Skill paths: {skill_paths!r}")
 
-    mcp_refs = []
-    for label, manifest in (("root", root_manifest), ("compatibility", compat_manifest)):
-        if "mcpServers" in manifest:
-            mcp_refs.append(label + ".mcpServers")
-    mcp_files = [name for name in LEGACY_MCP_FILES if (root / name).exists()]
-    add("skills-only-boundary", "PASS" if not mcp_refs and not mcp_files else "FAIL", "No MCP manifests/configuration are present" if not mcp_refs and not mcp_files else f"Unexpected MCP configuration: {mcp_refs + mcp_files!r}")
+    mcp_ok, mcp_message, registered_tools = validate_mcp_package(root, root_manifest, compat_manifest, read_json)
+    add("mcp-config", "PASS" if mcp_ok else "FAIL", mcp_message)
 
     deployment = [name for name in LEGACY_DEPLOYMENT_FILES if (root / name).exists()]
-    if (root / "cloudflare").exists():
-        deployment.append("cloudflare/")
-    add("obsolete-deployment", "PASS" if not deployment else "FAIL", "No retired Cloudflare/container deployment scaffolding" if not deployment else f"Retired deployment artifacts remain: {deployment!r}")
+    if (root / "cloudflare" / "container").exists():
+        deployment.append("cloudflare/container/")
+    add("obsolete-deployment", "PASS" if not deployment else "FAIL", "No Docker/container runtime scaffolding; the source-controlled Worker gateway is intentional" if not deployment else f"Retired deployment artifacts remain: {deployment!r}")
 
     skills = sorted((root / "skills").rglob("SKILL.md"))
     skill_names: dict[str, str] = {}
@@ -191,12 +223,11 @@ def check(root: Path) -> dict:
     stale = []
     for path in skills:
         body = path.read_text(encoding="utf-8")
-        for tool in FORBIDDEN_ACTIVE_CALLS:
-            if re.search(r"(?i)\b(?:call|invoke)\s+`" + re.escape(tool) + r"`", body):
-                stale.append(f"{path.relative_to(root)} invokes {tool}")
-        if re.search(r"(?i)actual MCP registry|MCP connection|MCP unit suite", body):
-            stale.append(f"{path.relative_to(root)} contains active MCP release instructions")
-    add("skill-tool-boundary", "PASS" if not stale else "FAIL", "No stale calls to retired tools in skill instructions" if not stale else "; ".join(stale[:20]))
+        for match in re.finditer(r"(?i)\b(?:call|invoke)\s+`([a-z0-9_]+)`", body):
+            tool = match.group(1)
+            if tool not in registered_tools:
+                stale.append(f"{path.relative_to(root)} invokes unregistered tool {tool}")
+    add("skill-tool-boundary", "PASS" if not stale else "FAIL", "Every explicit MCP tool invocation exists in the local or remote registry" if not stale else "; ".join(stale[:20]))
 
     readme = (root / "README.md").read_text(encoding="utf-8")
     readme_heading = re.search(r"(?m)^# Minecraft Bedrock Engineer — (\S+)\s*$", readme)
@@ -204,8 +235,8 @@ def check(root: Path) -> dict:
     changelog_heading = re.search(r"(?m)^##\s+(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?)(?:\s|$)", changelog)
     add("readme-version", "PASS" if readme_heading and versions[0] == readme_heading.group(1) else "FAIL", f"README heading version: {readme_heading.group(1) if readme_heading else 'missing'}")
     add("changelog-version", "PASS" if changelog_heading and versions[0] == changelog_heading.group(1) else "FAIL", f"Newest CHANGELOG heading version: {changelog_heading.group(1) if changelog_heading else 'missing'}")
-    readme_arch = "Skills-and-instructions-only" in readme and ("does not use MCP" in readme or "No MCP server" in readme)
-    add("readme-architecture", "PASS" if readme_arch else "FAIL", "README documents the intentional Skills-only architecture" if readme_arch else "README must explicitly document the Skills-only/no-MCP architecture")
+    readme_arch = "Skills" in readme and "16 local STDIO MCP servers" in readme and "Cloudflare" in readme and "Creator Tools" in readme
+    add("readme-architecture", "PASS" if readme_arch else "FAIL", "README documents Skills, 16 local STDIO servers, Creator Tools and the remote Worker" if readme_arch else "README must document the combined Skills + MCP + Creator Tools architecture")
 
     geometry_script = root / "skills/geometry-uv-engine/scripts/geometry_engine.py"
     geometry_test = root / "skills/geometry-uv-engine/scripts/test_geometry_engine.py"

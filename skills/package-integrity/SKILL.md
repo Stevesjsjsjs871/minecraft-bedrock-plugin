@@ -1,9 +1,9 @@
 ---
 name: package-integrity
-description: Use before publishing or updating Minecraft Bedrock Engineer to verify Skills-only package manifests, original prompt preservation, version parity, filesystem hygiene, provenance and bundled Mojang sample-index integrity.
+description: Use before publishing or updating Minecraft Bedrock Engineer to verify combined Skills/MCP manifests, local server registration, Creator Tools bridge, remote Worker contract, original prompt preservation, version parity, filesystem hygiene, provenance and bundled Mojang sample-index integrity.
 ---
 
-# Skills-only Package Integrity and Provenance Gate
+# Plugin Package Integrity and Provenance Gate
 
 Run the regression suite from the repository or extracted package:
 
@@ -43,7 +43,7 @@ Do not publish or install a candidate unless every check passes. A missing BUILD
 - SemVer parity across plugin.json, .codex-plugin/plugin.json, VERSION, README heading and newest versioned CHANGELOG heading.
 - Stable plugin identity and exact parity of the two default-prompt arrays.
 - The first three original default prompts are preserved verbatim and in order; adding later prompts is allowed.
-- Both manifests point to ./skills; the Skills-only package contains no active MCP configuration or retired deployment scaffolding.
+- Both manifests point to ./skills; mcp.json and .mcp.json register the same 16 local STDIO servers, workspace paths are scoped to PLUGIN_DATA, the 19-tool core includes the Creator Tools bridge, and the four-tool remote Worker contract is present.
 - Every SKILL.md has basic frontmatter with a unique non-empty name and description.
 - No symlinks, special files, __pycache__, .pyc or .pyo files; bounded file count, individual file size and total package size.
 - The pinned Mojang Samples gzip index decompresses and parses as JSON within a 64 MiB decompressed-size limit; count metadata is checked when available.
@@ -63,7 +63,7 @@ The generated mojang-samples-index.json.gz is intentionally not committed. CI re
 
 The checker is standard-library-only and read-only. The builder writes only a new archive and its sidecar, outside the package root, and never overwrites existing paths. Static package checks do not prove Minecraft import, rendering, gameplay, multiplayer, Blockbench interoperability or Script API runtime behavior; report those as NOT RUN unless actually tested.
 
-Legacy check_package_integrity.py and its tests validate the retired server/registry architecture. They are historical source, not the release gate for current Skills-only packages.
+Legacy check_package_integrity.py remains historical. The current server/tests suite is an active MCP protocol and authoring contract gate.
 
 
 ## Plugin Creator source parity audit

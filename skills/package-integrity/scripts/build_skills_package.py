@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a deterministic Skills-only tar.gz candidate with per-file provenance and a SHA-256 sidecar."""
+"""Build a deterministic Minecraft Bedrock Engineer plugin tar.gz candidate with per-file provenance and a SHA-256 sidecar."""
 from __future__ import annotations
 
 import argparse

@@ -1,10 +1,12 @@
-# Minecraft Bedrock Engineer — 1.5.11
+# Minecraft Bedrock Engineer — 1.5.13
 
 ## Architecture
 
-Minecraft Bedrock Engineer is a Skills-and-instructions-only project. The active architecture is based on specialist skills, bundled reference data and standalone scripts. No MCP server, registry, remote endpoint, Cloudflare worker or plugin-owned execution backend is part of this repository. Skills define workflows; they do not create tools, grant filesystem access, run code or work in the background. Scripts run only when the host provides a real executor and the package files are accessible.
+Minecraft Bedrock Engineer combines specialist Skills, versioned references, standalone validators, **16 local STDIO MCP server processes**, a Creator Tools CLI bridge and a separately connected Cloudflare Streamable HTTP gateway. The local servers are declared in `mcp.json` and `.mcp.json`; their working directory and `MINECRAFT_BEDROCK_WORKSPACE` are scoped to `${PLUGIN_DATA}`. Local STDIO requires a host that can launch Python 3 processes and expose their tools.
 
-The GitHub source intentionally excludes retired server wrappers and their obsolete tests. The Plugin Creator package remains the distribution artifact; this repository is the maintained Skills-first source mirror.
+The core local server exposes 19 tools, including `creator_tools_status`, `creator_tools_catalog`, `validate_with_mct` and `create_entity_with_mct`. Specialist servers cover textures, entities, animations, geometry/UV and reference transfer. The separately connected remote Worker at `https://minecraft-bedrock-plugin.msg2026.workers.dev/mcp` exposes four tools for manifest generation/validation, bounded public source reads and capability reporting; it does not access local files or invoke MCT CLI. Its Bearer credential remains client-managed and is never stored in this repository.
+
+Skills define workflows but do not themselves grant filesystem access, execution or background work. Verify live MCP connections and tool lists; a config file alone is not proof of a running server.
 
 ## Supported workflows
 
@@ -15,13 +17,13 @@ The GitHub source intentionally excludes retired server wrappers and their obsol
 - Standalone PNG validation, deterministic texture generation, geometry-aware painting plans and human-reviewed reference-to-UV mapping.
 - Archive, package, manifest, resource integrity, baseline and regression audits.
 - Mojang Samples indexing and official Creator documentation research with version/source provenance.
-- Release preparation, evidence reporting and Skills-only package integrity checks.
+- MCP-assisted authoring and audits, Creator Tools CLI status/catalog/validation handoff, release preparation, evidence reporting and package integrity checks.
 
 ## Execution contract
 
-1. Start with skills/skills-first-execution/SKILL.md and select only relevant specialist skills.
+1. Start with skills/skills-first-execution/SKILL.md; verify actual MCP availability, then select only relevant specialist skills.
 2. Inspect supplied files or an actually connected workspace. Establish project root, target version and baseline before editing.
-3. Use native file/code capabilities only when actually available. Otherwise provide a complete patch or exact reproducible commands and mark work NOT APPLIED / NOT RUN.
+3. Use local STDIO MCP only when the host has started the server and the workspace is available; use the remote Worker only for its four declared capabilities. Otherwise use native file/code capabilities or provide a patch and mark work NOT APPLIED / NOT RUN.
 4. Preserve existing mechanics, UUIDs, identifiers, assets and unrelated files. No silent overwrite or deletion.
 5. Prefer exact-version official docs and Mojang samples; cite provenance.
 6. Re-open changed files and validate manifests, UUIDs, identifiers, resource references, PNG/UV/animation relationships as applicable.
@@ -29,7 +31,7 @@ The GitHub source intentionally excludes retired server wrappers and their obsol
 
 ## Maintenance and validation
 
-Use skills/skills-only-maintenance/SKILL.md for plugin maintenance. First run the package-integrity regression tests:
+Use skills/plugin-maintenance/SKILL.md for plugin maintenance. First run the package-integrity regression tests:
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s skills/package-integrity/scripts -p 'test_*.py' -v
@@ -65,4 +67,4 @@ The provenance file and SHA-256 sidecar provide integrity metadata, not a digita
 
 The generated Mojang Samples index is restored from the official v1.26.50.4 full release asset. The upstream ZIP SHA-256 is pinned as \`c0b6151f5f9a0c31ebe3c909dfc82d97f12473ed2c6e039aa7e22d667042026c\`; the deterministic regenerated gzip is pinned as 1,128,406 bytes with SHA-256 \`48429d64391157553e6760b7f568e5e6d5d05fa6517427b5a1156c8bc18e61fc\`. It contains 22,252 indexed entries from 22,859 ZIP entries, with all category totals checked. Plugin Creator 1.5.12's stored gzip is 1,128,413 bytes; its bytes were not retrieved for direct comparison, so byte-for-byte parity is not claimed. The GitHub candidate is independently pinned to the deterministic generated index hash.
 
-Run only current standalone utilities and their corresponding tests. Historical changelog entries may mention retired architecture; they are retained as release history, not as active implementation. Runtime, multiplayer and Blockbench checks must be reported as NOT RUN unless actually performed.
+Run current standalone utilities, the local MCP registry/server tests and the remote Worker contract tests. Historical changelog entries describe earlier migrations; the current architecture is Skills plus local MCP and a separately connected remote Worker. Runtime, multiplayer and Blockbench checks must be reported as NOT RUN unless actually performed.

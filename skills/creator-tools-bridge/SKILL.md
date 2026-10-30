@@ -1,17 +1,23 @@
 ---
 name: creator-tools-bridge
-description: Use when coordinating this Skills-only workflow with an actually connected Minecraft Creator Tools capability or an explicitly authorized local CLI.
+description: Use when invoking the real local Minecraft Creator Tools CLI bridge exposed by the core MCP server.
 ---
 
-# Optional Creator Tools bridge
+# Minecraft Creator Tools CLI bridge
 
-This is an optional coordination procedure, not an integration. Do not call historical Creator Tools MCP names or assume that a tool exists because this skill mentions Creator Tools.
+The local `minecraft-bedrock-engineer` STDIO server registers these Creator Tools bridge operations:
 
-1. Inspect the active host's actual connected capabilities. If no Creator Tools capability is listed, report `UNAVAILABLE` and continue with native file/code workflows or a patch.
-2. For a local CLI, require explicit user authorization and inspect the installed version and `--help` first. Do not install software, download executables, accept EULAs, deploy, or modify a live world without explicit approval.
-3. Identify exactly which files Creator Tools will read/write. Snapshot the project and preserve unrelated files.
-4. Run only the requested operation. Capture the exact command/tool name, version, arguments and result.
-5. Re-inspect changed files, compare against the snapshot, run this plugin's available static audits and explain any deltas.
-6. Separate Creator Tools diagnostics from this plugin's checks. Mark game import/render/runtime `NOT RUN` unless actually tested.
+- Call `creator_tools_status` to detect the installed MCT CLI and report its path/version; this is read-only and never installs it.
+- Call `creator_tools_catalog` to inspect capabilities exposed by the installed CLI; no download or installation.
+- Call `validate_with_mct` to invoke the installed CLI's validation operation for an explicitly selected project and capture its actual result.
+- Call `create_entity_with_mct` only when the user requested entity creation; it stages a supported handoff and merges validated new files after a clean diff.
 
-If the capability is absent or fails, do not invent a successful delegation. Provide the exact manual steps or a complete patch.
+## Safety and execution
+
+1. Verify the live `minecraft-bedrock-engineer` MCP server and tool schemas before calling any bridge operation.
+2. Start with `creator_tools_status`; if the CLI is absent, report `UNAVAILABLE`. Never install software, download executables, accept EULAs or invent CLI flags.
+3. Inspect the exact CLI version and catalog before selecting a command. Do not assume capabilities from a different Creator Tools release.
+4. For validation, capture the exact project path, command arguments, exit code and output. Keep plugin static-audit results separate from MCT results.
+5. For entity creation, require the exact target project, template ID and entity slug; preserve existing files and refuse collisions. Re-inspect every staged output and report the diff.
+6. The remote Cloudflare Worker does not invoke MCT CLI. This bridge is available only through the local STDIO server when the host exposes it.
+7. Minecraft import, rendering, gameplay and Blockbench interoperability remain `NOT RUN` unless actually tested.

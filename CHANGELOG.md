@@ -1,5 +1,12 @@
 # Plugin package changelog
 
+## 1.5.13 — Restore MCP runtime and Creator Tools bridge
+- Restores 16 local STDIO MCP server registrations through `mcp.json` and `.mcp.json`; each process uses `${PLUGIN_DATA}` as its working/workspace root.
+- Restores the 19-tool core server, including Creator Tools CLI status, catalog, validation and staged entity handoff operations.
+- Restores the source-controlled Cloudflare Streamable HTTP Worker gateway and its four-tool capability contract; the remote connection remains separate and its Bearer token is never committed.
+- Adds an MCP registry test that launches all 16 local servers and verifies `initialize` and `tools/list`, plus package configuration and tool-registration checks.
+- Preserves plugin identity and all 12 default prompts. No Plugin Creator update, Worker deployment, PR merge or public release is performed.
+
 ## 1.5.11 — Standalone UV template renderer
 - Adds `uv_template_engine.py`, a separate transparent PNG UV guide generator for classic box and supported per-face cube UV.
 - Adds pixel-scale and total-pixel budget controls, labeled bone/cube/face regions, output SHA-256 and exclusive no-overwrite file creation.

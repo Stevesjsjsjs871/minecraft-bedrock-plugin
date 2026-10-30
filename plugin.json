@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "minecraft-bedrock-engineer",
-  "version": "1.5.11",
-  "description": "Minecraft Bedrock Engineer — Skills-first development, research, authoring guidance, BP/RP audits, geometry, animation, UV and texture workflows.",
+  "version": "1.5.13",
+  "description": "Minecraft Bedrock Engineer — Skills, local MCP authoring servers, Creator Tools bridge and reproducible BP/RP validation.",
   "author": {
     "name": "Plugin owner"
   },
@@ -61,14 +61,20 @@
     "reference-mapping-review",
     "uv-texture-retargeting",
     "skills-first",
-    "native-file-workflow"
+    "native-file-workflow",
+    "mcp",
+    "stdio",
+    "creator-tools-bridge",
+    "creator-tools-cli",
+    "cloudflare-workers",
+    "mcp-contract-tests"
   ],
   "extensions": {
     "com.openai": {
       "interface": {
         "displayName": "Minecraft Bedrock Engineer",
         "shortDescription": "Develop & audit Minecraft Bedrock add-ons",
-        "longDescription": "A Skills-first Minecraft Bedrock engineering assistant for version-aware BP/RP development, entities, blocks, items, recipes, models, animations, UI, textures, UV workflows, audits and regression planning. Skills and instructions only; no MCP connection or remote execution backend.",
+        "longDescription": "Minecraft Bedrock Engineer combines version-aware Bedrock BP/RP authoring, 16 local STDIO MCP servers, a Creator Tools CLI bridge, a separately connected four-tool Cloudflare gateway, geometry/UV and texture workflows, and reproducible audits.",
         "developerName": "Private project",
         "category": "Developer tools",
         "capabilities": [

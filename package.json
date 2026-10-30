@@ -1,0 +1,16 @@
+{
+  "name": "minecraft-bedrock-engineer-cloudflare",
+  "private": true,
+  "version": "1.4.1",
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261030.1",
+    "typescript": "5.9.3",
+    "wrangler": "4.156.0"
+  }
+}

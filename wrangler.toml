@@ -1,0 +1,9 @@
+name = "minecraft-bedrock-plugin"
+main = "cloudflare/src/index.ts"
+compatibility_date = "2026-10-30"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+[exports.BedrockMcpContainer]
+type = "durable-object"
+storage = "sqlite"

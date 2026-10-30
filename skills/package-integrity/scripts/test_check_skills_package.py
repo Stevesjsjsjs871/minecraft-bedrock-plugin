@@ -18,7 +18,7 @@ class SkillsPackageTests(unittest.TestCase):
         (self.root / ".codex-plugin").mkdir()
         sample = self.root / "skills/bedrock-development/references/mojang-samples-1.26.50.4"
         sample.mkdir(parents=True)
-        for name in ("bedrock-engineer-core", "skills-first-execution", "skills-only-maintenance", "geometry-uv-engine", "visual-resource-pipeline"):
+        for name in ("bedrock-engineer-core", "skills-first-execution", "skills-only-maintenance", "plugin-maintenance", "mcp-integration", "creator-tools-bridge", "geometry-uv-engine", "visual-resource-pipeline"):
             directory = self.root / "skills" / name
             directory.mkdir(parents=True, exist_ok=True)
             (directory / "SKILL.md").write_text(f"---\nname: {name}\ndescription: Test skill {name}.\n---\n", encoding="utf-8")
@@ -34,13 +34,42 @@ class SkillsPackageTests(unittest.TestCase):
         (visual / "test_png_engine.py").write_text("# tests\n", encoding="utf-8")
         prompts = list(checker.ORIGINAL_DEFAULT_PROMPTS) + ["A fourth test prompt."]
         interface = {"defaultPrompt": prompts}
-        root_manifest = {"name": checker.EXPECTED_NAME, "version": "1.5.11", "skills": "./skills", "extensions": {"com.openai": {"interface": interface}}}
-        compat_manifest = {"name": checker.EXPECTED_NAME, "version": "1.5.11", "skills": "./skills", "interface": interface}
+        root_manifest = {"name": checker.EXPECTED_NAME, "version": "1.5.13", "skills": "./skills", "extensions": {"com.openai": {"interface": interface}}}
+        compat_manifest = {"name": checker.EXPECTED_NAME, "version": "1.5.13", "skills": "./skills", "mcpServers": "./.mcp.json", "interface": interface}
         (self.root / "plugin.json").write_text(json.dumps(root_manifest), encoding="utf-8")
         (self.root / ".codex-plugin/plugin.json").write_text(json.dumps(compat_manifest), encoding="utf-8")
-        (self.root / "VERSION").write_text("1.5.11\n", encoding="utf-8")
-        (self.root / "README.md").write_text("# Minecraft Bedrock Engineer — 1.5.11\n\nSkills-and-instructions-only plugin. It does not use MCP.\n", encoding="utf-8")
-        (self.root / "CHANGELOG.md").write_text("# Changelog\n\n## 1.5.11 — Test fixture\n", encoding="utf-8")
+        server_dir = self.root / "server"
+        server_tests_dir = server_dir / "tests"
+        server_tests_dir.mkdir(parents=True, exist_ok=True)
+        for filename in checker.LOCAL_MCP_SERVERS.values():
+            source = '_tool("dummy_tool", "description", {}, [])\\n'
+            if filename == "mcp_server.py":
+                source = ''.join(f'_tool("{tool}", "description", {{}}, [])\\n' for tool in ("creator_tools_status", "creator_tools_catalog", "validate_with_mct", "create_entity_with_mct", "create_addon_project"))
+            (server_dir / filename).write_text(source, encoding="utf-8")
+        for test_name in checker.SERVER_TESTS:
+            (server_tests_dir / test_name).write_text("# test fixture\\n", encoding="utf-8")
+        (self.root / "archive_safety.py").write_text("# archive safety fixture\\n", encoding="utf-8")
+        entries = {}
+        for name, filename in checker.LOCAL_MCP_SERVERS.items():
+            entries[name] = {"type":"stdio","command":"python3","args":[f"${{PLUGIN_ROOT}}/server/{filename}"],"env":{"MINECRAFT_BEDROCK_WORKSPACE":"${PLUGIN_DATA}"},"cwd":"${PLUGIN_DATA}"}
+        (self.root / "mcp.json").write_text(json.dumps({"$schema": checker.MCP_SCHEMA, "mcpServers": entries}), encoding="utf-8")
+        (self.root / ".mcp.json").write_text(json.dumps({"mcpServers": entries}), encoding="utf-8")
+        cloudflare = self.root / "cloudflare"
+        (cloudflare / "src").mkdir(parents=True)
+        (cloudflare / "tests").mkdir(parents=True)
+        remote_names = ["bedrock_generate_manifest","bedrock_validate_manifest","bedrock_read_plugin_source","bedrock_plugin_capabilities"]
+        (cloudflare / "src/index.ts").write_text("const tools = [" + ",".join('{ name: "' + n + '" }' for n in remote_names) + "] as const;", encoding="utf-8")
+        (cloudflare / "capabilities.json").write_text(json.dumps({"endpoint":"https://minecraft-bedrock-plugin.msg2026.workers.dev/mcp","health_url":"https://minecraft-bedrock-plugin.msg2026.workers.dev/health","remote":{"tool_count":4,"tool_names":remote_names},"local":{"server_count":16}}), encoding="utf-8")
+        (cloudflare / "README.md").write_text("https://minecraft-bedrock-plugin.msg2026.workers.dev/mcp\\nhttps://minecraft-bedrock-plugin.msg2026.workers.dev/health", encoding="utf-8")
+        (cloudflare / "deploy-with-secrets.mjs").write_text("// fixture\\n", encoding="utf-8")
+        (cloudflare / "tests/test_capability_contract.py").write_text("# fixture\\n", encoding="utf-8")
+        (self.root / "package.json").write_text("{}", encoding="utf-8")
+        (self.root / "wrangler.toml").write_text("name = 'fixture'\\n", encoding="utf-8")
+        (self.root / "tsconfig.json").write_text("{}", encoding="utf-8")
+        (self.root / "RELEASE_NOTES_1.5.13.md").write_text("# Release notes fixture\\n", encoding="utf-8")
+        (self.root / "VERSION").write_text("1.5.13\n", encoding="utf-8")
+        (self.root / "README.md").write_text("# Minecraft Bedrock Engineer — 1.5.13\n\nSkills + MCP plugin with 16 local STDIO MCP servers, Creator Tools and a Cloudflare Worker.\n", encoding="utf-8")
+        (self.root / "CHANGELOG.md").write_text("# Changelog\n\n## 1.5.13 — Test fixture\n", encoding="utf-8")
         audit_benchmark = self.root / "skills/audit-benchmark"
         audit_benchmark.mkdir(parents=True)
         (audit_benchmark / "SKILL.md").write_text("---\nname: audit-benchmark\ndescription: Benchmark tests.\n---\n", encoding="utf-8")
@@ -83,6 +112,11 @@ class SkillsPackageTests(unittest.TestCase):
         restore_scripts.mkdir(parents=True, exist_ok=True)
         (restore_scripts / "restore_mojang_index.py").write_text("# restore helper\n", encoding="utf-8")
         (restore_scripts / "test_restore_mojang_index.py").write_text("# restore tests\n", encoding="utf-8")
+        for rel in checker.REQUIRED:
+            path = self.root / rel
+            if not path.exists():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("# fixture\\n", encoding="utf-8")
         records, violations = scan_package(self.root)
         self.assertEqual(violations, [])
         provenance = make_provenance(self.root, records, "a" * 40, 0, "refs/heads/test")
@@ -132,17 +166,26 @@ class SkillsPackageTests(unittest.TestCase):
         path.write_text(json.dumps(data), encoding="utf-8")
         self.assertEqual(self.by_id(checker.check(self.root), "original-default-prompts")["status"], "FAIL")
 
-    def test_mcp_config_rejected(self):
-        (self.root / ".mcp.json").write_text("{}", encoding="utf-8")
-        self.assertEqual(self.by_id(checker.check(self.root), "skills-only-boundary")["status"], "FAIL")
+    def test_mcp_config_invalid_workspace_fails(self):
+        path = self.root / "mcp.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        first = next(iter(data["mcpServers"]))
+        data["mcpServers"][first]["cwd"] = "../"
+        path.write_text(json.dumps(data), encoding="utf-8")
+        self.assertEqual(self.by_id(checker.check(self.root), "mcp-config")["status"], "FAIL")
 
-    def test_obsolete_cloudflare_rejected(self):
-        (self.root / "cloudflare").mkdir()
+    def test_active_mcp_tool_reference_is_allowed(self):
+        path = self.root / "skills/creator-tools-bridge/SKILL.md"
+        path.write_text("---\\nname: creator-tools-bridge\\ndescription: Active bridge.\\n---\\nCall `creator_tools_status` now\\n", encoding="utf-8")
+        self.assertEqual(self.by_id(checker.check(self.root), "skill-tool-boundary")["status"], "PASS")
+
+    def test_obsolete_cloudflare_container_rejected(self):
+        (self.root / "cloudflare/container").mkdir(parents=True)
         self.assertEqual(self.by_id(checker.check(self.root), "obsolete-deployment")["status"], "FAIL")
 
     def test_stale_tool_invocation_rejected(self):
         path = self.root / "skills/skills-only-maintenance/SKILL.md"
-        path.write_text("---\nname: skills-only-maintenance\ndescription: Useful description.\n---\ncall `create_addon_project` now\n", encoding="utf-8")
+        path.write_text("---\nname: skills-only-maintenance\ndescription: Useful description.\n---\ncall `tool_not_registered` now\n", encoding="utf-8")
         self.assertEqual(self.by_id(checker.check(self.root), "skill-tool-boundary")["status"], "FAIL")
 
     def test_duplicate_skill_name_rejected(self):

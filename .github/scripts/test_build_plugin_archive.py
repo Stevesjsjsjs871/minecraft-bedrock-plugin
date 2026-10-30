@@ -124,7 +124,7 @@ class BuildPluginArchiveTests(unittest.TestCase):
             write(repo, "README.md", "uncommitted\n"); output = root / "out.tar.gz"
             self.run_builder(repo, output)
             with tarfile.open(output, "r:gz") as tar:
-                self.assertEqual(tar.extractfile("README.md").read(), b"# Minecraft Bedrock Engineer — 1.2.3\n")
+                self.assertEqual(tar.extractfile("README.md").read(), "# Minecraft Bedrock Engineer — 1.2.3\n".encode("utf-8"))
 
     def test_mcp_config_mismatch_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:

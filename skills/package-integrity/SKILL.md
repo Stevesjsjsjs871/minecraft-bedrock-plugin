@@ -11,20 +11,16 @@ Run the regression suite from the repository or extracted package:
 python -m unittest discover -s skills/package-integrity/scripts -p 'test_*.py' -v
 ```
 
-For a release candidate, build a new deterministic archive outside the source tree:
+For a release candidate, build and verify a deterministic archive from a clean tracked Git snapshot. This avoids test-generated cache files without deleting anything from the working tree:
 
 ```bash
+set -euo pipefail
 mkdir -p dist
 source_dir="$(mktemp -d)"
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$source_dir" "$tmp_dir"' EXIT
 git archive HEAD | tar -x -C "$source_dir"
 python skills/package-integrity/scripts/build_skills_package.py "$source_dir" dist/minecraft-bedrock-engineer.tar.gz --source-commit "$(git rev-parse HEAD)" --source-date-epoch "$(git show -s --format=%ct HEAD)"
-```
-
-Then extract it into a fresh directory and run the strict checker against the extracted package:
-
-```bash
 tar -xzf dist/minecraft-bedrock-engineer.tar.gz -C "$tmp_dir"
 python skills/package-integrity/scripts/check_skills_package.py "$tmp_dir"
 (cd dist && sha256sum -c minecraft-bedrock-engineer.tar.gz.sha256)

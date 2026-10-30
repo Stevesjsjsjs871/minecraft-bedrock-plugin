@@ -31,11 +31,21 @@ class TextureGeneratorMcpTests(unittest.TestCase):
         self.fake_generator = self.workspace / "fake_generator.py"
         self.fake_generator.write_text(
             "from pathlib import Path\n"
+            "import struct, zlib\n"
             "PNG_SIGNATURE = b'\\x89PNG\\r\\n\\x1a\\n'\n"
+            "def chunk(kind, data):\n"
+            "    body = kind + data\n"
+            "    return struct.pack('>I', len(data)) + body + struct.pack('>I', zlib.crc32(body) & 0xffffffff)\n"
             "def write_texture(output, *, width=16, height=16, style='pixel_noise', base_color='#777777', accent_color='#A0A0A0', seed=1, alpha=255, force=False):\n"
             "    path = Path(output)\n"
             "    if path.exists() and not force: raise FileExistsError(path)\n"
-            "    payload = PNG_SIGNATURE + bytes([width % 256, height % 256, alpha % 256])\n"
+            "    rgb = bytes.fromhex(base_color.removeprefix('#'))\n"
+            "    pixel = rgb + bytes([alpha])\n"
+            "    rgba = pixel * (width * height)\n"
+            "    stride = width * 4\n"
+            "    scanlines = b''.join(b'\\x00' + rgba[y * stride:(y + 1) * stride] for y in range(height))\n"
+            "    ihdr = struct.pack('>IIBBBBB', width, height, 8, 6, 0, 0, 0)\n"
+            "    payload = PNG_SIGNATURE + chunk(b'IHDR', ihdr) + chunk(b'IDAT', zlib.compress(scanlines)) + chunk(b'IEND', b'')\n"
             "    path.write_bytes(payload)\n"
             "    return {'status':'created','format':'PNG','width':width,'height':height,'style':style,'seed':seed,'bytes_written':len(payload),'generator_status':'PROCEDURAL_STARTER'}\n",
             encoding="utf-8",
@@ -247,6 +257,8 @@ class TextureGeneratorMcpTests(unittest.TestCase):
         self.assertEqual(saved["resource_pack_name"], "Keep Existing Name")
         self.assertEqual(saved["texture_data"]["existing_block"], original["texture_data"]["existing_block"])
         self.assertEqual(saved["texture_data"]["ruby_ore"], {"textures": "textures/blocks/ruby_ore"})
+        lock_path = atlas_path.with_name(f".{atlas_path.name}.mbe.lock")
+        self.assertFalse(lock_path.exists(), "atlas lock must be released after a successful write")
         before = atlas_path.read_bytes()
         repeat = self._register()
         self.assertEqual(repeat["result"]["structuredContent"]["status"], "already_registered")
@@ -296,6 +308,7 @@ class TextureGeneratorMcpTests(unittest.TestCase):
         malformed = self._register()["result"]["structuredContent"]
         self.assertEqual(malformed["error"]["code"], "INVALID_ATLAS")
         self.assertEqual(atlas.read_text(encoding="utf-8"), "not-json")
+        self.assertFalse(atlas.with_name(f".{atlas.name}.mbe.lock").exists())
 
     def test_registration_rejects_corrupt_png_and_symlinked_texture_parent(self):
         bad = self.project / self.output_rel
@@ -316,6 +329,135 @@ class TextureGeneratorMcpTests(unittest.TestCase):
         result = self._register(texture_path=path)["result"]["structuredContent"]
         self.assertEqual(result["error"]["code"], "UNSAFE_TEXTURE_PATH")
         self.assertFalse((self.project / "resource_packs" / f"{self.project_name}_RP" / "textures" / "terrain_texture.json").exists())
+
+    @staticmethod
+    def _png_chunk(kind, data):
+        body = kind + data
+        return struct.pack(">I", len(data)) + body + struct.pack(">I", zlib.crc32(body) & 0xFFFFFFFF)
+
+    @classmethod
+    def _png_from_chunks(cls, chunks):
+        return PNG_SIGNATURE + b"".join(cls._png_chunk(kind, data) for kind, data in chunks)
+
+    @staticmethod
+    def _extract_png_chunks(png):
+        chunks = []
+        offset = len(PNG_SIGNATURE)
+        while offset < len(png):
+            length = struct.unpack(">I", png[offset:offset + 4])[0]
+            kind = png[offset + 4:offset + 8]
+            data = png[offset + 8:offset + 8 + length]
+            chunks.append((kind, data))
+            offset += length + 12
+        return chunks
+
+    def _assert_png_rejected(self, png_bytes):
+        path = self.workspace / "invalid.png"
+        path.write_bytes(png_bytes)
+        with self.assertRaises(texture_mcp.AtlasToolError) as caught:
+            texture_mcp._read_valid_png(path)
+        self.assertEqual(caught.exception.code, "INVALID_PNG")
+
+    def test_png_validator_rejects_invalid_ihdr_metadata(self):
+        valid_path = self._generate_real_png()
+        chunks = self._extract_png_chunks(valid_path.read_bytes())
+        ihdr = bytearray(chunks[0][1])
+        for index, value in ((8, 3), (10, 1), (11, 1), (12, 2)):
+            mutated = bytearray(ihdr)
+            mutated[index] = value
+            self._assert_png_rejected(self._png_from_chunks([(b"IHDR", bytes(mutated)), *chunks[1:]]))
+
+    def test_png_validator_rejects_corrupt_idat_even_with_a_valid_crc(self):
+        valid_path = self._generate_real_png()
+        chunks = self._extract_png_chunks(valid_path.read_bytes())
+        replaced = [(kind, b"not-zlib-data" if kind == b"IDAT" else data) for kind, data in chunks]
+        self._assert_png_rejected(self._png_from_chunks(replaced))
+
+    def test_png_validator_rejects_invalid_scanline_filter_and_extra_stream_data(self):
+        valid_path = self._generate_real_png(width=4, height=2)
+        chunks = self._extract_png_chunks(valid_path.read_bytes())
+        ihdr = chunks[0][1]
+        # RGBA: each row has a one-byte filter marker plus 4 * 4 pixel bytes.
+        invalid_filter = zlib.compress(b"\x05" + bytes(16) + b"\x00" + bytes(16))
+        self._assert_png_rejected(self._png_from_chunks([(b"IHDR", ihdr), (b"IDAT", invalid_filter), (b"IEND", b"")]))
+        normal_idat = next(data for kind, data in chunks if kind == b"IDAT")
+        self._assert_png_rejected(self._png_from_chunks([(b"IHDR", ihdr), (b"IDAT", normal_idat + b"trailing"), (b"IEND", b"")]))
+
+    def test_png_validator_rejects_unknown_critical_and_nonconsecutive_idat(self):
+        valid_path = self._generate_real_png()
+        chunks = self._extract_png_chunks(valid_path.read_bytes())
+        unknown_critical = [chunks[0], (b"ABCD", b"x"), *chunks[1:]]
+        self._assert_png_rejected(self._png_from_chunks(unknown_critical))
+        idat = next(data for kind, data in chunks if kind == b"IDAT")
+        midpoint = max(1, len(idat) // 2)
+        nonconsecutive = [chunks[0], (b"IDAT", idat[:midpoint]), (b"tEXt", b"k\x00v"), (b"IDAT", idat[midpoint:]), (b"IEND", b"")]
+        self._assert_png_rejected(self._png_from_chunks(nonconsecutive))
+
+    def test_png_validator_rejects_idat_expansion_beyond_declared_dimensions(self):
+        ihdr = struct.pack(">IIBBBBB", 1, 1, 8, 6, 0, 0, 0)
+        oversized_scanlines = zlib.compress(b"\x00" + bytes(64 * 1024))
+        png = self._png_from_chunks([(b"IHDR", ihdr), (b"IDAT", oversized_scanlines), (b"IEND", b"")])
+        self._assert_png_rejected(png)
+
+    def test_png_validator_rejects_misordered_palette_and_empty_indexed_transparency(self):
+        valid_path = self._generate_real_png()
+        chunks = self._extract_png_chunks(valid_path.read_bytes())
+        ihdr = struct.pack(">IIBBBBB", 2, 1, 1, 3, 0, 0, 0)
+        palette = bytes((0, 0, 0, 255, 0, 0))
+        image_data = zlib.compress(b"\x00\x40")
+        self._assert_png_rejected(self._png_from_chunks([
+            (b"IHDR", ihdr), (b"IDAT", image_data), (b"PLTE", palette), (b"IEND", b"")
+        ]))
+        self._assert_png_rejected(self._png_from_chunks([
+            (b"IHDR", ihdr), (b"PLTE", palette), (b"tRNS", b""), (b"IDAT", image_data), (b"IEND", b"")
+        ]))
+
+    def test_png_validator_accepts_indexed_png_with_palette(self):
+        ihdr = struct.pack(">IIBBBBB", 2, 1, 1, 3, 0, 0, 0)
+        palette = bytes((0, 0, 0, 255, 0, 0))
+        image_data = zlib.compress(b"\x00\x40")  # filter 0, two 1-bit palette indices
+        png = self._png_from_chunks([(b"IHDR", ihdr), (b"PLTE", palette), (b"IDAT", image_data), (b"IEND", b"")])
+        path = self.workspace / "indexed.png"
+        path.write_bytes(png)
+        self.assertEqual(texture_mcp._read_valid_png(path), (2, 1))
+
+    def test_png_validator_accepts_adam7_interlaced_rgba_png(self):
+        width = height = 8
+        ihdr = struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 1)
+        passes = ((0, 0, 8, 8), (4, 0, 8, 8), (0, 4, 4, 8), (2, 0, 4, 4), (0, 2, 2, 4), (1, 0, 2, 2), (0, 1, 1, 2))
+        rows = bytearray()
+        for x0, y0, dx, dy in passes:
+            pw = (width - x0 + dx - 1) // dx if width > x0 else 0
+            ph = (height - y0 + dy - 1) // dy if height > y0 else 0
+            for _ in range(ph):
+                rows.extend(b"\x00" + bytes(pw * 4))
+        png = self._png_from_chunks([(b"IHDR", ihdr), (b"IDAT", zlib.compress(bytes(rows))), (b"IEND", b"")])
+        path = self.workspace / "adam7.png"
+        path.write_bytes(png)
+        self.assertEqual(texture_mcp._read_valid_png(path), (8, 8))
+
+    def test_registration_refuses_active_atlas_lock_and_releases_own_lock_on_conflict(self):
+        self._generate_real_png()
+        atlas = self.project / "resource_packs" / f"{self.project_name}_RP" / "textures" / "terrain_texture.json"
+        lock = atlas.with_name(f".{atlas.name}.mbe.lock")
+        lock.write_text("active writer", encoding="utf-8")
+        busy = self._register()["result"]["structuredContent"]
+        self.assertEqual(busy["error"]["code"], "ATLAS_BUSY")
+        self.assertFalse(atlas.exists())
+        lock.unlink()
+        atlas.write_text(json.dumps({"texture_name": "atlas.terrain", "texture_data": {"ruby_ore": {"textures": "elsewhere"}}}), encoding="utf-8")
+        conflict = self._register()["result"]["structuredContent"]
+        self.assertEqual(conflict["error"]["code"], "IDENTIFIER_CONFLICT")
+        self.assertFalse(lock.exists(), "atlas lock must be released after a failed registration")
+
+    def test_registration_rejects_duplicate_json_keys_without_mutation(self):
+        self._generate_real_png()
+        atlas = self.project / "resource_packs" / f"{self.project_name}_RP" / "textures" / "terrain_texture.json"
+        original = b'{"texture_name":"atlas.terrain","texture_data":{},"texture_data":{"keep":{"textures":"textures/blocks/keep"}}}'
+        atlas.write_bytes(original)
+        result = self._register()["result"]["structuredContent"]
+        self.assertEqual(result["error"]["code"], "INVALID_ATLAS")
+        self.assertEqual(atlas.read_bytes(), original)
 
     def test_unknown_tool_and_unknown_method_return_protocol_errors(self):
         unknown_tool = texture_mcp.handle_message({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"something_else","arguments":{}}})

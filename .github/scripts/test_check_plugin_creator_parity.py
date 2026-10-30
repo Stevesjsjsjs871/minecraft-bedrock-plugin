@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import json
 import stat
+import shutil
 import tarfile
 import tempfile
 import unittest
@@ -119,6 +120,29 @@ class PluginCreatorParityTests(unittest.TestCase):
             archive.writestr(info, "../../outside.py")
         report = audit_archive(self.archive, self.repo)
         self.assertTrue(any("archive entry is a symlink" in item for item in report["errors"]))
+
+    def test_zip_symlink_directory_entry_fails(self) -> None:
+        with zipfile.ZipFile(self.archive, "a") as archive:
+            info = zipfile.ZipInfo("server/evil-dir/")
+            info.create_system = 3
+            info.external_attr = (stat.S_IFLNK | 0o777) << 16
+            archive.writestr(info, "outside")
+        report = audit_archive(self.archive, self.repo)
+        self.assertTrue(any("archive directory entry is not a directory" in item for item in report["errors"]))
+
+    def test_repository_nested_symlink_parent_fails_closed(self) -> None:
+        outside = self.root / "outside"
+        outside.mkdir()
+        (outside / "plugin.json").write_text("{}", encoding="utf-8")
+        shutil.rmtree(self.repo / ".codex-plugin")
+        link = self.repo / ".codex-plugin"
+        try:
+            link.symlink_to(outside, target_is_directory=True)
+        except (OSError, NotImplementedError) as exc:
+            self.skipTest(f"directory symlinks are unavailable: {exc}")
+        report = audit_archive(self.archive, self.repo)
+        self.assertEqual(report["status"], "FAIL")
+        self.assertTrue(any("repository package path contains a symlink" in item for item in report["errors"]))
 
     def test_tar_path_traversal_fails(self) -> None:
         path = self.root / "traversal.tar.gz"

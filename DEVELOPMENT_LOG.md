@@ -22,8 +22,27 @@
 - Updated the build-release skill with the release acceptance contract.
 
 ## Verification
-- Pending GitHub Actions for this branch.
-- Minecraft import/runtime and Creator Tools CLI are not part of these static release-gate tests.
+- GitHub Actions run #41058783899 passed on executable-source commit `6c32110556ceb8da8afdbcfaf3037cb22b2e5ccf` (Python 3.12.15).
+- Server regression suite: 399/399.
+- MCP registry contract: 3/3.
+- PNG validator: 15/15.
+- Texture-link auditor: 20/20.
+- Benchmark evaluator: 12/12.
+- Mojang indexer: 6/6.
+- Procedural texture generator: 12/12.
+- Package Integrity tests: 11/11.
+- Analyzer regression: 18/18.
+- Deterministic archive builder: 15/15.
+- Candidate archive built from the CI merge commit: 134 payload files, version 1.3.0, SHA-256 `defcf6ffaf3f0937a5e5c5531e79e3296e5e963a02af91ffa77636a4965bb06b`.
+- The candidate archive upload step was skipped in pull-request context; no retained downloadable artifact was produced.
+- Local clone/test attempt was blocked by DNS resolution for github.com; CI supplied the successful executable-code verification.
+- Minecraft import/runtime and Creator Tools CLI remain NOT RUN.
+- After the passing run, only this journal file was updated; executable files and workflow were not changed.
+
+## PR history
+- Initial PR #14 CI failed at compile time because a Unicode em dash was placed in a bytes literal in one test assertion.
+- Corrected the test to compare UTF-8 encoded text, created replacement PR #15, and closed PR #14 as superseded (not merged).
+- PR #15 is the active Draft review target, based on PR #13.
 
 ## Risks and next step
 - Plugin Creator 1.4.1 remains unchanged; its metadata drift and bytecode files require a separately approved update using the current expected release ID.

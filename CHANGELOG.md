@@ -1,35 +1,40 @@
 # Plugin package changelog
 
+## 1.1.1 — Animation-controller state machines
+- Adds `minecraft-bedrock-animation-controller-authoring` as a dedicated stdio MCP server.
+- Adds `create_animation_controller` to generate RP state-machine JSON from an initial state, state animation aliases, transition destinations/conditions, optional entry/exit commands and blend durations.
+- Binds the controller into an existing client entity using `description.animations` and `description.scripts.animate`, preserving unrelated client entity resources.
+- Adds read-only `validate_animation_controller` for state/transition/reference/binding checks.
+- Enforces linked scaffold manifests, workspace confinement, safe RP paths, symlink and duplicate-JSON rejection, animation alias existence and no-overwrite behavior. The two-file authoring operation cleans up its new controller if updating the entity fails.
+- Molang text is bounded but not parsed or executed. Minecraft runtime behavior remains NOT RUN.
+
+## 1.1.0 — First-pass custom entity authoring
+- Adds the `minecraft-bedrock-entity-authoring` stdio MCP server and `create_addon_entity` tool.
+- Creates linked BP entity, RP client entity, geometry and render-controller JSON from an explicit bounded bone/cube model input.
+- Validates bone names and parent graphs, finite coordinates, classic box-UV bounds, project manifests, entity identifier uniqueness and path safety.
+- Refuses output collisions and symlinks; rolls back the files created by the operation if a write fails partway through.
+- Does not fabricate textures, animations, animation controllers or spawn rules. Minecraft import/spawn/render testing remains NOT RUN.
+
 ## 1.0.14 — Full PNG stream validation and bounded texture audit
 - Adds shared `server/png_validation.py` to validate PNG chunks/CRCs, legal IHDR/PLTE/tRNS rules, consecutive IDAT chunks, bounded zlib decompression, exact scanline sizes/filter bytes and Adam7 passes.
-- Upgrades `audit_texture_links` from header/chunk checks to full decoded scanline validation, catching files with valid chunk CRCs but broken or inconsistent compressed image data.
-- Caches repeated PNG validation and applies per-audit limits for atlas entries, unique PNG files and aggregate bytes; reports `analysis_complete` and scan metrics so limited coverage is explicit.
-- Adds 18 new unit/integration cases around PNG stream corruption, color formats/interlace, scan budgets and cache reuse. Auditor remains read-only; runtime validation remains NOT RUN.
-
+- Upgrades `audit_texture_links` to validate decompressed PNG scanlines and catches valid-CRC but corrupt compressed image data.
+- Caches repeated PNG validation and applies per-audit limits for atlas entries, unique PNG files and aggregate bytes; reports `analysis_complete` and scan metrics.
+- Auditor remains read-only; runtime validation remains NOT RUN.
 
 ## 1.0.13 — Read-only BP/RP texture-link audit
-- Adds `audit_texture_links`, scanning BP block/item JSON through the matching RP terrain/item atlas to referenced PNG files.
-- Supports block `minecraft:material_instances` references and item `minecraft:icon` string/object variants.
-- Reports missing keys/files, malformed or duplicate-key JSON, invalid atlas paths, corrupt PNG chunks, unsafe symlinks and unused atlas entries with structured severity/path evidence.
-- Adds 16 regression tests. The auditor is read-only, bounded, workspace-confined and does not claim runtime verification.
+- Adds `audit_texture_links`, scanning BP block/item JSON through matching RP atlases to referenced PNG files.
+- Reports missing keys/files, malformed or duplicate-key JSON, invalid atlas paths, corrupt PNGs, unsafe symlinks and unused atlas entries.
+- Uses bounded scans and remains read-only, workspace-confined and runtime-unverified.
 
 ## 1.0.12 — PNG validation and atlas write safety
-- Validates the decompressed PNG image stream, legal IHDR metadata, critical chunk rules/order, consecutive IDAT chunks, bounded scanline sizes and filter methods, including Adam7 passes.
-- Validates generated PNGs before the MCP tool reports success.
-- Adds exclusive per-atlas locks across read/modify/write, refuses active/stale lock files instead of racing or deleting them, and retains atomic JSON replacement.
-- Rejects duplicate JSON object keys in existing atlas files to prevent ambiguous parse-and-rewrite data loss.
-- Adds regression tests for broken IDAT data, invalid filters, decompression expansion, indexed and Adam7 PNG support, duplicate JSON keys and lock cleanup.
+- Validates PNG image data, legal IHDR metadata, chunk ordering, consecutive IDAT data, bounded scanline sizes, filter methods and Adam7.
+- Validates generated PNGs, serializes atlas updates with exclusive locks and rejects duplicate JSON keys.
 - Static validation only; Minecraft import/rendering remains NOT RUN.
 
 ## 1.0.11 — Safe texture-atlas registration
-- Adds the `register_texture_atlas` MCP tool for block and item Resource Pack textures.
-- Preserves existing atlas metadata and unrelated entries; creates a minimal atlas only when absent and refuses conflicting identifiers.
-- Validates existing PNG signature, chunk boundaries and CRCs, IHDR dimensions, workspace containment, symlinks, malformed atlas JSON, oversized inputs and concurrent atlas changes.
-- Adds regression tests for block/item atlas writes, idempotent repeats, conflict safety, corruption, traversal and symlink rejection.
-- Does not edit BP/RP item or block definitions and does not claim in-game rendering verification.
+- Adds `register_texture_atlas` for block and item Resource Pack textures.
+- Preserves unrelated atlas entries and refuses conflicts, corrupt PNGs, unsafe paths and concurrent changes.
 
 ## 1.0.10 — Dedicated procedural texture MCP tool
-- Adds an independent stdio MCP server, `server/texture_generator_mcp.py`, exposing `generate_texture` while leaving the original server and dispatch untouched.
-- Generates bounded RGBA PNGs inside an existing project's RP `textures/` directory; validates canonical paths and dimensions, rejects symlinks and existing destinations, and returns structured metadata plus SHA-256.
-- Adds an integration/JSON-RPC regression suite for schema closure, project/path safety, no-overwrite, defaults, output metadata and error handling.
-- The tool uses deterministic procedural styles, not AI image synthesis or UV-aware painting. Minecraft import/render tests remain NOT RUN.
+- Adds the separate `minecraft-bedrock-texture-generator` stdio MCP server with `generate_texture`.
+- Generates bounded RGBA PNG starter textures using deterministic procedural styles; it is not AI image synthesis or UV-aware painting.

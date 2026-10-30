@@ -68,7 +68,16 @@ def read_json(path: Path) -> Any:
 
 
 def interface(manifest: dict, compat: bool) -> dict:
-    value = manifest.get("interface", {}) if compat else manifest.get("extensions", {}).get("com.openai", {}).get("interface", {})
+    if compat:
+        value = manifest.get("interface", {})
+    else:
+        extensions = manifest.get("extensions")
+        if not isinstance(extensions, dict):
+            return {}
+        provider = extensions.get("com.openai")
+        if not isinstance(provider, dict):
+            return {}
+        value = provider.get("interface", {})
     return value if isinstance(value, dict) else {}
 
 
@@ -123,7 +132,7 @@ def check(root: Path) -> dict:
 
     versions = [root_manifest.get("version"), compat_manifest.get("version"), version_file]
     semver_ok = all(isinstance(value, str) and SEMVER.fullmatch(value) for value in versions)
-    same_version = len(set(versions)) == 1
+    same_version = all(value == versions[0] for value in versions)
     add("version-parity", "PASS" if semver_ok and same_version else "FAIL", f"Version markers: root={versions[0]!r}, compatibility={versions[1]!r}, VERSION={versions[2]!r}")
     identities = [root_manifest.get("name"), compat_manifest.get("name")]
     add("plugin-identity", "PASS" if identities == [EXPECTED_NAME, EXPECTED_NAME] else "FAIL", f"Plugin identities: {identities!r}")

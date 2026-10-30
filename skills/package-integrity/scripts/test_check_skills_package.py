@@ -222,9 +222,6 @@ class SkillsPackageTests(unittest.TestCase):
         self.assertEqual(self.by_id(checker.check(self.root), "provenance-integrity")["status"], "FAIL")
 
 
-if __name__ == "__main__":
-    unittest.main(verbosity=2)
-
     def test_mojang_index_archive_hash_mismatch_fails(self):
         path = self.root / "skills/bedrock-development/references/mojang-samples-1.26.50.4/mojang-samples-index.json.gz"
         with gzip.open(path, "rt", encoding="utf-8") as stream:
@@ -270,3 +267,6 @@ if __name__ == "__main__":
         provenance["payload_total_bytes"] = float(provenance["payload_total_bytes"])
         ok, _ = validate_provenance(provenance, records)
         self.assertFalse(ok)
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

@@ -33,7 +33,6 @@ PYTHONDONTWRITEBYTECODE=1 python skills/package-integrity/scripts/build_skills_p
 tar -xzf dist/minecraft-bedrock-engineer.tar.gz -C "$extract_dir"
 PYTHONDONTWRITEBYTECODE=1 python skills/package-integrity/scripts/check_skills_package.py "$extract_dir"
 (cd dist && sha256sum -c minecraft-bedrock-engineer.tar.gz.sha256)
-(cd dist && sha256sum -c minecraft-bedrock-engineer.tar.gz.sha256)
 ```
 
 Do not publish or install a candidate unless every check passes. A missing BUILD_PROVENANCE.json is a hard failure, not a warning.
@@ -50,6 +49,7 @@ Do not publish or install a candidate unless every check passes. A missing BUILD
 - The pinned Mojang Samples gzip index decompresses and parses as JSON within a 64 MiB decompressed-size limit; count metadata is checked when available.
 - BUILD_PROVENANCE.json is mandatory and must match the exact file inventory, per-file SHA-256 values, byte totals, package version, plugin identity and canonical payload digest.
 - The archive builder writes normalized tar metadata and a fixed gzip timestamp, refuses existing outputs, and writes a sidecar SHA-256 for the exact archive bytes.
+- Archive verification is read-only and streaming: it does not call getmembers() or extract members; it caps decompressed bytes, file/header counts, per-file size, PAX metadata and trailing padding, verifies the gzip CRC/trailer, and rejects links, sparse/GNU extensions, duplicate or case-colliding paths, unsafe modes and non-zero data after the tar end marker.
 
 ## Provenance contract
 

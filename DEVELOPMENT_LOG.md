@@ -25,3 +25,15 @@
 - No artifact upload, PR merge, Plugin Creator update or public release. Minecraft/Blockbench runtime NOT RUN.
 
 - Local README and package-integrity skill recipes now keep the downloaded ZIP/generated index in a temporary input directory and extract the candidate into a separate clean directory; this prevents source inputs from being mistaken for package payload. Commands disable Python bytecode generation while building/checking.
+
+
+## 2026-10-30 — Bounded streaming archive verification
+
+- Baseline: PR #20 remains Draft/open, based on feat/cloudflare-workers-mcp at 208753f84a31ab4eae1ecfddc4a44eef7a87c7c0; PR #20 head is 4ef2ad7e5b38121221184c23b17153c9adce48e6. Latest verified candidate CI #41093546276 succeeded on code commit 3e4ff559b00ac43e0c5795a759cc5942a16245eb; final PR #20 head is documentation-only beyond that code commit.
+- Plugin Creator remains 1.5.12, current Release ID pluginrel_6ae4b2ea22f88191a00187713b7e9b91; source inventory re-read. No Plugin Creator mutation.
+- Finding: verify_archive() used tar.getmembers(), materializing the entire member list before applying limits. PAX/GNU metadata could be read before size checks, gzip CRC validation was not guaranteed by tar parsing alone, and the same archive was hashed then reopened by path, leaving a replacement window. Six package-checker tests were placed after unittest.main() and therefore were not discovered by CI.
+- Changes planned in this branch: stream tar members without getmembers() or extraction; bound decompressed bytes, header count, per-file size, per-header and aggregate PAX metadata and trailing padding; reject global PAX, GNU long-name/link and sparse extensions; verify gzip CRC by draining to EOF; hash and parse the same no-follow file descriptor; reject case-colliding paths, unsafe modes and non-zero trailing data; move six hidden regression tests into the test class.
+- New regression coverage: streaming/no-getmembers, PAX size and path override, duplicate/case-colliding paths, non-zero trailing data, gzip CRC/truncation, decompressed stream budget, header-count budget, unsafe modes and parent-directory symlinks.
+- Tests and CI results: pending at commit creation; update this log with exact GitHub Actions run ID and counts after the workflow completes.
+- Remaining risks: tarfile.TarInfo._proc_member is a standard-library internal hook used to reject oversized extension headers before tarfile reads them; validate against the pinned Python 3.12 CI runtime. This is an archive integrity gate, not a digital signature. Minecraft runtime/Blockbench remain outside this stage.
+- Safety: new branch is stacked on PR #20; no merge, Plugin Creator update, deployment or public release. Existing plugin identity, manifests, MCP boundaries and original three prompts are unchanged. No Spatial GUI.

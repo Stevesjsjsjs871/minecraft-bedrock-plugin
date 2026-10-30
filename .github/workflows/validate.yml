@@ -112,3 +112,23 @@ jobs:
               assert any("server/animation_controller_mcp.py" in arg.replace("\\", "/") for arg in animation.get("args", []))
           print("PASS: manifests, prompts, entity/animation authoring, texture authoring/audit and five MCP servers are synchronized at", expected)
           PY
+
+  entity-animation-portability:
+    name: Authoring tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test custom entity authoring
+        run: python -m unittest discover -s server/tests -p "test_entity_authoring_mcp.py" -v
+      - name: Test animation controller authoring
+        run: python -m unittest discover -s server/tests -p "test_animation_controller_mcp.py" -v
+      - name: Test five-server MCP registry
+        run: python -m unittest discover -s server/tests -p "test_mcp_registry.py" -v

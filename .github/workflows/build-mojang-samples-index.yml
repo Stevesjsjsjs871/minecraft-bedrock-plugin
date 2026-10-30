@@ -8,6 +8,9 @@ on:
       - .github/workflows/build-mojang-samples-index.yml
       - skills/bedrock-development/scripts/index_mojang_samples.py
       - skills/bedrock-development/references/mojang-samples-1.26.50.4/INDEX_METADATA.json
+      - skills/bedrock-development/scripts/test_index_mojang_samples.py
+      - skills/package-integrity/scripts/check_package_integrity.py
+      - skills/package-integrity/scripts/test_check_package_integrity.py
   workflow_dispatch:
 
 permissions:

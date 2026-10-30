@@ -266,7 +266,7 @@ def _index_audit(root: Path, checks: list[dict[str, str]], *, deep: bool) -> dic
     expected_categories = metadata.get("category_counts")
     source_asset_sha = metadata.get("source_asset_sha256")
 
-    if not SHA256_RE.fullmatch(sha or "") or not isinstance(target_version, str) or not re.fullmatch(r"\\d+\\.\\d+\\.\\d+\\.\\d+", target_version):
+    if not SHA256_RE.fullmatch(sha or "") or not isinstance(target_version, str) or not re.fullmatch(r"\d+\.\d+\.\d+\.\d+", target_version):
         checks.append({"id": "sample-index-metadata", "status": "FAIL", "message": "Metadata needs a four-part target_version and a 64-character lowercase ZIP SHA-256"})
         return None
     if not isinstance(indexed_count, int) or not isinstance(entry_count, int) or indexed_count < 1 or entry_count < indexed_count:

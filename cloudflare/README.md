@@ -16,6 +16,7 @@ This avoids maintaining a hand-written, incomplete TypeScript copy of the tool r
 ## Required deployment topology
 
 The Python backend must run as a persistent HTTPS container service. The repository root `Dockerfile` builds it and starts `cloudflare/container/app.py`.
+The backend initializes `MINECRAFT_BEDROCK_WORKSPACE` to `/data/workspace` when it is not supplied and creates the directory at startup. Mount a persistent volume at `/data` (or configure `MINECRAFT_BEDROCK_WORKSPACE` to a persistent mounted directory) before using write-capable tools; otherwise project files may be lost when the container is replaced.
 
 The Cloudflare Worker Free plan does not execute this Python container. Deploy the container to a Python/Docker-capable host first, then configure the Worker to proxy to it. The backend URL must be a public HTTPS base URL, for example `https://your-service.example`; the Worker appends `/mcp`.
 

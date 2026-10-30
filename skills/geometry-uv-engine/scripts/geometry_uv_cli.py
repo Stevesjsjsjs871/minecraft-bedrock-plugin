@@ -120,12 +120,12 @@ def _verify_generated_png(
     payload["template"]["sha256_verified"] = True
 
 
-def _execution_info(module: str) -> dict[str, str]:
+def _execution_info(module: str) -> dict[str, Any]:
     return {
         "mode": "local-cli-adapter",
         "transport": "direct-python-call",
         "backend_module": module,
-        "mcp_transport_started": "false",
+        "mcp_transport_started": False,
     }
 
 

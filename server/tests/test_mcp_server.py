@@ -594,6 +594,21 @@ class SchemaTests(unittest.TestCase):
         self.assertIsNotNone(geometry_result["results"][0]["bundled_reference"])
 
 
+    def test_bundled_full_mojang_index_is_loaded_by_mcp_search(self):
+        if not server.MOJANG_SAMPLE_INDEX.is_file():
+            self.skipTest("full Mojang index is absent from a minimal source checkout")
+        payload = server._load_mojang_sample_index()
+        self.assertEqual(payload.get("index_mode"), "full_index")
+        self.assertEqual(payload.get("target_version"), "1.26.50.4")
+        self.assertEqual(len(payload["entries"]), 22252)
+
+        result = server.call_tool("search_mojang_samples", {
+            "query": "minecraft:apple", "category": "item", "limit": 5
+        })
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(result["index_mode"], "full_index")
+        self.assertTrue(any(row["path"] == "behavior_pack/items/apple.json" for row in result["results"]))
+
     def test_mojang_sample_search_uses_explicit_curated_fallback_without_full_index(self):
         from unittest.mock import patch
         with tempfile.TemporaryDirectory() as td:

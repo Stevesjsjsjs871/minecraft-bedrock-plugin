@@ -35,7 +35,7 @@
 ## Mojang sample index pipeline
 
 - `skills/bedrock-development/references/mojang-samples-1.26.50.4/mojang-samples-index.json.gz` is a metadata-only index of 22,252 entries from Mojang's official `v1.26.50.4` full release asset.
-- `.github/workflows/build-mojang-samples-index.yml` pins the official asset ID, SHA-256 and size; verifies the full ZIP CRC table and archive statistics; runs the existing no-extraction indexer; checks category counts; records the generated index digest/size; runs the full test suite and package-integrity audit; then commits only the generated index and its metadata.
+- `.github/workflows/build-mojang-samples-index.yml` pins the official asset ID, SHA-256 and size; verifies the full ZIP CRC table and archive statistics; runs the existing no-extraction indexer; checks category counts; records the generated index digest/size; runs the full test suite and package-integrity audit; then commits only the generated index and its metadata. Automatic push-triggered generation is limited to this candidate branch; after merge, an owner can manually dispatch the workflow on `main` to revalidate/rebuild this pinned corpus.
 - The original full ZIP and binary texture/sound contents are not committed. The index supports offline path/category/identifier search, but reading a non-curated text file still requires the original ZIP in the configured workspace. Minecraft import/rendering remains `NOT RUN`.
 
 

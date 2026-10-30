@@ -22,7 +22,7 @@ concurrency:
 
 jobs:
   build-and-verify:
-    if: github.ref_name == 'hardening/png-decoder-validation-1-0-11-20261030'
+    if: github.ref_name == 'hardening/png-decoder-validation-1-0-11-20261030' || (github.event_name == 'workflow_dispatch' && github.ref_name == 'main')
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -215,7 +215,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$TARGET_BRANCH" = "hardening/png-decoder-validation-1-0-11-20261030"
+          case "$TARGET_BRANCH" in
+            hardening/png-decoder-validation-1-0-11-20261030|main) ;;
+            *) echo "Refusing to write generated index to unexpected branch: $TARGET_BRANCH"; exit 1 ;;
+          esac
           git diff --check
           git add skills/bedrock-development/references/mojang-samples-1.26.50.4/mojang-samples-index.json.gz
           git add skills/bedrock-development/references/mojang-samples-1.26.50.4/INDEX_METADATA.json

@@ -1,40 +1,33 @@
-# Minecraft Bedrock Engineer — 1.0.14
+# Minecraft Bedrock Engineer — 1.1.1
+
+## 1.1.1: animation-controller state machines
+
+- Adds the dedicated `minecraft-bedrock-animation-controller-authoring` stdio MCP server.
+- Adds `create_animation_controller`, which creates an RP animation-controller JSON with a defined initial state, bounded states, animation aliases, transitions and Molang commands.
+- Binds the new controller to an existing RP client entity by adding an alias in `description.animations` and registering that alias in `description.scripts.animate` without removing unrelated entries.
+- Adds read-only `validate_animation_controller` to check controller structure, state targets, alias references, controller binding and `scripts.animate` registration.
+- Checks the linked BP/RP scaffold, JSON duplicate keys, path containment, symlinks, existing controller IDs, output collisions and client-entity concurrent changes. It refuses to overwrite a controller file.
+- Molang checks are text-shape validation only. Minecraft import, expression evaluation, animation blending and runtime transitions remain `NOT RUN`.
+
+## 1.1.0: first-pass custom entity authoring
+
+- Adds the dedicated `minecraft-bedrock-entity-authoring` stdio MCP server with `create_addon_entity`.
+- Creates four coordinated resources in an existing linked BP/RP scaffold: BP entity definition, RP client entity, Bedrock geometry model and render controller.
+- Accepts an explicit bone/cube model definition with parent hierarchy, pivots, classic box UVs, optional cube transforms and locators. Checks duplicate/missing/cyclic bones, finite vectors, cube limits and UV bounds.
+- Validates the scaffold's BP/RP manifests and dependency, checks identifier collisions, confines writes to the selected project, rejects symlinks and existing destinations, and rolls back partial file creation.
+- Texture PNGs, animation clips/controllers and spawn rules are not fabricated. Minecraft import/spawn/render tests remain `NOT RUN`.
 
 ## 1.0.14: full PNG stream audit and bounded scan budgets
 
-- The read-only `audit_texture_links` tool now validates the decompressed PNG scanline stream, not only chunk CRCs and IHDR metadata. It checks legal color/depth combinations, PLTE/tRNS placement, consecutive IDAT chunks, bounded zlib output, exact scanline sizes, filter bytes and Adam7 passes.
-- Adds a reusable `server/png_validation.py` validator shared by the texture audit implementation, with explicit file/byte/dimension/pixel limits and symlink-safe file reads.
-- Caches validation for repeated PNG paths and caps atlas entries, unique PNG files and aggregate PNG bytes per audit. Results include `analysis_complete`, atlas keys checked, unique PNGs inspected and bytes inspected.
-- Adds regression cases for valid-CRC but corrupt zlib streams, scanline/filter errors, indexed/Adam7 PNGs, cache reuse and incomplete budgeted scans. The audit remains read-only; Minecraft runtime remains `NOT RUN`.
+- The read-only `audit_texture_links` tool validates decompressed PNG scanlines, legal color/depth combinations, PLTE/tRNS placement, consecutive IDAT chunks, bounded zlib output, filter bytes and Adam7 passes.
+- Adds reusable `server/png_validation.py`, validation caching and explicit per-audit limits. Results report `analysis_complete` and scan metrics.
+- Adds regression coverage for corrupt zlib streams, scanline/filter errors, indexed/Adam7 PNGs, cache reuse and incomplete scans. Runtime remains `NOT RUN`.
 
+## Earlier texture pipeline
 
-## 1.0.13: read-only BP/RP texture-link audit
+- 1.0.13 introduced the read-only BP/RP texture-link auditor.
+- 1.0.12 strengthened PNG data validation and safe atlas updates.
+- 1.0.11 added safe block/item atlas registration.
+- 1.0.10 added the separate procedural PNG texture generator.
 
-- Adds `audit_texture_links`, a dedicated read-only MCP tool that follows texture references from BP block/item definitions to the matching RP atlas and then to the actual PNG files.
-- Checks `minecraft:material_instances` block texture keys, both supported item icon forms (`texture` and `textures.default`), atlas key presence, texture-path containment, PNG signatures/chunk CRCs and dimensions.
-- Reports malformed/duplicate-key JSON, missing atlas keys, missing/corrupt PNGs, unsafe symlinks and unused atlas entries as structured findings with file paths and severity.
-- Uses bounded scans and file sizes, skips symlinked directories, and never edits project files. Runtime/import/rendering remains `NOT RUN`.
-
-## 1.0.12: deeper PNG validation and safer atlas updates
-
-- Validates PNG image data, not only chunk CRCs: legal IHDR combinations, chunk ordering, contiguous IDAT data, bounded zlib decompression, exact scanline lengths and filter bytes. Supports standard color types and Adam7 interlace.
-- Validates the procedural generator's PNG before reporting success.
-- Serializes atlas read/modify/write operations with an exclusive per-atlas lock, refuses busy locks and never automatically removes a possible stale lock.
-- Rejects duplicate JSON object keys in existing atlases rather than silently discarding earlier entries.
-- Adds regression coverage for malformed PNG streams, decompression expansion, invalid filters, Adam7/indexed PNGs, duplicate atlas keys and lock lifecycle.
-
-## 1.0.11: safe texture-atlas registration
-
-- Adds `register_texture_atlas` alongside the procedural `generate_texture` MCP tool.
-- Registers existing PNGs in the Bedrock block (`textures/terrain_texture.json`) or item (`textures/item_texture.json`) atlas while preserving unrelated entries.
-- Validates PNG chunk bounds and CRCs, dimensions, project/Resource Pack containment, atlas shape, and symlink safety; refuses conflicting texture identifiers and concurrent atlas changes.
-- Does not alter BP/RP item or block definitions. Those definitions must use the registered texture identifier; Minecraft runtime remains `NOT RUN`.
-
-## 1.0.10: dedicated procedural texture MCP tool
-
-- Registers a separate `minecraft-bedrock-texture-generator` stdio MCP server with the `generate_texture` tool, preserving the existing MCP server and its tools.
-- Generates real RGBA PNGs inside an existing project's Resource Pack `textures/` folder, using the existing ten-style procedural generator.
-- Enforces workspace/project containment, canonical relative POSIX paths, existing parent directories, no symlinked parents, size bounds and no-overwrite behavior.
-- Adds an independent JSON-RPC/MCP contract test suite. Generated assets are procedural starter textures, not AI image synthesis, UV-aware painting, or proof of Minecraft rendering.
-
-The original MCP server, plugin identity, permissions, main MCP entry, audit/reference tools and all three default prompts are preserved. Minecraft runtime remains `NOT RUN`.
+The original MCP server, plugin identity, permissions, default prompts and existing tools are preserved. Minecraft runtime remains `NOT RUN` unless explicitly reported otherwise.

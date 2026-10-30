@@ -23,6 +23,22 @@
         "${PLUGIN_ROOT}/server/texture_link_audit_mcp.py"
       ],
       "env": {}
+    },
+    "minecraft-bedrock-entity-authoring": {
+      "type": "stdio",
+      "command": "python3",
+      "args": [
+        "${PLUGIN_ROOT}/server/entity_authoring_mcp.py"
+      ],
+      "env": {}
+    },
+    "minecraft-bedrock-animation-controller-authoring": {
+      "type": "stdio",
+      "command": "python3",
+      "args": [
+        "${PLUGIN_ROOT}/server/animation_controller_mcp.py"
+      ],
+      "env": {}
     }
   }
 }

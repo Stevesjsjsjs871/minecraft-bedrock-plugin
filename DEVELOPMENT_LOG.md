@@ -23,7 +23,8 @@
 
 ### Verification
 - First GitHub Actions run #41019454214 executed 172 tests and found one stale assertion in the copied entity-server test: it expected server version 1.1.0 while the package is 1.1.1. All animation-array tests, registry tests, MCT-preservation checks and other entity tests passed.
-- Corrected the stale assertion in commit `03c7a170950969b1af1fe5d597e124c2de7b7410`; full rerun pending.
+- Corrected the stale assertion in commit `03c7a170950969b1af1fe5d597e124c2de7b7410`.
+- Follow-up CI #41019515461 passed the 172-test suite but failed the workflow's final compatibility script, which still expected the new entity server to expose the legacy name. Updated the script in commit `231baaa7ba3ad6c307cec34ca99f3af803f43d0e` to assert the advanced tool name and separately assert that the core legacy entity tool plus all four Creator Tools bridge tools remain registered. Full rerun pending.
 - Minecraft import, entity spawn/render, Molang execution, controller transitions in-game and Creator Tools CLI: NOT RUN.
 
 ### Remaining

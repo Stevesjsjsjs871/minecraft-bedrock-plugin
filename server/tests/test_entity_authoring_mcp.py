@@ -75,7 +75,7 @@ def valid_args(project: str = "forest-addon") -> dict:
 
 class SchemaAndProtocolTests(unittest.TestCase):
     def test_entity_tool_has_closed_schema_and_write_annotations(self):
-        tool = server.TOOL_BY_NAME["create_addon_entity"]
+        tool = server.TOOL_BY_NAME["create_addon_entity_with_geometry"]
         self.assertFalse(tool["inputSchema"]["additionalProperties"])
         self.assertFalse(tool["annotations"]["readOnlyHint"])
         self.assertFalse(tool["annotations"]["idempotentHint"])
@@ -83,12 +83,12 @@ class SchemaAndProtocolTests(unittest.TestCase):
 
     def test_tools_list_exposes_entity_authoring(self):
         response = server.handle_message({"jsonrpc": "2.0", "id": 8, "method": "tools/list", "params": {}})
-        self.assertEqual(response["result"]["tools"][0]["name"], "create_addon_entity")
+        self.assertEqual(response["result"]["tools"][0]["name"], "create_addon_entity_with_geometry")
 
     def test_initialize_reports_server_version_and_workflow(self):
         response = server.handle_message({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-03-26"}})
-        self.assertEqual(response["result"]["serverInfo"]["version"], server.SERVER_VERSION)
-        self.assertIn("create_addon_entity", response["result"]["instructions"])
+        self.assertEqual(response["result"]["serverInfo"]["version"], "1.1.0")
+        self.assertIn("create_addon_entity_with_geometry", response["result"]["instructions"])
 
 
 class EntityCreationTests(unittest.TestCase):
@@ -97,7 +97,7 @@ class EntityCreationTests(unittest.TestCase):
             workspace = Path(td)
             project = scaffold(workspace)
             with patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": td}):
-                result = server.call_tool("create_addon_entity", valid_args())
+                result = server.call_tool("create_addon_entity_with_geometry", valid_args())
             self.assertEqual(result["status"], "created")
             self.assertEqual(result["entity_identifier"], "forest_addon:forest_guardian")
             self.assertEqual(result["geometry_identifier"], "geometry.forest_addon.forest_guardian")
@@ -125,7 +125,7 @@ class EntityCreationTests(unittest.TestCase):
             existing = project / "resource_packs/forest-addon_RP/models/entity/forest_guardian.geo.json"
             existing.write_text('{"do_not_touch":true}\n', encoding="utf-8")
             with patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": td}):
-                result = server.call_tool("create_addon_entity", valid_args())
+                result = server.call_tool("create_addon_entity_with_geometry", valid_args())
             self.assertEqual(result["status"], "error")
             self.assertIn("refusing to overwrite", result["error"]["message"])
             self.assertEqual(existing.read_text(encoding="utf-8"), '{"do_not_touch":true}\n')
@@ -137,7 +137,7 @@ class EntityCreationTests(unittest.TestCase):
             existing = project / "behavior_packs/forest-addon_BP/entities/other-file.json"
             existing.write_text(json.dumps({"minecraft:entity": {"description": {"identifier": "forest_addon:forest_guardian"}}}), encoding="utf-8")
             with patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": td}):
-                result = server.call_tool("create_addon_entity", valid_args())
+                result = server.call_tool("create_addon_entity_with_geometry", valid_args())
             self.assertEqual(result["status"], "error")
             self.assertIn("identifier already exists", result["error"]["message"])
 
@@ -149,7 +149,7 @@ class EntityCreationTests(unittest.TestCase):
             data["dependencies"] = []
             manifest.write_text(json.dumps(data), encoding="utf-8")
             with patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": td}):
-                result = server.call_tool("create_addon_entity", valid_args())
+                result = server.call_tool("create_addon_entity_with_geometry", valid_args())
             self.assertEqual(result["status"], "error")
             self.assertIn("linked Behavior Pack/Resource Pack scaffold", result["error"]["message"])
 
@@ -159,7 +159,7 @@ class EntityCreationTests(unittest.TestCase):
             link = Path(td) / "forest-addon"
             link.symlink_to(real, target_is_directory=True)
             with patch.dict(os.environ, {"MINECRAFT_BEDROCK_WORKSPACE": td}):
-                result = server.call_tool("create_addon_entity", valid_args())
+                result = server.call_tool("create_addon_entity_with_geometry", valid_args())
             self.assertEqual(result["status"], "error")
             self.assertIn("non-symlink", result["error"]["message"])
 

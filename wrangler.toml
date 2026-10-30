@@ -1,4 +1,4 @@
-name = "minecraft-bedrock-engineer"
+name = "minecraft-bedrock-plugin"
 main = "cloudflare/src/index.ts"
 compatibility_date = "2026-10-30"
 compatibility_flags = ["nodejs_compat"]

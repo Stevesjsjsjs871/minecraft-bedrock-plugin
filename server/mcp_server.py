@@ -752,6 +752,14 @@ def _search_mojang_samples(args: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _sha256_sample_archive(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def _read_mojang_sample(args: dict[str, Any]) -> dict[str, Any]:
     sample_version = args["sample_version"]
     corpus = MOJANG_SAMPLE_CORPORA.get(sample_version)
@@ -772,6 +780,24 @@ def _read_mojang_sample(args: dict[str, Any]) -> dict[str, Any]:
     source = "bundled_curated_sample"
     if "archive_path" in args:
         archive = _resolve_archive(args["archive_path"])
+        expected_archive_sha = payload.get("archive_sha256")
+        if not isinstance(expected_archive_sha, str) or not re.fullmatch(r"[0-9a-f]{64}", expected_archive_sha):
+            return _error(
+                "SAMPLE_ARCHIVE_DIGEST_UNAVAILABLE",
+                "The selected sample index does not contain a verifiable source-archive SHA-256; refusing an unverified archive.",
+                {"sample_version": sample_version},
+            )
+        actual_archive_sha = _sha256_sample_archive(archive)
+        if actual_archive_sha != expected_archive_sha:
+            return _error(
+                "SAMPLE_ARCHIVE_VERSION_MISMATCH",
+                "The supplied ZIP does not match the exact full-release archive used to build the selected sample index.",
+                {
+                    "sample_version": sample_version,
+                    "expected_archive_sha256": expected_archive_sha,
+                    "actual_archive_sha256": actual_archive_sha,
+                },
+            )
         try:
             with zipfile.ZipFile(archive) as zf:
                 matches = [info for info in zf.infolist() if not info.is_dir() and info.filename == sample_path]

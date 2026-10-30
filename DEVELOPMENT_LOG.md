@@ -74,8 +74,9 @@ Compared selected current Plugin Creator files with the PR #6 source line:
 - Added regression tests for both cases and documented the additional checks.
 
 ### Verification
-- PR #9 CI run #158 on the prior checker revision: SUCCESS; all workflow steps completed.
-- New symlink-hardening tests are committed in this follow-up; their CI result is pending at the time of this log entry.
+- PR #9 CI run #158 on the initial checker revision: SUCCESS; all workflow steps completed.
+- PR #9 CI run #159 after symlink hardening: SUCCESS; all 18 parity-checker tests and every workflow step completed.
+- New symlink-hardening tests: 18/18 parity-checker tests passed in GitHub Actions run #159 (Python 3.12). The complete workflow, including compilation, existing server tests, package integrity, analyzer regressions, manifest checks and parity tests, completed successfully on commit `a937c7093a49e98e64ec3809cd2b7275e63e7aa6`.
 - Actual private archive-level parity execution remains NOT RUN because the archive download could not be materialized in the working container. The source API inventory comparison above is complete for all 94 readable text files; the >1 MiB gzip index remains uninspected at byte level.
 
 ### Next step

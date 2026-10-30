@@ -15,8 +15,8 @@ interface Env {
 }
 type Rpc = { jsonrpc?: string; id?: string | number | null; method?: string; params?: Record<string, unknown> };
 const REPO = "Stevesjsjsjs871/minecraft-bedrock-plugin";
-const DEFAULT_BRANCH = "feat/cloudflare-workers-mcp";
-const MAX_BODY = 1024 * 1024;
+const DEFAULT_BRANCH = "feat/unified-mcp-http-proxy";
+const MAX_BODY = 8 * 1024 * 1024;
 
 const tools = [
   { name: "bedrock_generate_manifest", description: "Generate a valid Minecraft Bedrock BP or RP manifest (format_version 2) with fresh UUIDs. Returns JSON; does not write files.", inputSchema: { type: "object", properties: { pack_type: { type: "string", enum: ["behavior", "resource"] }, name: { type: "string", minLength: 1, maxLength: 64 }, description: { type: "string", minLength: 1, maxLength: 256 }, min_engine_version: { type: "array", items: { type: "integer", minimum: 0 }, minItems: 3, maxItems: 3 }, version: { type: "array", items: { type: "integer", minimum: 0 }, minItems: 3, maxItems: 3 }, dependency_uuid: { type: "string", description: "Optional BP header UUID for an RP dependency." }, dependency_version: { type: "array", items: { type: "integer", minimum: 0 }, minItems: 3, maxItems: 3 } }, required: ["pack_type", "name", "description", "min_engine_version"], additionalProperties: false } },

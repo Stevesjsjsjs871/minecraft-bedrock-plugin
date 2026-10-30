@@ -245,14 +245,27 @@ def _registry_audit(server_path: Path, checks: list[dict[str, str]]) -> dict[str
     }
 
 
-def _index_audit(root: Path, checks: list[dict[str, str]], *, deep: bool) -> dict[str, Any] | None:
-    base = root / "skills/bedrock-development/references/mojang-samples-1.26.50.4"
+def _index_audit(
+    root: Path,
+    checks: list[dict[str, str]],
+    *,
+    deep: bool,
+    base: Path | None = None,
+    check_suffix: str | None = None,
+) -> dict[str, Any] | None:
+    base = base or root / "skills/bedrock-development/references/mojang-samples-1.26.50.4"
+
+    def record(check: dict[str, str]) -> None:
+        if check_suffix:
+            check = dict(check)
+            check["id"] = f"{check['id']}:{check_suffix}"
+        checks.append(check)
     metadata_path = base / "INDEX_METADATA.json"
     index_path = base / "mojang-samples-index.json.gz"
     try:
         metadata = _read_json(metadata_path)
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        checks.append({"id": "sample-index-metadata", "status": "FAIL", "message": f"Cannot parse sample-index metadata: {exc}"})
+        record({"id": "sample-index-metadata", "status": "FAIL", "message": f"Cannot parse sample-index metadata: {exc}"})
         return None
 
     sha = metadata.get("zip_sha256")
@@ -266,43 +279,47 @@ def _index_audit(root: Path, checks: list[dict[str, str]], *, deep: bool) -> dic
     expected_categories = metadata.get("category_counts")
     source_asset_sha = metadata.get("source_asset_sha256")
 
-    if not SHA256_RE.fullmatch(sha or "") or not isinstance(target_version, str) or not re.fullmatch(r"\d+\.\d+\.\d+\.\d+", target_version):
-        checks.append({"id": "sample-index-metadata", "status": "FAIL", "message": "Metadata needs a four-part target_version and a 64-character lowercase ZIP SHA-256"})
+    if not SHA256_RE.fullmatch(sha or "") or not isinstance(target_version, str) or not re.fullmatch(r"\d+\.\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?", target_version):
+        record({"id": "sample-index-metadata", "status": "FAIL", "message": "Metadata needs a four-part target_version and a 64-character lowercase ZIP SHA-256"})
+        return None
+    directory_version = base.name.removeprefix("mojang-samples-")
+    if directory_version != target_version:
+        record({"id": "sample-index-metadata", "status": "FAIL", "message": f"Directory version {directory_version!r} disagrees with metadata target_version {target_version!r}"})
         return None
     if not isinstance(indexed_count, int) or not isinstance(entry_count, int) or indexed_count < 1 or entry_count < indexed_count:
-        checks.append({"id": "sample-index-metadata", "status": "FAIL", "message": "Metadata entry/index counts are missing or inconsistent"})
+        record({"id": "sample-index-metadata", "status": "FAIL", "message": "Metadata entry/index counts are missing or inconsistent"})
         return None
     if source_archive is not None and (not isinstance(source_archive, str) or not source_archive or "/" in source_archive or "\\" in source_archive):
-        checks.append({"id": "sample-index-metadata", "status": "FAIL", "message": "source_archive must be a basename, not a path"})
+        record({"id": "sample-index-metadata", "status": "FAIL", "message": "source_archive must be a basename, not a path"})
         return None
     if expected_index_sha is not None and (not isinstance(expected_index_sha, str) or not SHA256_RE.fullmatch(expected_index_sha)):
-        checks.append({"id": "sample-index-metadata", "status": "FAIL", "message": "index_sha256 must be a 64-character lowercase SHA-256"})
+        record({"id": "sample-index-metadata", "status": "FAIL", "message": "index_sha256 must be a 64-character lowercase SHA-256"})
         return None
     if expected_index_size is not None and (type(expected_index_size) is not int or expected_index_size < 1):
-        checks.append({"id": "sample-index-metadata", "status": "FAIL", "message": "index_size_bytes must be a positive integer"})
+        record({"id": "sample-index-metadata", "status": "FAIL", "message": "index_size_bytes must be a positive integer"})
         return None
     if declared_uncompressed is not None and (type(declared_uncompressed) is not int or declared_uncompressed < 0):
-        checks.append({"id": "sample-index-metadata", "status": "FAIL", "message": "declared_uncompressed_bytes must be a non-negative integer"})
+        record({"id": "sample-index-metadata", "status": "FAIL", "message": "declared_uncompressed_bytes must be a non-negative integer"})
         return None
     if expected_categories is not None and (
         not isinstance(expected_categories, dict)
         or not expected_categories
         or any(not isinstance(key, str) or not key or type(value) is not int or value < 0 for key, value in expected_categories.items())
     ):
-        checks.append({"id": "sample-index-metadata", "status": "FAIL", "message": "category_counts must map non-empty category names to non-negative integers"})
+        record({"id": "sample-index-metadata", "status": "FAIL", "message": "category_counts must map non-empty category names to non-negative integers"})
         return None
     if source_asset_sha is not None and source_asset_sha != sha:
-        checks.append({"id": "sample-index-metadata", "status": "FAIL", "message": "source_asset_sha256 disagrees with zip_sha256"})
+        record({"id": "sample-index-metadata", "status": "FAIL", "message": "source_asset_sha256 disagrees with zip_sha256"})
         return None
 
-    checks.append({"id": "sample-index-metadata", "status": "PASS", "message": f"Sample provenance metadata is structurally valid ({target_version}; indexed {indexed_count}/{entry_count} entries)"})
+    record({"id": "sample-index-metadata", "status": "PASS", "message": f"Sample provenance metadata is structurally valid ({target_version}; indexed {indexed_count}/{entry_count} entries)"})
     if not deep:
-        checks.append({"id": "sample-index-content", "status": "WARN", "message": "Deep compressed-index validation skipped by option"})
+        record({"id": "sample-index-content", "status": "WARN", "message": "Deep compressed-index validation skipped by option"})
         return {"target_version": target_version, "indexed_count": indexed_count, "entry_count": entry_count, "zip_sha256": sha}
 
     if not index_path.is_file():
         if expected_index_sha is not None or expected_index_size is not None:
-            checks.append({"id": "sample-index-content", "status": "FAIL", "message": "Metadata pins a full generated index, but the compressed index file is absent"})
+            record({"id": "sample-index-content", "status": "FAIL", "message": "Metadata pins a full generated index, but the compressed index file is absent"})
             return None
         curated = [
             p for p in base.rglob("*")
@@ -310,7 +327,7 @@ def _index_audit(root: Path, checks: list[dict[str, str]], *, deep: bool) -> dic
             and p.name != "INDEX_METADATA.json"
         ]
         if curated:
-            checks.append({
+            record({
                 "id": "sample-index-content",
                 "status": "WARN",
                 "message": f"Full generated gzip index is absent; {len(curated)} curated source files remain available for fallback search",
@@ -323,17 +340,17 @@ def _index_audit(root: Path, checks: list[dict[str, str]], *, deep: bool) -> dic
                 "index_mode": "curated_fallback",
                 "curated_file_count": len(curated),
             }
-        checks.append({"id": "sample-index-content", "status": "FAIL", "message": "Compressed index is absent and no curated fallback files are present"})
+        record({"id": "sample-index-content", "status": "FAIL", "message": "Compressed index is absent and no curated fallback files are present"})
         return None
 
     try:
         with gzip.open(index_path, "rt", encoding="utf-8") as stream:
             index = json.load(stream)
     except (OSError, EOFError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        checks.append({"id": "sample-index-content", "status": "FAIL", "message": f"Compressed sample index is unreadable: {exc}"})
+        record({"id": "sample-index-content", "status": "FAIL", "message": f"Compressed sample index is unreadable: {exc}"})
         return None
     if not isinstance(index, dict):
-        checks.append({"id": "sample-index-content", "status": "FAIL", "message": "Compressed sample index root must be a JSON object"})
+        record({"id": "sample-index-content", "status": "FAIL", "message": "Compressed sample index root must be a JSON object"})
         return None
 
     actual_entries = index.get("entries")
@@ -415,9 +432,9 @@ def _index_audit(root: Path, checks: list[dict[str, str]], *, deep: bool) -> dic
         if bad_paths: details.append(f"unsafe paths sample={bad_paths[:3]}")
         if duplicate_paths: details.append(f"duplicate paths sample={duplicate_paths[:3]}")
         if malformed_entries: details.append(f"contract errors sample={malformed_entries[:8]}")
-        checks.append({"id": "sample-index-content", "status": "FAIL", "message": "; ".join(details)})
+        record({"id": "sample-index-content", "status": "FAIL", "message": "; ".join(details)})
     else:
-        checks.append({"id": "sample-index-content", "status": "PASS", "message": f"Compressed index validated: {actual_count} unique canonical entries; provenance, categories, policy and content digest match"})
+        record({"id": "sample-index-content", "status": "PASS", "message": f"Compressed index validated: {actual_count} unique canonical entries; provenance, categories, policy and content digest match"})
     return {
         "target_version": target_version,
         "indexed_count": indexed_count,
@@ -540,8 +557,17 @@ def audit_package(root: Path, *, deep_index: bool = True, strict_files: bool = T
     server = root / "server/mcp_server.py"
     registry = _registry_audit(server, checks) if server.is_file() else {"tool_count": 0, "tool_names": [], "duplicate_names": [], "missing_handlers": [], "schema_errors": ["server source missing"]}
     index = None
-    if (root / "skills/bedrock-development/references/mojang-samples-1.26.50.4/INDEX_METADATA.json").is_file():
-        index = _index_audit(root, checks, deep=deep_index)
+    indices: dict[str, Any] = {}
+    references_root = root / "skills/bedrock-development/references"
+    if references_root.is_dir():
+        sample_roots = sorted(path for path in references_root.glob("mojang-samples-*") if path.is_dir())
+        for sample_root in sample_roots:
+            version_label = sample_root.name.removeprefix("mojang-samples-")
+            suffix = None if version_label == "1.26.50.4" else version_label
+            report = _index_audit(root, checks, deep=deep_index, base=sample_root, check_suffix=suffix)
+            indices[version_label] = report
+            if version_label == "1.26.50.4":
+                index = report
 
     readme_path = root / "README.md"
     if readme_path.is_file() and len(versions) >= 3 and _semver(versions[0]):
@@ -571,10 +597,10 @@ def audit_package(root: Path, *, deep_index: bool = True, strict_files: bool = T
             add("changelog-version", "WARN", "CHANGELOG.md could not be read")
 
 
-    return _report(root, checks, registry, index)
+    return _report(root, checks, registry, index, indices)
 
 
-def _report(root: Path, checks: list[dict[str, str]], registry: dict[str, Any], index: dict[str, Any] | None) -> dict[str, Any]:
+def _report(root: Path, checks: list[dict[str, str]], registry: dict[str, Any], index: dict[str, Any] | None, indices: dict[str, Any] | None = None) -> dict[str, Any]:
     fails = sum(c["status"] == "FAIL" for c in checks)
     warns = sum(c["status"] == "WARN" for c in checks)
     status = "FAIL" if fails else ("WARN" if warns else "PASS")
@@ -587,6 +613,7 @@ def _report(root: Path, checks: list[dict[str, str]], registry: dict[str, Any], 
         "checks": checks,
         "mcp_registry": registry,
         "mojang_samples_index": index,
+        "mojang_samples_indices": indices or {},
         "runtime_status": "NOT RUN",
     }
 

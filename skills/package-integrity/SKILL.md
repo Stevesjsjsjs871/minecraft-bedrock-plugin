@@ -29,3 +29,10 @@ To repair only a recognized stale README first-line heading, use `--fix-readme-h
 - A static registry audit is not a replacement for `server/tests/test_mcp_server.py`; the complete test suite must still run separately.
 - A report with `runtime_status: NOT RUN` does not prove import, rendering, behavior, or multiplayer compatibility in the game.
 - Never overwrite a user's pack just to make an audit pass. Fix the source of a finding, then rerun the full gate.
+
+
+## Versioned Mojang sample index integrity
+
+- The checker discovers every `mojang-samples-*` directory under `skills/bedrock-development/references/` and audits each `INDEX_METADATA.json` and gzip index independently.
+- The directory suffix, metadata `target_version` and compressed index `target_version` must agree. Stable four-part versions and explicit prerelease suffixes are accepted; cross-version metadata is rejected.
+- The legacy `mojang_samples_index` report field continues to describe stable `1.26.50.4`; `mojang_samples_indices` contains the per-version reports.

@@ -34,7 +34,7 @@ Make package integrity a fail-closed release gate and add a deterministic Skills
   - verifies the first three default prompts verbatim and in order;
   - rejects bytecode/cache/symlinks/special files;
   - bounds decompression of the pinned Mojang Samples index to 64 MiB.
-- Added test_build_skills_package.py and expanded test_check_skills_package.py.
+- Added test_build_skills_package.py and expanded test_check_skills_package.py with malformed manifest/version cases and pinned benchmark dependency checks.
 - Updated package-integrity skill instructions, README maintenance workflow, CI step label and GITHUB_SYNC_NOTES.md.
 - Documented building from a clean git archive snapshot with explicit source commit/epoch, avoiding test-generated cache contamination without deleting user files.
 
@@ -43,12 +43,12 @@ Make package integrity a fail-closed release gate and add a deterministic Skills
 Local isolated fixture results:
 
 - python -m compileall -q . — PASS.
-- python -m unittest discover -s . -p 'test_*.py' -v — 32/32 PASS.
+- python -m unittest discover -s . -p 'test_*.py' -v — 34/34 PASS.
 - Deterministic archive smoke test — PASS.
 - Two builds with identical source, commit and epoch produced identical tar.gz bytes.
 - Tampered sidecar, bytecode cache, symlink, Windows drive/traversal paths, invalid Git SHA, overwrite and output-inside-source cases were rejected.
 
-The repository's GitHub Actions workflow discovers both package-integrity test files. Initial PR CI #41089549833 passed the package-integrity step but failed 10/12 audit-benchmark tests because jsonschema was not installed. Added a pinned jsonschema==4.26.0 requirements file and workflow install step; final PR-head CI #41090154638 completed SUCCESS on f3306792a3fb40b208e7c8c0224d8998239f753c: compileall PASS; geometry/UV 18/18; PNG/texture 22/22; package integrity/provenance 32/32; Mojang indexer 6/6; audit benchmark 12/12; release metadata check PASS. The pinned jsonschema==4.26.0 dependency installed successfully. Only documentation changed after the earlier code run; this final run also passed.
+The repository's GitHub Actions workflow discovers both package-integrity test files. Initial PR CI #41089549833 passed the package-integrity step but failed 10/12 audit-benchmark tests because jsonschema was not installed. Added a pinned jsonschema==4.26.0 requirements file and workflow install step; final PR-head CI #41090698773 completed SUCCESS on 9465977e38de02dd2f53acbe0f16cc3c56311866: compileall PASS; geometry/UV 18/18; PNG/texture 22/22; package integrity/provenance 34/34; Mojang indexer 6/6; audit benchmark 12/12; release metadata check PASS. The pinned jsonschema==4.26.0 dependency installed successfully.
 
 ## Not run / blockers
 

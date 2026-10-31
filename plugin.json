@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "minecraft-bedrock-engineer",
-  "version": "1.5.11",
+  "version": "1.8.0",
   "description": "Minecraft Bedrock Engineer — Skills-first development, research, authoring guidance, BP/RP audits, geometry, animation, UV and texture workflows.",
   "author": {
     "name": "Plugin owner"

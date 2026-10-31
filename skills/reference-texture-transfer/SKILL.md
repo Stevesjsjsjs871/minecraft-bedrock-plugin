@@ -1,49 +1,48 @@
 ---
 name: reference-texture-transfer
-description: Use when transferring parts of a user-provided or externally generated reference PNG onto explicitly selected Minecraft Bedrock geometry UV faces.
+description: Use when transferring reviewed reference PNG crops onto explicitly selected Minecraft Bedrock geometry UV faces with a deterministic local script.
 ---
 
 # Reference texture transfer
 
-## Purpose
+This skill describes a bundled local Python utility. It is not a hosted service and does not create filesystem access. Run it only when a real executor can access the package and the user's project. It does not use MCP, a registry, a remote backend, or network access.
 
-Use `map_reference_texture_to_uv` to map one or more rectangular crops from a 2D PNG reference onto selected bone/cube/face UV rectangles from a Bedrock `.geo.json`. This bridges a prepared reference sheet and the existing UV painter without inventing a 3D projection.
+## Inputs and safety
 
-## File placement
+Use a JSON request based on `references/reference-transfer.example.json`. Set `project_directory` to one lowercase kebab-case directory directly below the executor workspace. Geometry, source PNG, optional base PNG and output must be project-relative POSIX paths. The project must contain `resource_packs/<project>_RP/manifest.json`; outputs must be under an existing project folder and are created exclusively (never overwritten).
 
-- Geometry must live under `resource_packs/<project>_RP/models/entity/`.
-- Reference PNG must be inside `resource_packs/<project>_RP/textures/`; a dedicated folder such as `textures/references/` is recommended.
-- Optional base texture must live under `resource_packs/<project>_RP/textures/entity/` and match the geometry's declared `texture_width` and `texture_height` exactly.
-- Output is a new PNG under `resource_packs/<project>_RP/textures/entity/`. Existing files are never overwritten.
+Choose the exact `geometry_identifier` when the file contains multiple geometries. Each mapping requires a selector with one or more of `bone`, `cube_index`, and `face` (`north`, `south`, `east`, `west`, `up`, `down`) plus an integer `source_rect` crop. Review semantic correspondence yourself; the script does not identify which portrait region belongs on which model face.
 
-## Mapping contract
+Optional transforms are `rotation` (`0`, `90`, `180`, `270`), `flip_x`, `flip_y`; sampling is `nearest` or `bilinear`; blend mode is `over` or `replace`; opacity is `0..255`. Transform order is rotation followed by horizontal/vertical flips. A supplied base texture is preserved outside selected regions and must match the geometry texture canvas exactly.
 
-Each mapping has:
+UV overlaps and duplicate target selections fail by default. Set `allow_uv_overlap: true` only for intentionally shared UVs or ordered layering that has been reviewed. Static tool validation does not prove visual orientation or runtime correctness.
 
-- `selector`: at least one of `bone`, `cube_index`, or `face` (`north`, `south`, `east`, `west`, `up`, `down`). Use all three when targeting one exact face.
-- `source_rect`: integer pixel rectangle `{ "x": 0, "y": 0, "width": 16, "height": 16 }` inside the reference PNG.
-- Optional `rotation`: `0`, `90`, `180`, or `270`, plus `flip_x` / `flip_y`. Rotation is applied first, then the horizontal/vertical flips.
-- `sampling`: `nearest` for pixel-art preservation or `bilinear` for smoother down/up-sampling. Bilinear sampling uses premultiplied alpha to avoid common transparent-edge color fringes.
-- `opacity` and `blend_mode` (`over` or `replace`). `over` is source-over alpha compositing; `replace` copies the reference RGBA including its alpha after opacity scaling.
+## Run
 
-Mapping order is deterministic. If geometry UV islands overlap, or if multiple mappings select the same target region, the tool refuses by default. Set `allow_uv_overlap: true` only when sharing/ordered layering is intentional; later mappings win on shared texels.
+From the package root:
 
-## Important limitations
+```bash
+python skills/reference-texture-transfer/scripts/reference_transfer.py <request.json> --workspace <workspace-directory> --report <report.json>
+```
 
-- The tool transfers caller-selected 2D source rectangles. It does not infer which parts of a character portrait correspond to 3D faces, automatically unwrap a model, generate artwork, or perform AI inpainting.
-- `uv_rotation`, negative `uv_size`, UV mirroring and the engine's face-specific 3D sampling orientation are not simulated as a rendered 3D view. The transfer maps into the occupied texture-space rectangle; choose source orientation explicitly with `rotation` and flips.
-- Source PNGs must be 8-bit, non-interlaced and supported by the installed PNG decoder. Fully validate inputs and outputs. Optional base textures must match the geometry canvas dimensions.
-- `poly_mesh` and `texture_meshes` are outside the cube-face UV mapping scope.
-- It does not add texture references to client entities or render controllers. Register/link the generated output explicitly, then run the geometry UV audit and texture-link checks where applicable.
-- Static PNG/JSON checks do not prove Minecraft rendering. Import, visual inspection, mip/seam bleed and runtime remain `NOT RUN` until tested in the target game build.
+The script is dependency-free and uses only the Python standard library. It returns structured JSON with status, geometry/canvas, input and output SHA-256, mapping coverage, texel budget, warnings and explicit runtime status. To test:
 
-## Recommended workflow
+```bash
+cd skills/reference-texture-transfer/scripts
+python -m pytest -q
+```
 
-1. Inspect geometry and generate a labeled UV template.
-2. Prepare a reference sheet with known, clearly separated source rectangles (AI-generated art may be used as an input, but must be reviewed and mapped explicitly).
-3. Map one or more source rectangles to exact geometry bone/cube/face selectors; use `nearest` for pixel art and `bilinear` when soft resampling is intended.
-4. Use the existing texture as `base_texture_path` when unmapped pixels must be preserved.
-5. Review overlap warnings and the generated PNG; run geometry UV and resource-link audits.
-6. Import into the exact Minecraft Bedrock target build and inspect every face. Record visual/runtime tests separately.
+## Supported scope and limitations
 
-See `references/reference-transfer.example.json` for a compact example.
+- Supports classic box UV and per-face cube UV for six faces; unsupported mesh types are reported, not projected.
+- Handles PNG 8-bit non-interlaced color types 0, 2, 3, 4 and 6; rejects unsupported depth/interlace or invalid CRC/chunk/scanline data.
+- Applies explicit 2D source crops to texture-space rectangles. It does not infer semantic matches, unwrap geometry, generate artwork, simulate 3D projection, determine renderer face orientation, link textures to client entities, or verify seams/mipmaps.
+- Static PNG/JSON checks do not prove Minecraft rendering. Import, Blockbench inspection and game runtime remain `NOT RUN` until actually performed.
+
+## Workflow
+
+1. Audit geometry UVs and render a transparent UV guide.
+2. Prepare a reviewed reference image and manually define crops/selectors.
+3. Use a copy of the base texture when untouched pixels must remain.
+4. Run the transfer, inspect the report and resulting PNG; then rerun UV/resource-link audits.
+5. Import into the exact Bedrock build and visually inspect every face; report runtime evidence separately.

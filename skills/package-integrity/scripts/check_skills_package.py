@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 EXPECTED_NAME = "minecraft-bedrock-engineer"
 SEMVER = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$")
-REQUIRED = ["VERSION", "README.md", "plugin.json", ".codex-plugin/plugin.json", "skills/bedrock-engineer-core/SKILL.md", "skills/skills-first-execution/SKILL.md", "skills/skills-only-maintenance/SKILL.md", "skills/geometry-uv-engine/SKILL.md", "skills/geometry-uv-engine/scripts/geometry_engine.py", "skills/geometry-uv-engine/scripts/test_geometry_engine.py", "skills/geometry-uv-engine/scripts/uv_template_engine.py", "skills/geometry-uv-engine/scripts/test_uv_template_engine.py", "skills/visual-resource-pipeline/scripts/png_engine.py", "skills/visual-resource-pipeline/scripts/test_png_engine.py"]
+REQUIRED = ["VERSION", "README.md", "plugin.json", ".codex-plugin/plugin.json", "skills/bedrock-engineer-core/SKILL.md", "skills/skills-first-execution/SKILL.md", "skills/skills-only-maintenance/SKILL.md", "skills/geometry-uv-engine/SKILL.md", "skills/geometry-uv-engine/scripts/geometry_engine.py", "skills/geometry-uv-engine/scripts/test_geometry_engine.py", "skills/geometry-uv-engine/scripts/uv_template_engine.py", "skills/geometry-uv-engine/scripts/test_uv_template_engine.py", "skills/visual-resource-pipeline/scripts/png_engine.py", "skills/visual-resource-pipeline/scripts/test_png_engine.py", "skills/reference-texture-transfer/SKILL.md", "skills/reference-texture-transfer/scripts/reference_transfer.py", "skills/reference-texture-transfer/scripts/test_reference_transfer.py"]
 LEGACY_MCP_FILES = [".mcp.json", "mcp.json"]
 LEGACY_DEPLOYMENT_FILES = ["Dockerfile", "wrangler.toml", "package.json"]
 FORBIDDEN_ACTIVE_CALLS = ["create_addon_project", "create_addon_item", "create_addon_block", "create_addon_recipe", "create_addon_entity", "search_mojang_samples", "read_mojang_sample", "audit_texture_links", "diff_packs"]
@@ -80,6 +80,13 @@ def check(root: Path) -> dict:
  png_test=root/"skills/visual-resource-pipeline/scripts/test_png_engine.py"
  png_ok=png_script.is_file() and png_test.is_file()
  add("png-engine","PASS" if png_ok else "FAIL","Canonical PNG validator and focused tests are present")
+ transfer_script=root/"skills/reference-texture-transfer/scripts/reference_transfer.py"
+ transfer_test=root/"skills/reference-texture-transfer/scripts/test_reference_transfer.py"
+ transfer_text=transfer_script.read_text(encoding="utf-8") if transfer_script.is_file() else ""
+ transfer_contract=all(token in transfer_text for token in ("def transfer(", "decode_png_rgba", "allow_uv_overlap", "MAX_TEXEL_WRITES", "_exclusive_write", "sha256", "geometry_identifier"))
+ transfer_imports=re.search(r"(?im)^\s*(?:from|import)\s+(?:server|.*_mcp|mcp(?:\.|\s))", transfer_text) is None
+ transfer_ok=transfer_script.is_file() and transfer_test.is_file() and transfer_contract and transfer_imports
+ add("reference-texture-transfer","PASS" if transfer_ok else "FAIL","Standalone reference-transfer CLI, guarded PNG/UV pipeline, tests and no legacy server/MCP import dependencies" if transfer_ok else "Reference transfer script/tests, required contracts or independence check missing")
  add("readme-version","PASS" if h and versions[0]==h.group(1) else "FAIL",f"README heading version: {h.group(1) if h else 'missing'}")
  rok="Skills-and-instructions-only" in readme and "does not use MCP" in readme
  add("readme-architecture","PASS" if rok else "FAIL","README documents the intentional Skills-only architecture" if rok else "README must explicitly say Skills-and-instructions-only and does not use MCP")

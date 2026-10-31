@@ -30,3 +30,7 @@ This Skill is an instruction and review procedure. The package does not include 
 ## Limits
 
 The available static entity audit does not execute Molang, simulate state transitions, measure blend timing or validate every engine-specific controller rule. Minecraft import, transitions, interruption, looping, blending and multiplayer behavior remain NOT RUN until tested in the requested game build.
+
+## Required report
+
+Include target version, project/entity/controller identifiers, initial state, states and transitions count, referenced animation aliases, files created/updated or proposed, checks actually run, Molang/runtime caveats and in-game test plan. Mark all unperformed runtime behavior NOT RUN.

@@ -29,8 +29,10 @@ Check the script's current help before using additional options. Do not infer un
 - Literal aliases and selected dependency edges.
 - Parse failures, duplicate JSON keys, ambiguous paths and incomplete scans.
 
-Report the exact roots, files scanned and parsed, findings, unresolved edges, analysis completeness and report path.
+Report the exact roots, files scanned, finding paths and pointers, audit limits and completion status. Do not treat a partial scan as a clean result.
 
 ## Limits
 
-The audit is conservative and static. It does not evaluate Molang, run animation clips, simulate controller states, render geometry, validate every engine schema or launch Minecraft. Do not call it a full animation validator. Runtime and Blockbench checks remain NOT RUN unless actually performed.
+This conservative static audit does not evaluate Molang, execute scripts, render geometry, prove animation playback or fully validate Bedrock schemas. It cannot infer all dynamic resource references.
+
+Minecraft import, rendering, animation playback, controller transitions, multiplayer and Blockbench checks remain NOT RUN until genuinely performed in the target environment.

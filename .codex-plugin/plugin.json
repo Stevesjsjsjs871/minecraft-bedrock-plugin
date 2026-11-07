@@ -25,7 +25,7 @@
     ]
   },
   "name": "minecraft-bedrock-engineer",
-  "version": "1.8.0",
+  "version": "2.3.4",
   "description": "Minecraft Bedrock Engineer — Skills-first development, research, authoring guidance, BP/RP audits, geometry, animation, UV and texture workflows.",
   "author": {
     "name": "Plugin owner"

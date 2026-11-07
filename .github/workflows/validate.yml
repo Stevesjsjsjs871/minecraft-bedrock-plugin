@@ -2,7 +2,7 @@ name: Validate Minecraft Bedrock Engineer
 
 on:
   push:
-    branches: ["feat/cloudflare-workers-mcp"]
+    branches: ["feat/cloudflare-workers-mcp", "release/2.3.4"]
   pull_request:
   workflow_dispatch:
 
@@ -34,7 +34,7 @@ jobs:
           python - <<'PY'
           import json
           from pathlib import Path
-          expected = "1.5.11"
+          expected = "2.3.4"
           assert Path("VERSION").read_text().strip() == expected
           root = json.loads(Path("plugin.json").read_text())
           compat = json.loads(Path(".codex-plugin/plugin.json").read_text())

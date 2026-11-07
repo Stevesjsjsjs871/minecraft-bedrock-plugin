@@ -1,3 +1,11 @@
+## 2.3.4 — Consolidated domain entry points
+
+- Consolidates seven requested areas: Geometry & UV, Project Continuity, Baseline Regression, Creator Tools, Add-on Authoring, Reference Texture Transfer and Release Engineering.
+- Reduces the Skill inventory from 70 to 59 by retiring 11 redundant entry Skills; preserves independent specialist procedures, scripts, tests and approval gates.
+- Preserves 14 domains, 8 workflow profiles, all 12 default prompts and plugin identity.
+- Validation: 32/32 test files and 548/548 cases PASS; architecture 28/28 PASS; strict package integrity 20/20 PASS with zero warnings; 64 Python registry hashes match.
+- Activation matrix: 295 scenarios designed, all NOT RUN on target Plugin Host. Creator Tools integration and Minecraft runtime remain NOT RUN. Candidate is unpublished.
+
 # Plugin package changelog
 
 ## 1.8.0 — Standalone reference texture transfer and validation hardening

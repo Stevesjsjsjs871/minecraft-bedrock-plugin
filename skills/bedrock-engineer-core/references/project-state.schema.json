@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "project-state.schema.json",
+  "title": "Minecraft Bedrock Engineer Project State",
+  "description": "Integrity-checked metadata and file-inventory pointer for a single Bedrock project. Inventory snapshots contain hashes, not file backups.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "project", "revision", "created_at", "updated_at", "latest_snapshot", "last_complete_snapshot", "records", "history", "last_event_hash", "integrity"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "target_game_version", "source_of_truth", "pack_roots", "constraints", "preserve"],
+      "properties": {
+        "id": {"type": "string", "format": "uuid"},
+        "name": {"type": "string", "minLength": 1},
+        "target_game_version": {"type": ["string", "null"]},
+        "source_of_truth": {"type": "string"},
+        "pack_roots": {"type": "array", "items": {"type": "string"}},
+        "constraints": {"type": "array", "items": {"type": "string"}},
+        "preserve": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "revision": {"type": "integer", "minimum": 1},
+    "created_at": {"type": "string", "format": "date-time"},
+    "updated_at": {"type": "string", "format": "date-time"},
+    "latest_snapshot": {"$ref": "#/$defs/snapshotReference"},
+    "last_complete_snapshot": {"$ref": "#/$defs/snapshotReference"},
+    "records": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision", "requirement", "feature", "issue", "task", "test", "note"],
+      "properties": {
+        "decision": {"$ref": "#/$defs/recordList"},
+        "requirement": {"$ref": "#/$defs/recordList"},
+        "feature": {"$ref": "#/$defs/recordList"},
+        "issue": {"$ref": "#/$defs/recordList"},
+        "task": {"$ref": "#/$defs/recordList"},
+        "test": {"$ref": "#/$defs/recordList"},
+        "note": {"$ref": "#/$defs/recordList"}
+      }
+    },
+    "history": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/event"}},
+    "last_event_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "state_sha256"],
+      "properties": {
+        "algorithm": {"const": "sha256"},
+        "state_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+      }
+    }
+  },
+  "$defs": {
+    "snapshotReference": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["id", "sha256", "created_at", "complete", "file_count"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^snapshot-[a-f0-9]{32}$"},
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "created_at": {"type": "string", "format": "date-time"},
+        "complete": {"type": "boolean"},
+        "file_count": {"type": "integer", "minimum": 0}
+      }
+    },
+    "recordList": {"type": "array", "items": {"$ref": "#/$defs/record"}},
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "category", "title", "status", "details", "evidence", "source", "created_at", "updated_at", "created_revision", "updated_revision", "updates"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^rec-[a-f0-9]{32}$"},
+        "category": {"enum": ["decision", "requirement", "feature", "issue", "task", "test", "note"]},
+        "title": {"type": "string", "minLength": 1},
+        "status": {"type": "string", "minLength": 1},
+        "details": {"type": "string"},
+        "evidence": {"type": "array", "items": {"type": "string"}},
+        "source": {"type": "string"},
+        "created_at": {"type": "string", "format": "date-time"},
+        "updated_at": {"type": "string", "format": "date-time"},
+        "created_revision": {"type": "integer", "minimum": 1},
+        "updated_revision": {"type": "integer", "minimum": 1},
+        "updates": {"type": "array", "items": {"type": "object"}}
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["revision", "timestamp", "kind", "summary", "payload", "previous_event_hash", "event_hash"],
+      "properties": {
+        "revision": {"type": "integer", "minimum": 1},
+        "timestamp": {"type": "string", "format": "date-time"},
+        "kind": {"type": "string", "minLength": 1},
+        "summary": {"type": "string"},
+        "payload": {"type": "object"},
+        "previous_event_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "event_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+      }
+    }
+  }
+}

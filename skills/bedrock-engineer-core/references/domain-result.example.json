@@ -1,0 +1,46 @@
+{
+  "domain_id": "bp_rp_authoring",
+  "status": "PASS",
+  "summary": "The requested BP/RP changes were applied and statically checked.",
+  "findings": [],
+  "changed_files": [
+    {
+      "path": "behavior_packs/example/manifest.json",
+      "action": "modified",
+      "status": "VERIFIED"
+    },
+    {
+      "path": "resource_packs/example/items/example.item.json",
+      "action": "added",
+      "status": "APPLIED"
+    }
+  ],
+  "evidence": [
+    {
+      "check": "manifest JSON parse",
+      "status": "PASS",
+      "details": "Both manifests parsed with duplicate-key rejection."
+    },
+    {
+      "check": "Minecraft import",
+      "status": "NOT RUN",
+      "details": "The candidate was not imported into a game runtime."
+    }
+  ],
+  "limitations": [
+    "Static validation does not prove in-game behavior."
+  ],
+  "next_domains": [
+    "audit_validation"
+  ],
+  "runtime_status": "NOT RUN",
+  "criterion_results": [
+    {
+      "criterion": "BP/RP manifests and their dependency links remain valid.",
+      "status": "MET",
+      "evidence": [
+        "BP header dependency matches the inspected RP header UUID and version."
+      ]
+    }
+  ]
+}

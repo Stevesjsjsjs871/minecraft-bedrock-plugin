@@ -1,0 +1,28 @@
+{
+  "target_version": "1.26.50",
+  "entity_identifier": "example:forest_guardian",
+  "behavior_pack": {
+    "entity_definition": "entities/forest_guardian.json"
+  },
+  "resource_pack": {
+    "client_entity": "entity/forest_guardian.entity.json",
+    "geometry_identifier": "geometry.forest_guardian",
+    "geometry_file": "models/entity/forest_guardian.geo.json",
+    "texture_aliases": {
+      "default": "textures/entity/forest_guardian"
+    },
+    "animation_aliases": {
+      "idle": "animation.forest_guardian.idle",
+      "move": "controller.animation.forest_guardian.move"
+    },
+    "render_controllers": [
+      "controller.render.forest_guardian"
+    ]
+  },
+  "verification": {
+    "static_graph": "run audit_entity_pipeline.py and inspect all findings",
+    "png_integrity": "run the canonical PNG validator separately",
+    "uv_integrity": "run geometry-uv-engine / geometry-uv-engine separately",
+    "runtime": "NOT RUN until tested in the exact Minecraft build"
+  }
+}

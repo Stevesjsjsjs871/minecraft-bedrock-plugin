@@ -5,10 +5,10 @@ description: Use when creating new Minecraft Bedrock add-on content and selectin
 
 # Mojang Samples–Driven Authoring
 
-Use the user-provided Mojang `bedrock-samples` archive as a version-specific reference when creating content. It is a reference corpus, not a blanket permission to redistribute vanilla assets. Pair this skill with `addon-creation` for project setup and `automated-validation` for independent static checks.
+Use the user-provided Mojang `bedrock-samples` archive as a version-specific reference when creating content. Keep the pinned 1.26.50.4 corpus and the separately indexed 2026-11-07 `main` branch snapshot distinct; the latter manifests declare minimum engine 1.26.60 but its Git commit is not pinned, so it is not interchangeable with a release-tagged sample set. It is a reference corpus, not a blanket permission to redistribute vanilla assets. Pair this skill with `addon-creation` for project setup and `automated-validation` for independent static checks.
 
 ## Source identity
-The archive index in `references/mojang-samples-1.26.50.4/INDEX_METADATA.json` records the uploaded archive SHA-256. If the user supplies another archive or changes its contents, build a new index with `skills/bedrock-development/scripts/index_mojang_samples.py` and record its hash. Do not conflate release samples with preview samples.
+The pinned archive index in `skills/bedrock-development/references/mojang-samples-1.26.50.4/INDEX_METADATA.json` records the uploaded archive SHA-256. The separately supplied main-branch archive index is in `skills/bedrock-development/references/mojang-samples-main-2026-11-07/index.json.gz`; its provenance is an archive hash, not a commit SHA. If the user supplies another archive or changes its contents, build a new index with `skills/bedrock-development/scripts/index_mojang_samples.py` and record its hash. Do not conflate release samples with preview samples.
 
 ## Authoring method
 1. Resolve target game version and requested type (item, block, recipe, entity, geometry, animation, controller, UI, localization, loot table, or script).

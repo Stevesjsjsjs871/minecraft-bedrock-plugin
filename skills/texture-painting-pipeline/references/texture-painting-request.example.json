@@ -1,0 +1,34 @@
+{
+  "project_directory": "forest-addon",
+  "geometry_path": "resource_packs/forest-addon_RP/models/entity/guardian.geo.json",
+  "geometry_identifier": "geometry.guardian",
+  "source_texture_path": "resource_packs/forest-addon_RP/textures/entity/guardian_base.png",
+  "output_path": "resource_packs/forest-addon_RP/textures/entity/guardian_painted.png",
+  "allow_uv_overlap": false,
+  "operations": [
+    {
+      "selector": {
+        "bone": "body",
+        "cube_index": 0,
+        "face": "north"
+      },
+      "mode": "fill",
+      "color": "#B7A17A",
+      "opacity": 255,
+      "blend_mode": "over"
+    },
+    {
+      "selector": {
+        "bone": "body",
+        "cube_index": 0,
+        "face": "south"
+      },
+      "mode": "checker",
+      "color": "#7B6246",
+      "secondary_color": "#9A805E",
+      "cell_size": 2,
+      "opacity": 200,
+      "blend_mode": "over"
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 ---
 name: validation-runbook
-description: Use to run and report the current Skills-only Minecraft Bedrock Engineer package validation suite without relying on retired MCP/server tests.
+description: Use to run and report the current Skills-only Minecraft Bedrock Engineer package validation suite using only the current Skills-local test suite.
 ---
 
 # Skills-only validation runbook
@@ -26,7 +26,7 @@ python -m unittest discover -s skills/audit-benchmark/scripts -p 'test_*.py' -v
 python -m unittest discover -s skills/bedrock-development/scripts -p 'test_*.py' -v
 python -m unittest discover -s skills/visual-resource-pipeline/scripts -p 'test_*.py' -v
 ```
-Run only suites whose files are present in this candidate. Do not use stale `server/tests` or MCP registry suites as the current Skills-only release gate.
+Run only suites whose files are present in this candidate. The current Skills-only test inventory is discovered only under `skills/`; no legacy protocol test tree is shipped.
 
 ## 4. Project audit and regression
 Inspect `bedrock_audit.py --help` before choosing arguments. Run the auditor against a supplied test pack or candidate, then run the regression harness with its documented options. Validate the report schema only if the required validator is already available; do not silently install dependencies.

@@ -1,6 +1,6 @@
 ---
 name: geometry-uv-engine
-description: Inspect Bedrock geometry cube layouts and UV face bounds and generate reproducible UV guide images from supported geometry formats.
+description: Use to audit Minecraft Bedrock geometry UVs, render UV template guides, or validate PNG assets; includes geometry-audit, template-authoring and PNG-check modes.
 ---
 
 # Geometry & UV Engine
@@ -9,9 +9,9 @@ This skill defines a deterministic workflow, not a remote tool. It does not crea
 
 ## Current implementation boundary
 
-Existing legacy sources contain reusable algorithms for classic box UV and per-face UV inspection, overlap detection, bounds validation, template rasterization and PNG encoding. They remain preserved in `server/` as dormant migration sources until dependencies are separated and legacy tests are adapted. This skill does not advertise those old wrappers as active callable integrations.
+The current package ships standalone implementations for classic box UV and per-face UV inspection, overlap detection, bounds validation, template rasterization and PNG encoding. No retired server/protocol wrapper is required or included.
 
-The standalone `scripts/geometry_engine.py` parses `.geo.json` and audits supported classic box/per-face cube UV rectangles, bounds and overlaps. `scripts/uv_template_engine.py` renders a labeled transparent PNG UV guide for those supported cube formats. `scripts/png_engine.py` validates PNG integrity.
+The standalone `scripts/geometry_engine.py` parses `.geo.json` and audits supported classic box/per-face cube UV rectangles, bounds and overlaps. `scripts/uv_template_engine.py` renders a labeled transparent PNG UV guide for those supported cube formats. `scripts/png_engine.py` validates PNG integrity. For explicit reference-crop mapping onto exact UV faces, use `skills/uv-texture-retargeting/scripts/reference_transfer.py` after reviewing `reference-mapping-review`; it is a separate deterministic local utility.
 
 ## Safe geometry/UV audit procedure
 
@@ -35,4 +35,14 @@ The standalone `scripts/geometry_engine.py` parses `.geo.json` and audits suppor
 
 ## Migration status
 
-The static geometry parser and UV bounds/overlap analyzer are migrated into a standalone CLI with focused tests. The standalone renderer is migrated with a focused test suite. The legacy server source remains preserved for dependency-aware cleanup. The renderer does not provide poly-mesh projections, client-entity texture binding, PNG-to-canvas matching or actual renderer sampling.
+The static geometry parser and UV bounds/overlap analyzer, standalone UV template renderer, PNG validator and explicit reference-texture transfer core are available as local scripts with focused tests. The package contains no legacy server/protocol source tree. These scripts do not provide poly-mesh projections, client-entity texture binding, semantic portrait matching or actual renderer sampling.
+
+## Consolidated modes: Geometry & UV
+
+This Skill is the canonical entry for geometry/UV operations formerly exposed through `geometry-uv-engine` and `geometry-uv-engine`. Select only the required mode:
+
+- **audit** — inspect `.geo.json`, geometry identifiers, cube bounds, face UV bounds, overlaps and supported geometry constraints; report findings without rewriting source.
+- **render-template** — generate a separate labeled transparent UV guide PNG from supported geometry, using explicit output path, pixel scale and maximum-pixel budget.
+- **png-check** — inspect PNG integrity, dimensions and hashes. PNG validity does not prove agreement with the intended texture canvas, face orientation or game renderer.
+
+Implementation remains in this Skill's existing `geometry_engine.py`, `uv_template_engine.py` and `png_engine.py`; preserve their existing CLI contracts, tests and paths. The focused geometry, template and PNG suites are separate acceptance checks (10, 8 and 18 cases respectively). Poly-mesh/texture-mesh UV projection remains unsupported. Do not imply template rendering emulates Minecraft's renderer. Reference-image semantic mapping is outside this Skill and must use `uv-texture-retargeting` plus the separate human `reference-mapping-review` gate.

@@ -1,0 +1,20 @@
+path,change_type,reason
+skills/addon-creation/SKILL.md,modified,route shared code quality contract
+skills/addon-creation/SKILL.md,modified,route shared code quality contract
+skills/addon-creation/SKILL.md,modified,route shared code quality contract
+skills/cooking-addon-engineering/SKILL.md,modified,route shared code quality contract
+skills/entity-authoring/SKILL.md,modified,route shared code quality contract
+skills/entity-authoring-pipeline/SKILL.md,modified,route shared code quality contract
+skills/animated-entity-bundle-authoring/SKILL.md,modified,route shared code quality contract
+skills/bedrock-engineer-core/SKILL.md,modified,Core code authoring contract
+skills/bedrock-development/SKILL.md,modified,Script API authoring checklist
+references/code-quality-standard.md,unchanged,shared source standard retained
+VERSION,modified,plugin candidate version 2.3.2
+plugin.json,modified,plugin candidate version 2.3.2
+RELEASE_NOTES_2.3.2.md,added,release documentation
+CHANGE_MANIFEST_2.3.2.csv,added,change inventory
+VALIDATION_REPORT_2.3.2.md,added,local validation evidence
+VERSION_HISTORY.md,modified,record candidate version history
+README.md,modified,document 2.3.2 changes and validation
+CHANGELOG.md,modified,record 2.3.2 changes
+.codex-plugin/plugin.json,modified,version parity 2.3.2

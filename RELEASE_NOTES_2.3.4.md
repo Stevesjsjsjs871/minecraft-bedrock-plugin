@@ -1,31 +1,20 @@
-# Release notes — 2.3.4
+# MBE 2.3.4 — Domain consolidation
 
-**Status:** unpublished candidate; this GitHub branch is a staging branch, not a live Plugin Creator release.
+Consolidates Geometry & UV, Project Continuity, Baseline Regression, Creator Tools, Add-on Authoring, Reference Texture Transfer and Release Engineering into canonical Skill entry points with explicit modes. Eleven redundant entry Skills were retired (70 → 59); distinct specialist procedures, scripts, tests, human approval gates and release boundaries remain.
 
-## Consolidated areas
+## Preserved package contracts
 
-- Geometry & UV: `geometry-uv-engine`.
-- Project continuity: `project-continuity`, with the separate `project-state-management` utility contract.
-- Baseline regression: `addon-baseline-diff`.
-- Creator Tools: `creator-tools-bridge`.
-- Add-on authoring: `addon-creation`.
-- Reference texture transfer: `uv-texture-retargeting`.
-- Release engineering: `release-artifact-workflow` and `release-quality-gate`.
-
-## Package facts
-
-- 59 Skills, 14 domains, 8 workflow profiles.
-- 64 Python registry entries with checked SHA-256 values.
-- 295 target-host activation scenarios designed; all NOT RUN.
-- 12 default prompts and plugin identity preserved.
+- 14 domains and 8 workflow profiles.
+- All 12 default prompts and plugin identity.
 - Skills-only architecture; no MCP service, server, remote execution backend or new runtime.
+- 64 Python registry entries with matching file hashes.
 
 ## Validation
 
-- 32/32 test files and 548/548 cases PASS.
-- Architecture validator 28/28 PASS.
-- Strict package integrity 20/20 PASS, zero warnings.
-- Python compilation PASS; Markdown relative-link scan: zero broken links.
-- Plugin Host activation, packaged-script integration, Creator Tools connection and Minecraft runtime remain NOT VERIFIED / NOT RUN.
+- Python tests: 32/32 files, 548/548 cases PASS.
+- Architecture: 28/28 PASS.
+- Strict package integrity: 20/20 PASS, zero warnings.
+- Activation matrix: 295 designed cases, all NOT RUN on target Plugin Host.
+- Plugin Host integration, Creator Tools integration and Minecraft runtime: NOT VERIFIED / NOT RUN.
 
-These are local candidate validation results; they are not evidence of GitHub package completeness or target-host runtime behavior.
+This is an unpublished local candidate. No live publication was performed.

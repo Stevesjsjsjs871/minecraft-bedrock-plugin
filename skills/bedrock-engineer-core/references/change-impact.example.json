@@ -1,0 +1,150 @@
+{
+  "changed_paths": [
+    "resource_packs/demo_rp/animations/guardian.animation.json"
+  ],
+  "coverage": {
+    "files_exceeding_total_byte_budget": 0,
+    "ignored_directories": [
+      ".git",
+      ".mbe",
+      ".mypy_cache",
+      ".pytest_cache",
+      ".ruff_cache",
+      ".tox",
+      ".venv",
+      "__pycache__",
+      "build",
+      "dist",
+      "node_modules",
+      "venv"
+    ],
+    "parse_skipped_size": 0,
+    "scanned_bytes": 1765,
+    "scanned_files": 16,
+    "symlinks_skipped": 0,
+    "truncated": false,
+    "unreadable_entries": 0
+  },
+  "edges": [
+    {
+      "confidence": "HIGH",
+      "from": "behavior_packs/demo_bp/manifest.json",
+      "kind": "manifest_dependency",
+      "reference": "33333333-3333-4333-8333-333333333333",
+      "to": "resource_packs/demo_rp/manifest.json"
+    },
+    {
+      "confidence": "MEDIUM",
+      "from": "behavior_packs/demo_bp/recipes/sword.json",
+      "kind": "item_reference",
+      "reference": "demo:ore",
+      "to": "behavior_packs/demo_bp/items/ore.json"
+    },
+    {
+      "confidence": "MEDIUM",
+      "from": "behavior_packs/demo_bp/recipes/sword.json",
+      "kind": "item_reference",
+      "reference": "demo:sword",
+      "to": "behavior_packs/demo_bp/items/sword.json"
+    },
+    {
+      "confidence": "HIGH",
+      "from": "behavior_packs/demo_bp/scripts/main.js",
+      "kind": "script_import",
+      "reference": "./helper.js",
+      "to": "behavior_packs/demo_bp/scripts/helper.js"
+    },
+    {
+      "confidence": "HIGH",
+      "from": "resource_packs/demo_rp/entity/guardian.entity.json",
+      "kind": "entity_client_binding",
+      "reference": "demo:guardian",
+      "to": "behavior_packs/demo_bp/entities/guardian.json"
+    },
+    {
+      "confidence": "HIGH",
+      "from": "resource_packs/demo_rp/entity/guardian.entity.json",
+      "kind": "animation_controller_binding",
+      "reference": "controller.animation.guardian",
+      "to": "resource_packs/demo_rp/animation_controllers/guardian.controller.json"
+    },
+    {
+      "confidence": "HIGH",
+      "from": "resource_packs/demo_rp/entity/guardian.entity.json",
+      "kind": "animation_alias",
+      "reference": "animation.guardian.idle",
+      "to": "resource_packs/demo_rp/animations/guardian.animation.json"
+    },
+    {
+      "confidence": "HIGH",
+      "from": "resource_packs/demo_rp/entity/guardian.entity.json",
+      "kind": "geometry_alias",
+      "reference": "geometry.guardian",
+      "to": "resource_packs/demo_rp/models/entity/guardian.geo.json"
+    },
+    {
+      "confidence": "HIGH",
+      "from": "resource_packs/demo_rp/entity/guardian.entity.json",
+      "kind": "render_controller_binding",
+      "reference": "controller.render.guardian",
+      "to": "resource_packs/demo_rp/render_controllers/guardian.render_controllers.json"
+    },
+    {
+      "confidence": "HIGH",
+      "from": "resource_packs/demo_rp/entity/guardian.entity.json",
+      "kind": "texture_alias",
+      "reference": "textures/entity/guardian",
+      "to": "resource_packs/demo_rp/textures/entity/guardian.png"
+    },
+    {
+      "confidence": "HIGH",
+      "from": "resource_packs/demo_rp/ui/hud_screen.json",
+      "kind": "$ui_defs_path",
+      "reference": "ui/widgets.json",
+      "to": "resource_packs/demo_rp/ui/widgets.json"
+    }
+  ],
+  "findings": [],
+  "impact": [
+    {
+      "confidence": "HIGH",
+      "depth": 0,
+      "impact": "DIRECT",
+      "path": "resource_packs/demo_rp/animations/guardian.animation.json",
+      "via": []
+    },
+    {
+      "confidence": "HIGH",
+      "depth": 1,
+      "impact": "INDIRECT",
+      "path": "resource_packs/demo_rp/entity/guardian.entity.json",
+      "relationship": "animation_alias",
+      "via": [
+        "resource_packs/demo_rp/animations/guardian.animation.json"
+      ]
+    }
+  ],
+  "limitations": [
+    "This is static dependency analysis; it does not evaluate Molang, scripts, runtime-discovered identifiers or Minecraft loading behavior.",
+    "Some Bedrock references use aliases, generated paths or pack-specific conventions that cannot be resolved statically.",
+    "Unresolved/ambiguous references are review signals, not proof that a feature is broken.",
+    "The analyzer never edits, deletes, executes or packages project files."
+  ],
+  "project_root_name": "synthetic-bedrock-addon",
+  "schema_version": "1.0.0",
+  "summary": {
+    "affected_files": 1,
+    "ambiguous_references": 0,
+    "changed_dependency_misses": 0,
+    "changed_paths_present": 1,
+    "declared_identifiers": 8,
+    "direct_changes": 1,
+    "graph_edges": 11,
+    "high_severity_findings": 0,
+    "parse_failures": 0,
+    "parsed_json_files": 13,
+    "parsed_script_files": 2,
+    "status": "PASS",
+    "unresolved_references": 0
+  }
+}

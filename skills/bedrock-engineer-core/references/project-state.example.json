@@ -1,0 +1,51 @@
+{
+  "schema_version": "1.0.0",
+  "project": {
+    "id": "2a68261f-3e0c-4db8-aa53-1db348a2ef15",
+    "name": "Example Bedrock Add-on",
+    "target_game_version": "1.26.50",
+    "source_of_truth": "the inspected project workspace",
+    "pack_roots": ["behavior_packs/example_bp", "resource_packs/example_rp"],
+    "constraints": ["preserve existing identifiers"],
+    "preserve": ["existing recipes and entity behaviors"]
+  },
+  "revision": 1,
+  "created_at": "2026-10-31T12:00:00Z",
+  "updated_at": "2026-10-31T12:00:00Z",
+  "latest_snapshot": {
+    "id": "snapshot-8ebf9bb44e3d44b2b3e8e947a1c2d3e4",
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "created_at": "2026-10-31T12:00:00Z",
+    "complete": true,
+    "file_count": 42
+  },
+  "last_complete_snapshot": {
+    "id": "snapshot-8ebf9bb44e3d44b2b3e8e947a1c2d3e4",
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "created_at": "2026-10-31T12:00:00Z",
+    "complete": true,
+    "file_count": 42
+  },
+  "records": {
+    "decision": [],
+    "requirement": [],
+    "feature": [],
+    "issue": [],
+    "task": [],
+    "test": [],
+    "note": []
+  },
+  "history": [
+    {
+      "revision": 1,
+      "timestamp": "2026-10-31T12:00:00Z",
+      "kind": "project.initialized",
+      "summary": "Created initial state and file inventory.",
+      "payload": {"snapshot_id": "snapshot-8ebf9bb44e3d44b2b3e8e947a1c2d3e4", "complete": true, "file_count": 42},
+      "previous_event_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "event_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ],
+  "last_event_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "integrity": {"algorithm": "sha256", "state_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"}
+}

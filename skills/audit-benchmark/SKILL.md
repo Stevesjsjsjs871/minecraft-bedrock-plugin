@@ -29,3 +29,13 @@ Measure whether the static auditor finds the reviewed issues it claims to check,
 - A benchmark miss can be caused by analyzer behavior, rule-title drift, path normalization, or an incomplete label. Inspect each mismatch before assigning blame.
 - A pack downloaded from the internet is not automatically redistributable. The benchmark may retain local-only hashes and labels without packaging the original file.
 - Synthetic tests still protect known regressions; benchmark results complement them and do not replace runtime testing.
+
+## Optional real-pack corpus inventory
+
+To create a metadata-only inventory from explicitly supplied local `.mcpack`, `.mcaddon` or `.zip` files:
+
+```bash
+python skills/audit-benchmark/scripts/real_pack_benchmark_builder.py pack-a.mcpack pack-b.mcaddon --output corpus-inventory.json
+```
+
+The builder records archive SHA-256, bounded ZIP member metadata and small readable manifest headers. It does not extract archives, execute pack code, assign labels, run the Bedrock auditor, or calculate precision/recall. The result status is `INVENTORY_ONLY`; independent review and the existing evaluator workflow remain mandatory.

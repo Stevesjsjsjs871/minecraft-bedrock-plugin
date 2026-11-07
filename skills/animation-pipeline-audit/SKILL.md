@@ -1,37 +1,46 @@
 ---
 name: animation-pipeline-audit
-description: Use when checking whether a Minecraft Bedrock entity's RP animation clips, animation-controller state machines, client-entity aliases, scripts.animate entries, geometry identifiers and model bone names form a consistent end-to-end graph.
+description: Use when auditing the end-to-end Bedrock entity animation graph linking client-entity aliases, animation clips, controller states, geometry identifiers and model bone names.
 ---
 
-# End-to-end entity animation pipeline audit
+# End-to-end Entity Animation Pipeline Audit
 
-## Purpose
+## Purpose and real implementation
 
-Use `audit_entity_animation_pipeline` after adding or changing animation clips, animation controllers or entity geometry. It performs a read-only cross-resource audit for one Resource Pack client entity; it does not generate or rewrite any files.
+Use the bundled read-only utility `skills/entity-authoring-pipeline/scripts/audit_entity_pipeline.py` when a real Python executor can access the package and the selected BP/RP project. This Skill does not expose an MCP tool named `audit_entity_animation_pipeline` and does not provide a hosted file scanner. If the script or project is unavailable, perform a bounded manual inspection or report the check `BLOCKED`/`NOT RUN`.
 
-## What it checks
+## Inputs and command
 
-1. Confirms the selected project is an existing linked BP/RP scaffold and reads only within that project.
-2. Inventories the entity's `description.animations`, `description.geometry` and `description.scripts.animate` references.
-3. Indexes exact animation identifiers from RP `animations/`, controller identifiers from `animation_controllers/`, and geometry identifiers from `models/entity/`.
-4. Detects missing, duplicated or ambiguous definitions and unresolved aliases.
-5. Checks that each controller state's animation entries refer to aliases in this client entity and that transition destinations resolve to states in the same controller.
-6. Checks nested controller references for cycles.
-7. Compares clip bone names with the bones in every geometry variant declared by this client entity. Unknown names are warnings, not automatic proof of a broken pack; a clip may intentionally target a different geometry variant.
-8. Performs bounded structural checks on clip lengths, channels, keyframe timestamps, numeric duplicate timestamps and discontinuous pre/post keyframes. JSON object property order is not treated as semantic keyframe order.
+Required: exact BP root and RP root from one linked project. Optional: an exact `namespace:entity` filter. From the plugin package root:
+
+```bash
+python skills/entity-authoring-pipeline/scripts/audit_entity_pipeline.py \
+  --bp-root <behavior-pack-root> \
+  --rp-root <resource-pack-root> \
+  --entity-id namespace:entity \
+  --output animation-pipeline-report.json
+
+python skills/entity-authoring-pipeline/scripts/test_audit_entity_pipeline.py -v
+```
+
+Omit `--entity-id` to audit all entities covered by the utility. Inspect `--help` and the script source before use if the installed package differs. The test command checks the utility itself; it does not validate the user's pack.
+
+## Current static coverage
+
+The utility parses supported JSON and inventories literal entity/client-entity, geometry, texture, animation, controller and render-controller relationships. It checks client-entity `description.animations`, `description.geometry` and `scripts.animate`; literal clip/controller/geometry identifiers and aliases; controller state animation aliases and transition destinations; nested controller references; and clip bone names against declared geometry variants. It reports duplicate, missing, ambiguous and uncertain/external references conservatively.
 
 ## Interpretation
 
-- `HIGH` findings are exact missing/ambiguous resources, invalid graph references or unsafe/malformed inputs.
-- `WARNING` findings include potential bone mismatches and suspicious controller cycles; consider the specific entity/geometry context before changing anything.
-- `INFO` findings describe nonstandard or external/dynamic references that this static index cannot resolve.
-- `analysis_complete=false` means a scan limit, unsafe path or parse failure reduced coverage. Do not treat a partial graph as a clean audit.
-- Vanilla resources outside this RP may be external dependencies. Missing identifiers that share the client entity's namespace are reported as local missing resources; different-namespace and unqualified identifiers are conservatively reported as external/uncertain `INFO` references. This namespace heuristic is not proof of pack ownership.
+- `HIGH`: strong evidence of exact missing/ambiguous resources, invalid literal graph edges or unsafe/malformed input.
+- `WARNING`: potential bone mismatches, suspicious cycles or questionable structure; review context before changing anything.
+- `INFO`: dynamic, external or nonstandard references the static analyzer cannot resolve.
+- `analysis_complete=false`: a limit, unsafe path or parse error reduced coverage. Do not present it as a clean audit.
+- Vanilla assets outside the RP and other-pack dependencies may be external. Namespace heuristics are not proof of ownership.
 
-## Limits
+## Limits and next checks
 
-The audit does not evaluate Molang, infer dynamic resource names, execute scripts, render geometry, measure interpolation/blending, or launch Minecraft. It is not a complete engine schema validator. In-game behavior remains `NOT RUN` unless a real target-version test was performed.
+This is not a complete Bedrock schema validator. It does not evaluate Molang, infer dynamic resource names, execute scripts, render geometry, simulate interpolation/blending, inspect runtime controller priority, validate all PNG data or launch Minecraft. Pair it with geometry/UV, PNG, dependency-closure and full pack audits where relevant. Runtime remains `NOT RUN` until the exact target build is tested.
 
 ## Required report
 
-Report entity identifier, files scanned/parsed by category, resolved alias counts, controller state/transition counts, findings with exact paths and JSON pointers, `analysis_complete`, Molang status and Minecraft runtime status. Never delete a resource based solely on this audit.
+Return entity filter, BP/RP roots, files parsed/scanned by category, resolved and unresolved alias counts, controller state/transition counts, findings with exact paths and JSON pointers, `analysis_complete`, skipped/unsupported cases, command and exit code, utility test result (separate from pack result), Molang status and Minecraft runtime status. Never delete resources solely because this audit cannot resolve them.

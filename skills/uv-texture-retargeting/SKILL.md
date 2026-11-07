@@ -1,43 +1,61 @@
 ---
 name: uv-texture-retargeting
-description: Convert a reviewed image reference into a Bedrock entity texture in one guarded operation by validating explicit source crops and exact geometry UV face selectors, planning the mapping, applying PNG transfer, and verifying the result.
+description: Use to plan, review and deterministically transfer reference-image pixels onto exact Minecraft Bedrock geometry UV faces.
 ---
 
 # UV Texture Retargeting
 
-Use `retarget_texture_to_entity` when a creator has a reference sheet and an existing Bedrock geometry and wants the reviewed texture mapping applied in one request.
+## Purpose and capability boundary
+
+This is a coordinated workflow, not a single bundled tool. The current package contains no `retarget_texture_to_entity`, `build_uv_mapping_plan` or `map_reference_texture_to_uv` tool. Use the real local scripts `analyze_visual_reference.py` and `reference_transfer.py` only when a Python executor can access the plugin package and project. Otherwise prepare a manual mapping/transfer request and mark it `NOT APPLIED`.
 
 ## Required inputs
 
-- Existing project directory.
-- Exact `.geo.json` path and geometry identifier.
-- Reference PNG already in the selected Resource Pack.
-- New output PNG path under `textures/entity/`.
-- One or more explicit source crop rectangles (`x`, `y`, `width`, `height`) mapped to exact geometry selectors (`bone`, `cube_index`, `face`).
-- A short human-authored semantic label for every mapping.
-- `approved: true` for every assignment and `review_confirmed: true` at the request level, set only after visual inspection.
+- Existing project directory and linked RP.
+- Exact `.geo.json` path and geometry identifier when more than one is present.
+- Reference PNG inside the project RP textures tree.
+- Optional base texture whose pixels should be preserved outside mapped regions.
+- New, non-existing output PNG path under the RP textures tree.
+- One or more visually reviewed pixel crop rectangles mapped to exact geometry selectors (`bone`, `cube_index`, `face`).
+- Sampling, rotation/flips, opacity and blend choices where needed.
 
-Do not guess which pixels depict the head, torso, limbs, armor or other semantic parts. Use an image viewer and the geometry UV template/UV inventory to establish each crop and face mapping. The deterministic visual-reference analyzer is a region inventory aid; its geometric candidate scores are not semantic confidence.
+Every semantic label and source-to-face assignment must be explicitly reviewed from the image and geometry. Never derive body-part semantics from aspect-ratio/area scores.
 
-## Execution sequence
+## Workflow
 
-1. The server hashes the geometry and reference files and verifies that they are safe, bounded project files.
-2. It runs `analyze_visual_reference` for diagnostics and checks that the analyzed PNG hash matches the input hash.
-3. It calls `build_uv_mapping_plan` with the reviewed assignments. The planner checks source rectangles, selector expansion, UV bounds, duplicate targets, overlaps and optional full coverage.
-4. If the plan is not executable, the operation stops before writing.
-5. It calls `map_reference_texture_to_uv` with the transfer request, creating a new PNG without overwriting any existing file.
-6. It rechecks geometry/reference hashes, validates the output PNG, verifies dimensions against the geometry texture canvas and compares the output SHA-256 with the transfer result.
+1. Establish project identity, target Bedrock version, BP/RP roots and baseline. Verify the source and output paths are inside the intended RP; do not overwrite an existing output.
+2. Inspect the geometry with `geometry-uv-engine` and create a UV guide with `geometry-uv-engine` when a real executor is available. Record texture dimensions, supported faces, bounds and overlaps.
+3. Analyze the reference PNG with `skills/visual-reference-analysis/scripts/analyze_visual_reference.py` when executable. Record image SHA-256 and pixel dimensions. This is a read-only region inventory, not semantic recognition.
+4. Complete `reference-mapping-review` manually. Approve/reject each crop-to-face mapping and record reviewer rationale plus reference/geometry hashes. Re-review if either source changes.
+5. Build a JSON transfer request using the exact schema in `skills/uv-texture-retargeting/references/reference-transfer.example.json`. Valid root keys are `project_directory`, `geometry_path`, optional `geometry_identifier`, `reference_image_path`, optional `base_texture_path`, `output_path`, optional `background_color`, `mappings` and `allow_uv_overlap`. Each mapping contains `selector`, `source_rect` and optional `rotation`, `flip_x`, `flip_y`, `sampling`, `opacity`, `blend_mode`. Do not include review-only keys such as `review_confirmed`, `approved`, `source_assignments` or `require_full_coverage`; the transfer parser does not accept them.
+6. Inspect the real CLI contract, then run:
 
-## Safety and scope
+```bash
+python skills/uv-texture-retargeting/scripts/reference_transfer.py <request.json> --workspace <workspace-directory> --report <report.json>
+```
 
-- Source geometry and reference PNG are read-only.
-- Existing output paths are refused by the transfer engine.
-- Overlap, layered assignments and full-coverage requirements are explicit controls. Keep overlap disabled unless the shared pixels are intentional.
-- `review_confirmed` is an explicit approval gate, not a claim that the model recognized semantics automatically.
-- Current support is for geometry cube UV formats understood by the existing UV tools. Unsupported mesh formats are not silently projected.
-- This performs 2D texture-space transfer. It does not emulate Bedrock face sampling, lighting, normals, material rendering, mipmaps, seam bleed, animation or 3D projection.
-- Minecraft import, in-game rendering, Blockbench interoperability and runtime behavior remain `NOT RUN` unless separately tested.
+7. Inspect the output PNG visually and verify the reported dimensions, PNG decoding, SHA-256, mapped face selectors, unmapped coverage and overlap warnings. Re-run geometry UV, PNG and resource-link audits.
+8. Compare the output tree against baseline. Do not replace the original reference/base texture unless explicitly authorized.
+9. Import into the exact Bedrock build and inspect every intended face, orientation, seam, alpha/material and mip behavior. Mark runtime `NOT RUN` otherwise.
 
-## Example
+## Safety and supported scope
 
-See `references/retarget-request.example.json`. Paths are illustrative and must be changed to files that exist in the active project.
+- The downstream transfer script is `skills/uv-texture-retargeting/scripts/reference_transfer.py`; it supports classic box/per-face cube UV cases described in its Skill, not arbitrary mesh projection.
+- PNG inputs are limited to the formats/depths documented in `uv-texture-retargeting/SKILL.md`; unsupported/interlaced/high-bit-depth files must be converted before transfer.
+- UV overlap and duplicate target selections fail by default. Enable `allow_uv_overlap` only after explicit review.
+- Output creation is exclusive; keep paths project-relative POSIX paths and reject symlinks/traversal.
+- This is deterministic 2D texture-space transfer, not 3D projection, AI semantic texture synthesis or proof of Bedrock rendering.
+
+## Required report
+
+Report project and target version; reference/geometry/base hashes; geometry identifier and texture canvas; every source crop and target selector; review decisions; mapped/unmapped faces and overlaps; transfer command/exit code; output path, dimensions and SHA-256; PNG/UV/resource checks; baseline delta; unsupported formats; and Minecraft runtime status.
+
+## Consolidated planning and transfer modes
+
+This is the canonical user-facing end-to-end workflow formerly supplemented by `uv-texture-retargeting` and `uv-texture-retargeting`. Modes:
+
+- **mapping-plan** — inventory geometry/cubes/faces, image crops, exact `(bone, cube_index, face)` selectors, texture dimensions and candidate UV mapping; record source image/geometry hashes and confidence limits.
+- **reviewed-transfer** — require the separate `reference-mapping-review` human approval decision before deterministic pixel transfer. Translate only approved mapping fields into the strict transfer request schema; review-only keys such as `approved` or `review_confirmed` must never be passed to the transfer parser.
+- **inspect-output** — inspect distinct output PNG, hash/dimensions, mapped/unmapped coverage, overlaps and rerun relevant UV/PNG/resource-link audits.
+
+The deterministic implementation remains at `skills/uv-texture-retargeting/scripts/reference_transfer.py`, with its existing tests and example request; do not move or duplicate it. The request schema is strict: preserve path confinement, source hashes, no-overwrite behavior and supported UV limitations. Geometric ranking is not semantic certainty. Human approval remains mandatory for semantic face/crop decisions; never automate or bypass `reference-mapping-review`.

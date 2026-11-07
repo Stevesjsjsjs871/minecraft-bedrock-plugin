@@ -1,0 +1,7 @@
+{
+  "project_directory": "cinematic-interactions",
+  "change_type": "fix",
+  "title_suffix": "v{version}",
+  "manifest_paths": "auto",
+  "allow_independent_versions": false
+}

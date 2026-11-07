@@ -1,0 +1,16 @@
+{
+  "baseline": "CinematicInteractions_WB06_candidate.mcaddon",
+  "candidate": "CinematicInteractions_WB07_candidate.mcaddon",
+  "target_minecraft_version": "1.26.50",
+  "expected_scope": "WB-07: controlled Script API lifecycle and performance verification",
+  "required_checks": [
+    "archive_integrity",
+    "bp_rp_dependency",
+    "file_delta_review",
+    "javascript_syntax",
+    "json_diagnostics"
+  ],
+  "runtime_status": "NOT RUN",
+  "example_only": true,
+  "note": "Illustrative WB06-to-WB07 workflow context; not evidence that the user archive was scanned."
+}

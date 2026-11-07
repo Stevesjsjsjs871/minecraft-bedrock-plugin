@@ -1,0 +1,11 @@
+capability,environment,status,evidence,boundaries
+Local filesystem and Python,Candidate validation container,VERIFIED,Exact 2.3.4 candidate; 32/32 test files and 548/548 cases PASS,Not installed Plugin Host or Minecraft
+Skills test runner,Candidate validation container,VERIFIED,32/32 test files; 548/548 cases PASS,Local tests only
+Package integrity checker,Candidate validation container,VERIFIED,20/20 PASS; zero warnings,Static checks only
+Domain architecture validator,Candidate validation container,VERIFIED,28/28 PASS; 14 domains; 59 Skills; 8 profiles,Static registry/contract validation
+Script execution registry,Candidate package,VERIFIED,64 entries; all paths and SHA-256 values match,Does not prove target-host execution
+Plugin Host Skill activation,Installed target Plugin Host,NOT_VERIFIED,295 scenarios designed; none executed,Requires target-host traces
+Plugin Host bundled Python execution,Installed target Plugin Host,NOT_VERIFIED,No invocation trace supplied,Local Python does not establish integration
+Creator Tools / Blockbench,Target environment,NOT_RUN,No connected integration run,Requires actual connection/authorization
+Minecraft runtime,Minecraft client/device,NOT_RUN,No import/render/gameplay/multiplayer run,Requires exact target environment
+Live Plugin Creator publication,Live Plugin Creator,NOT_PERFORMED,Candidate remains unpublished,Separate explicit approval required

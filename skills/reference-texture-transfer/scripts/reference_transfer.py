@@ -15,6 +15,7 @@ PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 MAX_JSON_BYTES, MAX_PNG_BYTES = 2 * 1024 * 1024, 16 * 1024 * 1024
 MAX_DIMENSION, MAX_PIXELS = 4096, 16_777_216
 MAX_MAPPINGS, MAX_REGIONS, MAX_TEXEL_WRITES = 256, 6000, 16_777_216
+MAX_PNG_CHUNKS = 4096
 
 class TransferError(ValueError):
     """Invalid, unsupported, or unsafe reference-transfer input."""
@@ -71,6 +72,43 @@ def _resolve_file(project: Path, relative: str, label: str) -> Path:
         raise TransferError(f"{label} is missing or resolves outside project") from exc
     if not resolved.is_file(): raise TransferError(f"{label} is not a regular file")
     return resolved
+
+
+
+def _read_project_file_pinned(project: Path, relative: str, limit: int, label: str) -> bytes:
+    """Read beneath a pinned project directory; reject symlink components and swaps."""
+    parts = _safe_relpath(relative, label).split("/")
+    flags_dir = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    flags_file = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    root_fd = os.open(project, flags_dir)
+    current_fd = root_fd
+    try:
+        for part in parts[:-1]:
+            next_fd = os.open(part, flags_dir, dir_fd=current_fd)
+            if current_fd != root_fd: os.close(current_fd)
+            current_fd = next_fd
+        fd = os.open(parts[-1], flags_file, dir_fd=current_fd)
+        try:
+            st = os.fstat(fd)
+            if not __import__("stat").S_ISREG(st.st_mode): raise TransferError(f"{label} is not a regular file")
+            if st.st_size > limit: raise TransferError(f"{label} exceeds {limit} byte safety limit")
+            chunks=[]; remaining=limit+1
+            while remaining:
+                block=os.read(fd,min(1024*1024,remaining))
+                if not block: break
+                chunks.append(block); remaining-=len(block)
+            data=b"".join(chunks)
+            if len(data)>limit: raise TransferError(f"{label} exceeds {limit} byte safety limit")
+            after=os.fstat(fd)
+            if (st.st_dev,st.st_ino,st.st_size,st.st_mtime_ns)!=(after.st_dev,after.st_ino,after.st_size,after.st_mtime_ns):
+                raise TransferError(f"{label} changed while being read")
+            return data
+        finally: os.close(fd)
+    except OSError as exc:
+        raise TransferError(f"unsafe or unreadable {label}: {exc}") from exc
+    finally:
+        if current_fd != root_fd: os.close(current_fd)
+        os.close(root_fd)
 
 
 def _new_destination(project: Path, relative: str) -> Path:
@@ -157,8 +195,10 @@ def _intersects(a,b): return min(a[2],b[2]) > max(a[0],b[0]) and min(a[3],b[3]) 
 def decode_png_rgba(data: bytes):
     if not isinstance(data, bytes) or not 45 <= len(data) <= MAX_PNG_BYTES or data[:8] != PNG_SIGNATURE:
         raise TransferError("PNG signature or file-size validation failed")
-    pos=8; ihdr=None; idat=bytearray(); palette=b""; trns=b""; idat_started=False; idat_ended=False; ended=False
+    pos=8; ihdr=None; idat=bytearray(); palette=b""; trns=b""; idat_started=False; idat_ended=False; ended=False; chunk_count=0
     while pos < len(data):
+        chunk_count+=1
+        if chunk_count>MAX_PNG_CHUNKS: raise TransferError(f"PNG exceeds {MAX_PNG_CHUNKS} chunk limit")
         if pos+12 > len(data): raise TransferError("truncated PNG chunk header")
         n=struct.unpack(">I",data[pos:pos+4])[0]; kind=data[pos+4:pos+8]; end=pos+n+12
         if end>len(data): raise TransferError(f"truncated PNG {kind!r} chunk")
@@ -332,9 +372,9 @@ def transfer(raw: dict[str,Any], *, workspace: Path | None = None):
     a=validate_request(raw); workspace=workspace or Path(os.environ.get("MINECRAFT_BEDROCK_WORKSPACE",Path.cwd()))
     project,rp=_resolve_project(a["project_directory"],workspace)
     geo_file=_resolve_file(project,a["geometry_path"],"geometry_path")
-    if geo_file.stat().st_size>MAX_JSON_BYTES: raise TransferError("geometry JSON exceeds 2 MiB")
     try:
-        root=json.loads(geo_file.read_text(encoding="utf-8-sig"),object_pairs_hook=_unique_pairs,parse_constant=lambda x: (_ for _ in ()).throw(TransferError(f"non-finite JSON constant {x}")))
+        geometry_payload=_read_project_file_pinned(project,a["geometry_path"],MAX_JSON_BYTES,"geometry_path")
+        root=json.loads(geometry_payload.decode("utf-8-sig"),object_pairs_hook=_unique_pairs,parse_constant=lambda x: (_ for _ in ()).throw(TransferError(f"non-finite JSON constant {x}")))
     except (UnicodeDecodeError,json.JSONDecodeError) as exc: raise TransferError(f"invalid geometry JSON: {exc}") from exc
     geos=root.get("minecraft:geometry") if isinstance(root,dict) else None
     if not isinstance(geos,list) or not geos: raise TransferError("minecraft:geometry must be a non-empty array")
@@ -363,16 +403,14 @@ def transfer(raw: dict[str,Any], *, workspace: Path | None = None):
         if not complete: break
     if (overlaps or not complete) and not a["allow_uv_overlap"]: raise TransferError("UV overlap found or overlap analysis hit its budget; review and explicitly allow only intentional sharing")
     ref_file=_resolve_file(project,a["reference_image_path"],"reference_image_path")
-    if ref_file.stat().st_size>MAX_PNG_BYTES: raise TransferError("reference PNG exceeds 16 MiB")
-    reference_payload = ref_file.read_bytes()
+    reference_payload = _read_project_file_pinned(project,a["reference_image_path"],MAX_PNG_BYTES,"reference_image_path")
     rw, rh, source = decode_png_rgba(reference_payload)
     for i,m in enumerate(a["mappings"]):
         r=m["source_rect"]
         if r["x"]+r["width"]>rw or r["y"]+r["height"]>rh: raise TransferError(f"mappings[{i}] source_rect exceeds {rw}x{rh} image")
     if a["base_texture_path"]:
         base_file=_resolve_file(project,a["base_texture_path"],"base_texture_path")
-        if base_file.stat().st_size>MAX_PNG_BYTES: raise TransferError("base PNG exceeds 16 MiB")
-        base_payload = base_file.read_bytes()
+        base_payload = _read_project_file_pinned(project,a["base_texture_path"],MAX_PNG_BYTES,"base_texture_path")
         bw, bh, canvas = decode_png_rgba(base_payload)
         if (bw,bh)!=(w,h): raise TransferError(f"base texture is {bw}x{bh}; geometry requires {w}x{h}")
         canvas=bytearray(canvas)
@@ -391,6 +429,8 @@ def transfer(raw: dict[str,Any], *, workspace: Path | None = None):
             if writes>MAX_TEXEL_WRITES: raise TransferError("transfer exceeds 16,777,216 texel-write budget")
             plan.append((mi,m,region,(px0,py0,px1,py1)))
     if dupes and not a["allow_uv_overlap"]: raise TransferError("same UV face selected more than once; explicit ordered layering approval required")
+    if dupes and a["allow_uv_overlap"]:
+        findings.append({"code":"ORDERED_MAPPING_LAYERS", "duplicate_region_selections":dupes})
     results=[]; changed=0
     for mi,m,region,(x0,y0,x1,y1) in plan:
         rect=m["source_rect"]; local=0; tw,th=x1-x0,y1-y0

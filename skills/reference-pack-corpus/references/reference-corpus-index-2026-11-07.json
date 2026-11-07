@@ -1,0 +1,5251 @@
+{
+  "schema_version": 1,
+  "generated_on": "2026-11-07",
+  "policy": "metadata-only; no source assets or code copied",
+  "archives": [
+    {
+      "schema_version": 1,
+      "dataset_type": "bedrock_reference_archive",
+      "source_label": "Mojang Bedrock Samples main branch snapshot",
+      "source_url": "https://github.com/Mojang/bedrock-samples",
+      "archive_name": "bedrock-samples-main.zip",
+      "archive_size_bytes": 169626102,
+      "archive_sha256": "2c5823a2c8f2cfe96f3a2068df8fdcf9f4bb6050d1c4d42437dafb3916cdb362",
+      "archive_stats": {
+        "entry_count": 22939,
+        "file_count": 22327,
+        "directory_count": 612,
+        "declared_uncompressed_bytes": 321723452,
+        "extension_counts": {
+          ".fsb": 4761,
+          ".hdr": 12,
+          ".html": 21,
+          ".jpg": 18,
+          ".json": 9022,
+          ".lang": 29,
+          ".md": 3,
+          ".ogg": 3,
+          ".pdn": 1,
+          ".png": 5126,
+          ".tga": 3328,
+          ".yml": 2,
+          "[no extension]": 1
+        }
+      },
+      "safety": {
+        "path_traversal": "PASS",
+        "absolute_paths": "PASS",
+        "symlinks": "PASS",
+        "duplicate_paths": "REJECTED",
+        "case_unicode_collisions": "REJECTED",
+        "file_directory_collisions": "REJECTED",
+        "special_files": "REJECTED",
+        "crc_test": "PASS",
+        "hash_source": "same_pinned_descriptor",
+        "extraction_performed": false,
+        "embedded_code_executed": false
+      },
+      "manifests": [
+        {
+          "path": "bedrock-samples-main/behavior_pack/manifest.json",
+          "parse_status": "valid",
+          "name": "Vanilla Behavior Pack",
+          "header_version": [
+            0,
+            0,
+            1
+          ],
+          "min_engine_version": [
+            1,
+            26,
+            60
+          ],
+          "modules": [
+            {
+              "type": "data",
+              "version": [
+                0,
+                0,
+                1
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "66c6e9a8-3093-462a-9c36-dbb052165822",
+              "version": [
+                0,
+                0,
+                1
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "bedrock-samples-main/metadata/json_schemas/client_server/packaging/3.0.0/Manifest.json",
+          "parse_status": "valid",
+          "name": null,
+          "header_version": null,
+          "min_engine_version": null,
+          "modules": [],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "bedrock-samples-main/resource_pack/manifest.json",
+          "parse_status": "valid",
+          "name": "Vanilla Resource Pack",
+          "header_version": [
+            0,
+            0,
+            1
+          ],
+          "min_engine_version": [
+            1,
+            26,
+            60
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                0,
+                0,
+                1
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [],
+          "capabilities": [],
+          "experiments": []
+        }
+      ],
+      "limits": {
+        "compressed_bytes": 268435456,
+        "entries": 50000,
+        "member_bytes": 134217728,
+        "total_uncompressed_bytes": 536870912,
+        "manifest_bytes": 2097152,
+        "compression_ratio": 1000
+      },
+      "provenance_class": "official_mojang_samples",
+      "branch_or_revision": "main branch archive; commit SHA not embedded in supplied ZIP"
+    },
+    {
+      "schema_version": 1,
+      "dataset_type": "bedrock_reference_archive",
+      "source_label": "Microsoft Minecraft Samples main branch snapshot",
+      "source_url": "https://github.com/microsoft/minecraft-samples",
+      "archive_name": "minecraft-samples-main.zip",
+      "archive_size_bytes": 7464423,
+      "archive_sha256": "0acdd58b4cb76d87947d1c0b14243245bcd930c0efe4cc4241d39a38d58f8142",
+      "archive_stats": {
+        "entry_count": 2307,
+        "file_count": 1666,
+        "directory_count": 641,
+        "declared_uncompressed_bytes": 12159994,
+        "extension_counts": {
+          ".bbmodel": 2,
+          ".dat": 1,
+          ".dat_old": 1,
+          ".jpeg": 1,
+          ".js": 1,
+          ".json": 1030,
+          ".lang": 23,
+          ".ldb": 2,
+          ".mcaddon": 2,
+          ".mcpack": 2,
+          ".mcstructure": 29,
+          ".mcworld": 1,
+          ".md": 32,
+          ".mjs": 27,
+          ".mp3": 1,
+          ".ogg": 7,
+          ".pastein": 1,
+          ".png": 364,
+          ".tga": 5,
+          ".ts": 98,
+          ".txt": 1,
+          ".yml": 2,
+          ".zip": 1,
+          "[no extension]": 32
+        }
+      },
+      "safety": {
+        "path_traversal": "PASS",
+        "absolute_paths": "PASS",
+        "symlinks": "PASS",
+        "duplicate_paths": "REJECTED",
+        "case_unicode_collisions": "REJECTED",
+        "file_directory_collisions": "REJECTED",
+        "special_files": "REJECTED",
+        "crc_test": "PASS",
+        "hash_source": "same_pinned_descriptor",
+        "extraction_performed": false,
+        "embedded_code_executed": false
+      },
+      "manifests": [
+        {
+          "path": "minecraft-samples-main/add_entity_robot/full/robot_example_full_behavior/manifest.json",
+          "parse_status": "valid",
+          "name": "Robot Add-Entity Full Example - Behavior",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            12,
+            0
+          ],
+          "modules": [
+            {
+              "type": "data",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "bb405256-d96b-44c4-aca5-5044b660a0b3",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/add_entity_robot/full/robot_example_full_resources/manifest.json",
+          "parse_status": "valid",
+          "name": "Robot Add-Entity Full Example - Resources",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            12,
+            0
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "6eaedf14-74c0-49e1-907d-3a8974cb006c",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/add_entity_robot/min/robot_example_min_behavior/manifest.json",
+          "parse_status": "valid",
+          "name": "Robot Add-Entity Minimal Example - Behavior",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            12,
+            0
+          ],
+          "modules": [
+            {
+              "type": "data",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "bb405256-d96b-44c4-aca5-5044b660a0b2",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/add_entity_robot/min/robot_example_min_resources/manifest.json",
+          "parse_status": "valid",
+          "name": "Robot Add-Entity Minimal Example - Resources",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            12,
+            0
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "6eaedf14-74c0-49e1-907d-3a8974cb006b",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/addon_starter/1_hello_world/behavior_packs/aop_mobs/manifest.json",
+          "parse_status": "valid",
+          "name": "Sample Add-on Pack",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            16,
+            0
+          ],
+          "modules": [
+            {
+              "type": "data",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            },
+            {
+              "type": "script",
+              "version": [
+                0,
+                0,
+                1
+              ],
+              "language": "javascript"
+            }
+          ],
+          "script_module_count": 1,
+          "script_api_dependencies": [
+            {
+              "module_name": "@minecraft/server",
+              "version": "2.0.0"
+            },
+            {
+              "module_name": "@minecraft/server-ui",
+              "version": "2.0.0"
+            }
+          ],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "9d6dad89-6e29-46ba-83d5-490a4901caef",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/addon_starter/1_hello_world/resource_packs/aop_mobs/manifest.json",
+          "parse_status": "valid",
+          "name": "Sample Add-on Pack",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            16,
+            0
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "9ec8af93-4b38-429f-a4bd-7e277a50d238",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/addon_starter/2_entities/behavior_packs/aop_mobs/manifest.json",
+          "parse_status": "valid",
+          "name": "Sample Add-on Pack",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            16,
+            0
+          ],
+          "modules": [
+            {
+              "type": "data",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            },
+            {
+              "type": "script",
+              "version": [
+                0,
+                0,
+                1
+              ],
+              "language": "javascript"
+            }
+          ],
+          "script_module_count": 1,
+          "script_api_dependencies": [
+            {
+              "module_name": "@minecraft/server",
+              "version": "2.0.0"
+            },
+            {
+              "module_name": "@minecraft/server-ui",
+              "version": "2.0.0"
+            }
+          ],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "9d6dad89-6e29-46ba-83d5-490a4901caef",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/addon_starter/2_entities/resource_packs/aop_mobs/manifest.json",
+          "parse_status": "valid",
+          "name": "Sample Add-on Pack",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            16,
+            0
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "9ec8af93-4b38-429f-a4bd-7e277a50d238",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/addon_starter/complete/behavior_packs/aop_mobs/manifest.json",
+          "parse_status": "valid",
+          "name": "Sample Add-on Pack",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            26,
+            10
+          ],
+          "modules": [
+            {
+              "type": "data",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            },
+            {
+              "type": "script",
+              "version": [
+                0,
+                0,
+                1
+              ],
+              "language": "javascript"
+            }
+          ],
+          "script_module_count": 1,
+          "script_api_dependencies": [
+            {
+              "module_name": "@minecraft/server",
+              "version": "2.0.0"
+            },
+            {
+              "module_name": "@minecraft/server-ui",
+              "version": "2.0.0"
+            }
+          ],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "9d6dad89-6e29-46ba-83d5-490a4901caef",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/addon_starter/complete/resource_packs/aop_mobs/manifest.json",
+          "parse_status": "valid",
+          "name": "Sample Add-on Pack",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            26,
+            10
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "9ec8af93-4b38-429f-a4bd-7e277a50d238",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/addon_starter/start/behavior_packs/aop_mobs/manifest.json",
+          "parse_status": "valid",
+          "name": "Sample Add-on Pack",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            16,
+            0
+          ],
+          "modules": [
+            {
+              "type": "data",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            },
+            {
+              "type": "script",
+              "version": [
+                0,
+                0,
+                1
+              ],
+              "language": "javascript"
+            }
+          ],
+          "script_module_count": 1,
+          "script_api_dependencies": [
+            {
+              "module_name": "@minecraft/server",
+              "version": "2.0.0"
+            },
+            {
+              "module_name": "@minecraft/server-ui",
+              "version": "2.0.0"
+            }
+          ],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "9d6dad89-6e29-46ba-83d5-490a4901caef",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/addon_starter/start/resource_packs/aop_mobs/manifest.json",
+          "parse_status": "valid",
+          "name": "Sample Add-on Pack",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            16,
+            0
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "9ec8af93-4b38-429f-a4bd-7e277a50d238",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/behavior_pack_sample/manifest.json",
+          "parse_status": "valid",
+          "name": "My Behavior Pack",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            16,
+            0
+          ],
+          "modules": [
+            {
+              "type": "data",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/casual_creator/chill_dreams/1_dream_turkey/behavior_packs/mamm_cds/manifest.json",
+          "parse_status": "valid",
+          "name": "Chill Dreams Add-On - Part 1 the Dream Turkey",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            20,
+            0
+          ],
+          "modules": [
+            {
+              "type": "data",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            },
+            {
+              "type": "script",
+              "version": [
+                0,
+                0,
+                1
+              ],
+              "language": "javascript"
+            }
+          ],
+          "script_module_count": 1,
+          "script_api_dependencies": [
+            {
+              "module_name": "@minecraft/server",
+              "version": "1.8.0"
+            },
+            {
+              "module_name": "@minecraft/server-ui",
+              "version": "1.1.0"
+            }
+          ],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "bc234388-0691-40a4-89bd-e783a5c90830",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/casual_creator/chill_dreams/1_dream_turkey/resource_packs/mamm_cds/manifest.json",
+          "parse_status": "valid",
+          "name": "Chill Dreams Add-On - Part 1 the Dream Turkey",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            20,
+            0
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "4dff1106-b6f7-4f3b-aca3-79c45133285b",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/casual_creator/chill_dreams/2_dreams_come_true/behavior_packs/mamm_cds/manifest.json",
+          "parse_status": "valid",
+          "name": "Chill Dreams Add-On",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            20,
+            0
+          ],
+          "modules": [
+            {
+              "type": "data",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            },
+            {
+              "type": "script",
+              "version": [
+                0,
+                0,
+                1
+              ],
+              "language": "javascript"
+            }
+          ],
+          "script_module_count": 1,
+          "script_api_dependencies": [
+            {
+              "module_name": "@minecraft/server",
+              "version": "1.8.0"
+            },
+            {
+              "module_name": "@minecraft/server-ui",
+              "version": "1.1.0"
+            }
+          ],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "bc234388-0691-40a4-89bd-e783a5c90830",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/casual_creator/chill_dreams/2_dreams_come_true/resource_packs/mamm_cds/manifest.json",
+          "parse_status": "valid",
+          "name": "Chill Dreams Add-On",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            20,
+            0
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "4dff1106-b6f7-4f3b-aca3-79c45133285b",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/casual_creator/chill_dreams/complete/behavior_packs/mamm_cds/manifest.json",
+          "parse_status": "valid",
+          "name": "Chill Dreams Add-On",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            20,
+            0
+          ],
+          "modules": [
+            {
+              "type": "data",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            },
+            {
+              "type": "script",
+              "version": [
+                0,
+                0,
+                1
+              ],
+              "language": "javascript"
+            }
+          ],
+          "script_module_count": 1,
+          "script_api_dependencies": [
+            {
+              "module_name": "@minecraft/server",
+              "version": "1.8.0"
+            },
+            {
+              "module_name": "@minecraft/server-ui",
+              "version": "1.1.0"
+            }
+          ],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "bc234388-0691-40a4-89bd-e783a5c90830",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/casual_creator/chill_dreams/complete/resource_packs/mamm_cds/manifest.json",
+          "parse_status": "valid",
+          "name": "Chill Dreams Add-On",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            20,
+            0
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "4dff1106-b6f7-4f3b-aca3-79c45133285b",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/casual_creator/custom_cat_eliza/behavior_packs/mike_eliz/manifest.json",
+          "parse_status": "valid",
+          "name": "eliza",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            21,
+            50
+          ],
+          "modules": [
+            {
+              "type": "data",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            },
+            {
+              "type": "script",
+              "version": [
+                0,
+                0,
+                1
+              ],
+              "language": "javascript"
+            }
+          ],
+          "script_module_count": 1,
+          "script_api_dependencies": [
+            {
+              "module_name": "@minecraft/server",
+              "version": [
+                1,
+                16,
+                0
+              ]
+            },
+            {
+              "module_name": "@minecraft/server-ui",
+              "version": [
+                1,
+                3,
+                0
+              ]
+            }
+          ],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "5a264e74-1568-4888-8ced-5f2fd3e73f65",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/casual_creator/custom_cat_eliza/resource_packs/mike_eliz/manifest.json",
+          "parse_status": "valid",
+          "name": "eliza",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            21,
+            50
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "2064b7de-dacc-4e60-b0fd-5c651266f04d",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/casual_creator/gray_wave/behavior_packs/mikeamm_gwve/manifest.json",
+          "parse_status": "valid",
+          "name": "Gray Wave Machines",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            21,
+            50
+          ],
+          "modules": [
+            {
+              "type": "data",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            },
+            {
+              "type": "script",
+              "version": [
+                0,
+                0,
+                1
+              ],
+              "language": "javascript"
+            }
+          ],
+          "script_module_count": 1,
+          "script_api_dependencies": [
+            {
+              "module_name": "@minecraft/server",
+              "version": "1.16.0"
+            },
+            {
+              "module_name": "@minecraft/server-ui",
+              "version": "1.3.0"
+            }
+          ],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "61a921e3-089b-4c92-b48d-2f907af32942",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/casual_creator/gray_wave/resource_packs/mikeamm_gwve/manifest.json",
+          "parse_status": "valid",
+          "name": "Gray Wave Machines",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            21,
+            50
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "ceeaa134-b4b8-43fc-8f2a-5de40f7da6cb",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/chill_oasis_blocks_and_features/chill_oasis_assets/behavior_packs/chill_oasis_assets/manifest.json",
+          "parse_status": "valid",
+          "name": "Chill Oasis Assets",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            16,
+            0
+          ],
+          "modules": [
+            {
+              "type": "data",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "e3a39e90-ffc3-4043-dfc4-8c5e9e6015bb",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/chill_oasis_blocks_and_features/chill_oasis_assets/resource_packs/chill_oasis_assets/manifest.json",
+          "parse_status": "valid",
+          "name": "Chill Oasis Assets",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            16,
+            0
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "8f65a568-1afc-3c8d-4ef2-0f268274231a",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/chill_oasis_blocks_and_features/chill_oasis_biome/behavior_packs/chill_oasis_biome/manifest.json",
+          "parse_status": "valid",
+          "name": "Chill Oasis Biome",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            21,
+            80
+          ],
+          "modules": [
+            {
+              "type": "data",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "ad3dfc7e-02aa-44a6-bb51-cf515071737c",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            },
+            {
+              "uuid": "8f65a568-1afc-3c8d-4ef2-0f268274231a",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/chill_oasis_blocks_and_features/chill_oasis_biome/resource_packs/chill_oasis_biome/manifest.json",
+          "parse_status": "valid",
+          "name": "Chill Oasis Biome",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            16,
+            0
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "3394f6f5-1f45-40c5-a53d-9079a52233d2",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            },
+            {
+              "uuid": "e3a39e90-ffc3-4043-dfc4-8c5e9e6015bb",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/configurable_packs/behavior_packs/configurable_pack/manifest.json",
+          "parse_status": "valid",
+          "name": "ConfigurablePack",
+          "header_version": "1.0.0",
+          "min_engine_version": "1.21.110",
+          "modules": [
+            {
+              "type": "data",
+              "version": "1.0.0",
+              "language": null
+            },
+            {
+              "type": "script",
+              "version": "0.0.1",
+              "language": "javascript"
+            }
+          ],
+          "script_module_count": 1,
+          "script_api_dependencies": [
+            {
+              "module_name": "@minecraft/server",
+              "version": "2.3.0-beta"
+            },
+            {
+              "module_name": "@minecraft/server-ui",
+              "version": "2.0.0"
+            }
+          ],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "b1bd7840-def4-4bb2-abfa-81c4b513eef1",
+              "version": "1.0.0"
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/configurable_packs/resource_packs/configurable_pack/manifest.json",
+          "parse_status": "valid",
+          "name": "ConfigurablePack",
+          "header_version": "1.0.0",
+          "min_engine_version": "1.21.110",
+          "modules": [
+            {
+              "type": "resources",
+              "version": "1.0.0",
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "67789bf7-a2ec-471a-973a-8bcdee7a507c",
+              "version": "1.0.0"
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/creator_camp/behavior_packs/creator_camp/manifest.json",
+          "parse_status": "valid",
+          "name": "CreatorCamp",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            21,
+            90
+          ],
+          "modules": [
+            {
+              "type": "script",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": "javascript"
+            }
+          ],
+          "script_module_count": 1,
+          "script_api_dependencies": [
+            {
+              "module_name": "@minecraft/server",
+              "version": [
+                2,
+                0,
+                0
+              ]
+            }
+          ],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "7510cf8b-6df1-4c3d-911e-68b522c199aa",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/creator_camp/resource_packs/creator_camp/manifest.json",
+          "parse_status": "valid",
+          "name": "CreatorCamp",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            21,
+            90
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "20a33263-335f-4156-b8ec-fa3f16a23cf1",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/crystal_caverns/behavior_pack/manifest.json",
+          "parse_status": "valid",
+          "name": "Crystal Caverns Biome",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            21,
+            40
+          ],
+          "modules": [
+            {
+              "type": "data",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "3235710f-de4e-4b60-b926-bbfe91eeba4c",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/crystal_caverns/resource_pack/manifest.json",
+          "parse_status": "valid",
+          "name": "Crystal Caverns Resources",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            21,
+            40
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/culled_block_sample/culled_block_behavior_pack/manifest.json",
+          "parse_status": "valid",
+          "name": "Culled Blocks",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            21,
+            0
+          ],
+          "modules": [
+            {
+              "type": "data",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [
+            {
+              "module_name": "@minecraft/server",
+              "version": "2.0.0"
+            }
+          ],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "58540088-b664-4379-97cb-b630b0d89363",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/culled_block_sample/culled_block_resource_pack/manifest.json",
+          "parse_status": "valid",
+          "name": "Culled Blocks Resource Pack",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            21,
+            0
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "df70c351-cd47-4dc0-8f42-64c040e825d4",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/custom_blocks/behavior_packs/custom_blocks/manifest.json",
+          "parse_status": "valid",
+          "name": "Custom Blocks",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            20,
+            80
+          ],
+          "modules": [
+            {
+              "type": "script",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": "javascript"
+            },
+            {
+              "type": "data",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 1,
+          "script_api_dependencies": [
+            {
+              "module_name": "@minecraft/server",
+              "version": "2.0.0"
+            }
+          ],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "7ae29fa1-0853-448d-850c-87dbdd583c4f",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/custom_blocks/resource_packs/custom_blocks/manifest.json",
+          "parse_status": "valid",
+          "name": "Custom Blocks Resource Pack",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            16,
+            0
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "874f1a8c-2c74-4be1-8770-1bcb40e0cd74",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/custom_dimensions/behavior_packs/creator_customdi/manifest.json",
+          "parse_status": "valid",
+          "name": "Custom dimensions",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            26,
+            10
+          ],
+          "modules": [
+            {
+              "type": "script",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": "javascript"
+            }
+          ],
+          "script_module_count": 1,
+          "script_api_dependencies": [
+            {
+              "module_name": "@minecraft/server",
+              "version": "2.8.0"
+            },
+            {
+              "module_name": "@minecraft/server-ui",
+              "version": "2.0.0"
+            }
+          ],
+          "pack_uuid_dependencies": [],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/custom_dimensions/resource_packs/creator_customdi/manifest.json",
+          "parse_status": "valid",
+          "name": "Custom dimensions",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            26,
+            10
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "942979ee-53e8-4488-a830-93b8da3431d4",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/custom_features/basic_orange_ore/behavior_packs/basic_orange_ore/manifest.json",
+          "parse_status": "valid",
+          "name": "Orange Ore feature",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            21,
+            30
+          ],
+          "modules": [
+            {
+              "type": "data",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "f5d98bbc-6934-4ef5-a707-a49c49ba0d89",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/custom_features/basic_orange_ore/resource_packs/basic_orange_ore/manifest.json",
+          "parse_status": "valid",
+          "name": "Orange Ore Feature",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            16,
+            0
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/custom_features/example_feature_set/behavior_packs/example_feature_set/manifest.json",
+          "parse_status": "valid",
+          "name": "Features Samples",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            20,
+            20
+          ],
+          "modules": [
+            {
+              "type": "data",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "2a512d59-32a1-4f7c-937d-6dac81b80b90",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/custom_features/example_feature_set/resource_packs/example_feature_set/manifest.json",
+          "parse_status": "valid",
+          "name": "Features Samples",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            20,
+            20
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "1ceadbc5-c309-4599-8c30-bc1a9f9a41cc",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/custom_items/behavior_packs/custom_item/manifest.json",
+          "parse_status": "valid",
+          "name": "Custom Items Behavior Pack",
+          "header_version": [
+            1,
+            0,
+            1
+          ],
+          "min_engine_version": [
+            1,
+            20,
+            30
+          ],
+          "modules": [
+            {
+              "type": "script",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": "javascript"
+            },
+            {
+              "type": "data",
+              "version": [
+                1,
+                0,
+                1
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 1,
+          "script_api_dependencies": [
+            {
+              "module_name": "@minecraft/server",
+              "version": "2.0.0"
+            }
+          ],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "d37d7758-ab9c-4d49-8b07-e0d5686df23d",
+              "version": [
+                1,
+                0,
+                1
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/custom_items/resource_packs/custom_item/manifest.json",
+          "parse_status": "valid",
+          "name": "Custom Items Resource Pack",
+          "header_version": [
+            1,
+            0,
+            1
+          ],
+          "min_engine_version": [
+            1,
+            20,
+            30
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                1
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/custom_projectiles/behavior_pack/manifest.json",
+          "parse_status": "valid",
+          "name": "Custom Projectile BP",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            26,
+            0
+          ],
+          "modules": [
+            {
+              "type": "data",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "d5d44d4c-bd24-4ead-9871-267ecb72cacb",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/custom_projectiles/resource_pack/manifest.json",
+          "parse_status": "valid",
+          "name": "Custom Projectile RP",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            26,
+            0
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "9ed6661f-d62e-44ff-bd25-b8791348b85f",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/debug_tools/behavior_packs/debug_tools_editor/manifest.json",
+          "parse_status": "valid",
+          "name": "Debug Tools for Editor",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            20,
+            0
+          ],
+          "modules": [
+            {
+              "type": "script",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": "javascript"
+            }
+          ],
+          "script_module_count": 1,
+          "script_api_dependencies": [
+            {
+              "module_name": "@minecraft/server-editor",
+              "version": "0.1.0-beta"
+            },
+            {
+              "module_name": "@minecraft/server",
+              "version": "1.15.0-beta"
+            },
+            {
+              "module_name": "@minecraft/server-ui",
+              "version": "1.4.0-beta"
+            }
+          ],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "81a06565-8345-42eb-8839-4d288bfb6a55",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [
+            "editorExtension"
+          ],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/debug_tools/behavior_packs/debug_tools_ingame/manifest.json",
+          "parse_status": "valid",
+          "name": "Debug Tools",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            20,
+            0
+          ],
+          "modules": [
+            {
+              "type": "script",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": "javascript"
+            }
+          ],
+          "script_module_count": 1,
+          "script_api_dependencies": [
+            {
+              "module_name": "@minecraft/server",
+              "version": "1.10.0"
+            },
+            {
+              "module_name": "@minecraft/server-ui",
+              "version": "1.1.0"
+            }
+          ],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "499c30a5-224d-4d44-82f6-3aae66b14217",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/debug_tools/resource_packs/debug_tools_editor/manifest.json",
+          "parse_status": "valid",
+          "name": "Debug Tools for Editor",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            20,
+            0
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "6b6c7b7e-5851-48ef-ae1a-316692c7e737",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [
+            "editorExtension"
+          ],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/debug_tools/resource_packs/debug_tools_ingame/manifest.json",
+          "parse_status": "valid",
+          "name": "Debug Tools",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            20,
+            0
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "45a86633-80d8-49be-adac-9550966e3444",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/deferred_lighting_starter/resource_packs/samp_dlstarter/manifest.json",
+          "parse_status": "valid",
+          "name": "Vibrant Visuals Starter Configuration",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            21,
+            70
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [],
+          "capabilities": [
+            "pbr"
+          ],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/jigsaws/basic_dungeon/behavior_packs/mike_basi/manifest.json",
+          "parse_status": "valid",
+          "name": "Basic Jigsaw Dungeon",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            21,
+            100
+          ],
+          "modules": [
+            {
+              "type": "data",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            },
+            {
+              "type": "script",
+              "version": [
+                0,
+                0,
+                1
+              ],
+              "language": "javascript"
+            }
+          ],
+          "script_module_count": 1,
+          "script_api_dependencies": [
+            {
+              "module_name": "@minecraft/server",
+              "version": [
+                1,
+                15,
+                0
+              ]
+            },
+            {
+              "module_name": "@minecraft/server-ui",
+              "version": [
+                1,
+                3,
+                0
+              ]
+            }
+          ],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "7fcce301-f48b-4bb8-8fc0-3720d88f4961",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/jigsaws/basic_dungeon/resource_packs/mike_basi/manifest.json",
+          "parse_status": "valid",
+          "name": "Basic Jigsaw Dungeon",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            21,
+            40
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "bf089d3e-4ff6-40a5-aca8-820abd267c62",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/lucky_block/version_1/behavior_packs/mike_luck/manifest.json",
+          "parse_status": "valid",
+          "name": "luckyblock",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            21,
+            60
+          ],
+          "modules": [
+            {
+              "type": "data",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            },
+            {
+              "type": "script",
+              "version": [
+                0,
+                0,
+                1
+              ],
+              "language": "javascript"
+            }
+          ],
+          "script_module_count": 1,
+          "script_api_dependencies": [
+            {
+              "module_name": "@minecraft/server",
+              "version": [
+                1,
+                17,
+                0
+              ]
+            },
+            {
+              "module_name": "@minecraft/server-ui",
+              "version": [
+                1,
+                3,
+                0
+              ]
+            }
+          ],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "3b9a4412-76ec-46b5-8236-c1dd9eba3348",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/lucky_block/version_1/resource_packs/mike_luck/manifest.json",
+          "parse_status": "valid",
+          "name": "luckyblock",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            21,
+            60
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "c412302f-969d-4600-8df9-7dcf5dc25ef6",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/mclive2022_addon/mclive2022behaviorpack/manifest.json",
+          "parse_status": "valid",
+          "name": "Minecraft Live",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            16,
+            0
+          ],
+          "modules": [
+            {
+              "type": "data",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "8cee9cd5-6ce6-a8da-da8c-f06d93c3ea12",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/mclive2022_addon/mclive2022resourcepack/manifest.json",
+          "parse_status": "valid",
+          "name": "Minecraft Live",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            16,
+            0
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "9d352270-22bb-f1e0-75ab-34b4049544e2",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/multi-block_sample/behavior_pack/manifest.json",
+          "parse_status": "valid",
+          "name": "Multi-block BP",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            26,
+            40
+          ],
+          "modules": [
+            {
+              "type": "data",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            },
+            {
+              "type": "script",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": "javascript"
+            }
+          ],
+          "script_module_count": 1,
+          "script_api_dependencies": [
+            {
+              "module_name": "@minecraft/server",
+              "version": "2.9.0"
+            }
+          ],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "f7de05e6-ef3f-4ed2-83b7-e7b08426e67a",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/multi-block_sample/resource_pack/manifest.json",
+          "parse_status": "valid",
+          "name": "Multi-block RP",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            26,
+            40
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "9cb9e514-aa31-44bf-aaaa-2e2f0a893ce6",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/npc_dialogue_sample/manifest.json",
+          "parse_status": "valid",
+          "name": "My NPC Dialogue Sample Pack",
+          "header_version": [
+            0,
+            0,
+            1
+          ],
+          "min_engine_version": [
+            1,
+            12,
+            0
+          ],
+          "modules": [
+            {
+              "type": "data",
+              "version": [
+                0,
+                0,
+                1
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/palm_tree_blocks_and_features/palm_tree_blocks/behavior_packs/palm_tree/manifest.json",
+          "parse_status": "valid",
+          "name": "Palm Tree",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            16,
+            0
+          ],
+          "modules": [
+            {
+              "type": "data",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "e3a39e90-ffc3-4043-dfc4-8c5e9e6015ba",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/palm_tree_blocks_and_features/palm_tree_blocks/resource_packs/palm_tree/manifest.json",
+          "parse_status": "valid",
+          "name": "Palm Tree",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            16,
+            0
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "8f65a568-1afc-3c8d-4ef2-0f2682742319",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/palm_tree_blocks_and_features/palm_tree_blocks_features/behavior_packs/palm_tree_features/manifest.json",
+          "parse_status": "valid",
+          "name": "Palm Tree Features",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            16,
+            0
+          ],
+          "modules": [
+            {
+              "type": "data",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "ad3dfc7e-02aa-44a6-bb51-cf515071737b",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            },
+            {
+              "uuid": "8f65a568-1afc-3c8d-4ef2-0f2682742319",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/palm_tree_blocks_and_features/palm_tree_blocks_features/resource_packs/palm_tree_features/manifest.json",
+          "parse_status": "valid",
+          "name": "Palm Tree Features",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            16,
+            0
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "3394f6f5-1f45-40c5-a53d-9079a52233d1",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            },
+            {
+              "uuid": "e3a39e90-ffc3-4043-dfc4-8c5e9e6015ba",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/particles_examples_1.19/unzipped/manifest.json",
+          "parse_status": "valid",
+          "name": "Particle System Examples 1.19",
+          "header_version": [
+            0,
+            0,
+            1
+          ],
+          "min_engine_version": [
+            1,
+            10,
+            0
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                0,
+                0,
+                1
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/resource_pack_sample/manifest.json",
+          "parse_status": "valid",
+          "name": "My Resource Pack",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            16,
+            0
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/rtx_resource_pack/manifest.json",
+          "parse_status": "valid",
+          "name": "RTX Sample Resource Pack",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            12,
+            0
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                0,
+                0,
+                1
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [],
+          "capabilities": [
+            "raytraced"
+          ],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/shapeshifter/behavior_pack/shapeshifter/manifest.json",
+          "parse_status": "valid",
+          "name": "shapeshifter",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            16,
+            0
+          ],
+          "modules": [
+            {
+              "type": "data",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "0b9782bd-25c1-6929-669c-a114032526c5",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/shapeshifter/resource_pack/shapeshifter/manifest.json",
+          "parse_status": "valid",
+          "name": "shapeshifter",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            16,
+            0
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/starter_blocks/behavior_packs/starter_blocks/manifest.json",
+          "parse_status": "valid",
+          "name": "Starter Blocks",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            20,
+            80
+          ],
+          "modules": [
+            {
+              "type": "script",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": "javascript"
+            },
+            {
+              "type": "data",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 1,
+          "script_api_dependencies": [
+            {
+              "module_name": "@minecraft/server",
+              "version": "1.17.0"
+            }
+          ],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "9c1b8877-1a87-4a09-86c6-baf0b316fd1b",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/starter_blocks/resource_packs/starter_blocks/manifest.json",
+          "parse_status": "valid",
+          "name": "Starter Blocks Resource Pack",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            21,
+            0
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "87e4e25f-b7be-4f16-a74b-da877f94dd48",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/starter_items/behavior_packs/starter_Items/manifest.json",
+          "parse_status": "valid",
+          "name": "Starter Items",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            21,
+            100
+          ],
+          "modules": [
+            {
+              "type": "script",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": "javascript"
+            },
+            {
+              "type": "data",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 1,
+          "script_api_dependencies": [
+            {
+              "module_name": "@minecraft/server",
+              "version": "2.0.0"
+            }
+          ],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "52d086c9-0626-48b0-87d8-90f0231bc01d",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/starter_items/resource_packs/starter_items/manifest.json",
+          "parse_status": "valid",
+          "name": "Starter Items Resource Pack",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            21,
+            100
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "4580ff3f-cf14-412c-9712-814577326860",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/structure_blocks_sample_behavior_pack/manifest.json",
+          "parse_status": "valid",
+          "name": "My Structure Block Sample Pack",
+          "header_version": [
+            0,
+            0,
+            1
+          ],
+          "min_engine_version": [
+            1,
+            12,
+            0
+          ],
+          "modules": [
+            {
+              "type": "data",
+              "version": [
+                0,
+                0,
+                1
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/toss_lab/behavior_packs/toss_lab/manifest.json",
+          "parse_status": "valid",
+          "name": "Toss Lab",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            26,
+            30
+          ],
+          "modules": [
+            {
+              "type": "data",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            },
+            {
+              "type": "script",
+              "version": [
+                0,
+                0,
+                1
+              ],
+              "language": "javascript"
+            }
+          ],
+          "script_module_count": 1,
+          "script_api_dependencies": [
+            {
+              "module_name": "@minecraft/server",
+              "version": [
+                2,
+                6,
+                0
+              ]
+            },
+            {
+              "module_name": "@minecraft/server-ui",
+              "version": [
+                2,
+                0,
+                0
+              ]
+            }
+          ],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "5b74cd67-9ef5-4d9b-9a47-0ec0ae452fcc",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-samples-main/toss_lab/resource_packs/toss_lab/manifest.json",
+          "parse_status": "valid",
+          "name": "Toss Lab",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            26,
+            30
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "a1da103e-ee1f-4b62-bedf-b7800c253a22",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        }
+      ],
+      "limits": {
+        "compressed_bytes": 268435456,
+        "entries": 50000,
+        "member_bytes": 134217728,
+        "total_uncompressed_bytes": 536870912,
+        "manifest_bytes": 2097152,
+        "compression_ratio": 1000
+      },
+      "provenance_class": "official_microsoft_samples",
+      "branch_or_revision": "main branch archive; commit SHA not embedded in supplied ZIP"
+    },
+    {
+      "schema_version": 1,
+      "dataset_type": "bedrock_reference_archive",
+      "source_label": "Microsoft Minecraft Scripting Samples main branch snapshot",
+      "source_url": "https://github.com/microsoft/minecraft-scripting-samples",
+      "archive_name": "minecraft-scripting-samples-main.zip",
+      "archive_size_bytes": 4388984,
+      "archive_sha256": "121a60c8c8164294870ad5987750d5a5266c5ae1db2f0c1718698ae27a10e658",
+      "archive_stats": {
+        "entry_count": 411,
+        "file_count": 303,
+        "directory_count": 108,
+        "declared_uncompressed_bytes": 5020456,
+        "extension_counts": {
+          ".dat": 1,
+          ".dat_old": 1,
+          ".jpeg": 1,
+          ".json": 116,
+          ".lang": 3,
+          ".mcstructure": 10,
+          ".md": 15,
+          ".mjs": 11,
+          ".png": 41,
+          ".ts": 84,
+          ".txt": 1,
+          ".yml": 3,
+          "[no extension]": 16
+        }
+      },
+      "safety": {
+        "path_traversal": "PASS",
+        "absolute_paths": "PASS",
+        "symlinks": "PASS",
+        "duplicate_paths": "REJECTED",
+        "case_unicode_collisions": "REJECTED",
+        "file_directory_collisions": "REJECTED",
+        "special_files": "REJECTED",
+        "crc_test": "PASS",
+        "hash_source": "same_pinned_descriptor",
+        "extraction_performed": false,
+        "embedded_code_executed": false
+      },
+      "manifests": [
+        {
+          "path": "minecraft-scripting-samples-main/build-challenge/behavior_packs/buildchallenge/manifest.json",
+          "parse_status": "valid",
+          "name": "Build Challenge",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            21,
+            20
+          ],
+          "modules": [
+            {
+              "type": "script",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": "javascript"
+            }
+          ],
+          "script_module_count": 1,
+          "script_api_dependencies": [
+            {
+              "module_name": "@minecraft/server",
+              "version": "2.0.0"
+            },
+            {
+              "module_name": "@minecraft/server-ui",
+              "version": "2.0.0"
+            }
+          ],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "1103c416-7d50-4cf7-99c2-01decb358293",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-scripting-samples-main/build-challenge/resource_packs/buildchallenge/manifest.json",
+          "parse_status": "valid",
+          "name": "Build challenge resource pack",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            21,
+            20
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "cfe3d87b-8792-47f6-b4e0-67b251065ca9",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-scripting-samples-main/custom-commands/behavior_packs/mike_cc/manifest.json",
+          "parse_status": "valid",
+          "name": "CustomCommands",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            21,
+            80
+          ],
+          "modules": [
+            {
+              "type": "script",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": "javascript"
+            }
+          ],
+          "script_module_count": 1,
+          "script_api_dependencies": [
+            {
+              "module_name": "@minecraft/server",
+              "version": "2.1.0"
+            }
+          ],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "06f36430-433b-4315-a30f-02d41e54b078",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-scripting-samples-main/custom-commands/resource_packs/mike_cc/manifest.json",
+          "parse_status": "valid",
+          "name": "CustomCommands",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            21,
+            80
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "490cb58c-e6b1-4af2-8f48-433b96ae8dcd",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-scripting-samples-main/custom-components/behavior_packs/custom_components/manifest.json",
+          "parse_status": "valid",
+          "name": "Custom components behavior pack",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            20,
+            30
+          ],
+          "modules": [
+            {
+              "type": "script",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": "javascript"
+            }
+          ],
+          "script_module_count": 1,
+          "script_api_dependencies": [
+            {
+              "module_name": "@minecraft/server",
+              "version": "2.0.0"
+            }
+          ],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "7bd3b140-a9c0-42cb-aa56-0bdedc80e27b",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-scripting-samples-main/custom-components/resource_packs/custom_components/manifest.json",
+          "parse_status": "valid",
+          "name": "Custom components resource pack",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            20,
+            30
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "922f8c01-632f-4579-91c4-40101d578de7",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-scripting-samples-main/editor-basics/behavior_packs/editor-basics/manifest.json",
+          "parse_status": "valid",
+          "name": "Minecraft Editor Basics",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            20,
+            0
+          ],
+          "modules": [
+            {
+              "type": "script",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": "javascript"
+            }
+          ],
+          "script_module_count": 1,
+          "script_api_dependencies": [
+            {
+              "module_name": "@minecraft/server-editor",
+              "version": "beta"
+            },
+            {
+              "module_name": "@minecraft/server",
+              "version": "beta"
+            }
+          ],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "b3d35b27-1827-4bff-bdf5-694942cfdd25",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [
+            "editorExtension"
+          ],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-scripting-samples-main/editor-basics/resource_packs/editor-basics/manifest.json",
+          "parse_status": "valid",
+          "name": "Minecraft Editor Basics",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            20,
+            0
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "2fb88d39-e589-4e49-a69f-f575f8705e5c",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [
+            "editorExtension"
+          ],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-scripting-samples-main/editor-multi/behavior_packs/editor-multi/manifest.json",
+          "parse_status": "valid",
+          "name": "Minecraft Editor Multiple Plugin",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            21,
+            90
+          ],
+          "modules": [
+            {
+              "type": "script",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": "javascript"
+            }
+          ],
+          "script_module_count": 1,
+          "script_api_dependencies": [
+            {
+              "module_name": "@minecraft/server-editor",
+              "version": "beta"
+            },
+            {
+              "module_name": "@minecraft/server",
+              "version": "beta"
+            }
+          ],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "83e67115-f576-4335-b014-dc3c1a102620",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [
+            "editorExtension"
+          ],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-scripting-samples-main/editor-multi/resource_packs/editor-multi/manifest.json",
+          "parse_status": "valid",
+          "name": "Minecraft Editor Multiple Plugin",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            20,
+            0
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "abfc8701-02a7-4cbb-87d6-004f5d56c1d1",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [
+            "editorExtension"
+          ],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-scripting-samples-main/editor-script-box/behavior_packs/editor-script-box/manifest.json",
+          "parse_status": "valid",
+          "name": "Editor Script Box",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            21,
+            0
+          ],
+          "modules": [
+            {
+              "type": "script",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": "javascript"
+            }
+          ],
+          "script_module_count": 1,
+          "script_api_dependencies": [
+            {
+              "module_name": "@minecraft/server-editor",
+              "version": "0.1.0-beta"
+            },
+            {
+              "module_name": "@minecraft/server",
+              "version": "2.0.0"
+            },
+            {
+              "module_name": "@minecraft/server-ui",
+              "version": "2.0.0"
+            }
+          ],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "1cbf2047-73a7-45e0-a2ee-6dfdf27a0685",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [
+            "editorExtension"
+          ],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-scripting-samples-main/editor-script-box/resource_packs/editor-script-box/manifest.json",
+          "parse_status": "valid",
+          "name": "Editor Script Box",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            21,
+            0
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "421d57b3-b40e-459f-aee9-adaf63f7895d",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [
+            "editorExtension"
+          ],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-scripting-samples-main/howto-gallery-betas/behavior_packs/howto-gallery-betas/manifest.json",
+          "parse_status": "valid",
+          "name": "Minecraft JavaScript How-to Gallery (Beta APIs)",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            21,
+            40
+          ],
+          "modules": [
+            {
+              "type": "script",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": "javascript"
+            }
+          ],
+          "script_module_count": 1,
+          "script_api_dependencies": [
+            {
+              "module_name": "@minecraft/server",
+              "version": "2.2.0-beta"
+            },
+            {
+              "module_name": "@minecraft/server-ui",
+              "version": "2.2.0-beta"
+            },
+            {
+              "module_name": "@minecraft/server-gametest",
+              "version": "2.2.0-beta"
+            }
+          ],
+          "pack_uuid_dependencies": [],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-scripting-samples-main/howto-gallery/behavior_packs/howto-gallery/manifest.json",
+          "parse_status": "valid",
+          "name": "Minecraft JavaScript How-to Gallery",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            20,
+            0
+          ],
+          "modules": [
+            {
+              "type": "script",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": "javascript"
+            }
+          ],
+          "script_module_count": 1,
+          "script_api_dependencies": [
+            {
+              "module_name": "@minecraft/server",
+              "version": "2.0.0"
+            },
+            {
+              "module_name": "@minecraft/server-ui",
+              "version": "2.0.0"
+            }
+          ],
+          "pack_uuid_dependencies": [],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-scripting-samples-main/script-box/behavior_packs/script-box/manifest.json",
+          "parse_status": "valid",
+          "name": "Script Box",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            20,
+            0
+          ],
+          "modules": [
+            {
+              "type": "script",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": "javascript"
+            }
+          ],
+          "script_module_count": 1,
+          "script_api_dependencies": [
+            {
+              "module_name": "@minecraft/server",
+              "version": "2.0.0"
+            },
+            {
+              "module_name": "@minecraft/server-ui",
+              "version": "2.0.0"
+            }
+          ],
+          "pack_uuid_dependencies": [],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-scripting-samples-main/ts-starter-complete-cotta/behavior_packs/cotta/manifest.json",
+          "parse_status": "valid",
+          "name": "Cotta Behavior Pack",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            20,
+            30
+          ],
+          "modules": [
+            {
+              "type": "script",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": "javascript"
+            }
+          ],
+          "script_module_count": 1,
+          "script_api_dependencies": [
+            {
+              "module_name": "@minecraft/server",
+              "version": "2.0.0"
+            }
+          ],
+          "pack_uuid_dependencies": [],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-scripting-samples-main/ts-starter-complete-cotta/resource_packs/cotta/manifest.json",
+          "parse_status": "valid",
+          "name": "Cotta resource pack",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            20,
+            30
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "79587552-f454-4cee-855e-652b7675c507",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-scripting-samples-main/ts-starter/behavior_packs/starter/manifest.json",
+          "parse_status": "valid",
+          "name": "My script behavior pack",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            20,
+            30
+          ],
+          "modules": [
+            {
+              "type": "script",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": "javascript"
+            }
+          ],
+          "script_module_count": 1,
+          "script_api_dependencies": [
+            {
+              "module_name": "@minecraft/server",
+              "version": "2.0.0"
+            }
+          ],
+          "pack_uuid_dependencies": [],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-scripting-samples-main/ts-starter/resource_packs/starter/manifest.json",
+          "parse_status": "valid",
+          "name": "My resource pack",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            20,
+            30
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "14e467b4-e3aa-49d3-8352-f8439fd7b2ee",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        }
+      ],
+      "limits": {
+        "compressed_bytes": 268435456,
+        "entries": 50000,
+        "member_bytes": 134217728,
+        "total_uncompressed_bytes": 536870912,
+        "manifest_bytes": 2097152,
+        "compression_ratio": 1000
+      },
+      "provenance_class": "official_microsoft_scripting_samples",
+      "branch_or_revision": "main branch archive; commit SHA not embedded in supplied ZIP"
+    },
+    {
+      "schema_version": 1,
+      "dataset_type": "bedrock_reference_archive",
+      "source_label": "Microsoft Minecraft GameTests main branch snapshot",
+      "source_url": "https://github.com/microsoft/minecraft-gametests",
+      "archive_name": "minecraft-gametests-main.zip",
+      "archive_size_bytes": 49722,
+      "archive_sha256": "062e512258f79a88f0d74f1db683204db03471a034837998035a0124aeb681bb",
+      "archive_stats": {
+        "entry_count": 52,
+        "file_count": 37,
+        "directory_count": 15,
+        "declared_uncompressed_bytes": 124814,
+        "extension_counts": {
+          ".js": 6,
+          ".json": 14,
+          ".mcstructure": 8,
+          ".md": 4,
+          ".png": 2,
+          "[no extension]": 3
+        }
+      },
+      "safety": {
+        "path_traversal": "PASS",
+        "absolute_paths": "PASS",
+        "symlinks": "PASS",
+        "duplicate_paths": "REJECTED",
+        "case_unicode_collisions": "REJECTED",
+        "file_directory_collisions": "REJECTED",
+        "special_files": "REJECTED",
+        "crc_test": "PASS",
+        "hash_source": "same_pinned_descriptor",
+        "extraction_performed": false,
+        "embedded_code_executed": false
+      },
+      "manifests": [
+        {
+          "path": "minecraft-gametests-main/js-gametests/behavior_packs/JsGameTests/manifest.json",
+          "parse_status": "valid",
+          "name": "JavaScript GameTests",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            21,
+            0
+          ],
+          "modules": [
+            {
+              "type": "script",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": "javascript"
+            }
+          ],
+          "script_module_count": 1,
+          "script_api_dependencies": [
+            {
+              "module_name": "@minecraft/server",
+              "version": "1.13.0-beta"
+            },
+            {
+              "module_name": "@minecraft/server-gametest",
+              "version": "1.0.0-beta"
+            }
+          ],
+          "pack_uuid_dependencies": [],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-gametests-main/starterTestsTutorial/behavior_packs/starterTestsTutorial/manifest.json",
+          "parse_status": "valid",
+          "name": "Starter Hello World Tests",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            21,
+            0
+          ],
+          "modules": [
+            {
+              "type": "script",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": "javascript"
+            }
+          ],
+          "script_module_count": 1,
+          "script_api_dependencies": [
+            {
+              "module_name": "@minecraft/server",
+              "version": "1.13.0-beta"
+            },
+            {
+              "module_name": "@minecraft/server-gametest",
+              "version": "1.0.0-beta"
+            }
+          ],
+          "pack_uuid_dependencies": [],
+          "capabilities": [],
+          "experiments": []
+        }
+      ],
+      "limits": {
+        "compressed_bytes": 268435456,
+        "entries": 50000,
+        "member_bytes": 134217728,
+        "total_uncompressed_bytes": 536870912,
+        "manifest_bytes": 2097152,
+        "compression_ratio": 1000
+      },
+      "provenance_class": "official_microsoft_gametests",
+      "branch_or_revision": "main branch archive; commit SHA not embedded in supplied ZIP"
+    },
+    {
+      "schema_version": 1,
+      "dataset_type": "bedrock_reference_archive",
+      "source_label": "Community Robot Add-on snapshot",
+      "source_url": "https://github.com/scriptalumen/minecraft-robot-addon",
+      "archive_name": "minecraft-robot-addon-main.zip",
+      "archive_size_bytes": 17723,
+      "archive_sha256": "7a17fb4d0bc1f41f6f879065d6eb262e34081fd9668212eed82871e592649e08",
+      "archive_stats": {
+        "entry_count": 22,
+        "file_count": 11,
+        "directory_count": 11,
+        "declared_uncompressed_bytes": 32416,
+        "extension_counts": {
+          ".bbmodel": 1,
+          ".json": 6,
+          ".lang": 1,
+          ".mcaddon": 1,
+          ".md": 1,
+          ".png": 1
+        }
+      },
+      "safety": {
+        "path_traversal": "PASS",
+        "absolute_paths": "PASS",
+        "symlinks": "PASS",
+        "duplicate_paths": "REJECTED",
+        "case_unicode_collisions": "REJECTED",
+        "file_directory_collisions": "REJECTED",
+        "special_files": "REJECTED",
+        "crc_test": "PASS",
+        "hash_source": "same_pinned_descriptor",
+        "extraction_performed": false,
+        "embedded_code_executed": false
+      },
+      "manifests": [
+        {
+          "path": "minecraft-robot-addon-main/Robot_BP/manifest.json",
+          "parse_status": "valid",
+          "name": "Robot Behavior Pack",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            21,
+            0
+          ],
+          "modules": [
+            {
+              "type": "data",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "8fd370d7-366e-426b-a8f0-3866e525cf6b",
+              "version": [
+                1,
+                0,
+                0
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "minecraft-robot-addon-main/Robot_RP/manifest.json",
+          "parse_status": "valid",
+          "name": "Robot Resource Pack",
+          "header_version": [
+            1,
+            0,
+            0
+          ],
+          "min_engine_version": [
+            1,
+            21,
+            0
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                0
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [],
+          "capabilities": [],
+          "experiments": []
+        }
+      ],
+      "limits": {
+        "compressed_bytes": 268435456,
+        "entries": 50000,
+        "member_bytes": 134217728,
+        "total_uncompressed_bytes": 536870912,
+        "manifest_bytes": 2097152,
+        "compression_ratio": 1000
+      },
+      "provenance_class": "community_mit",
+      "branch_or_revision": "main branch archive; commit SHA not embedded in supplied ZIP"
+    },
+    {
+      "schema_version": 1,
+      "dataset_type": "bedrock_reference_archive",
+      "source_label": "Community MinUI snapshot",
+      "source_url": "https://github.com/codex-alchemist-dev/MinUI",
+      "archive_name": "MinUI-main.zip",
+      "archive_size_bytes": 161393,
+      "archive_sha256": "bdae6559565088515c18d9f8d1479990be1b4587442bda9083daacb8999de02f",
+      "archive_stats": {
+        "entry_count": 88,
+        "file_count": 71,
+        "directory_count": 17,
+        "declared_uncompressed_bytes": 467844,
+        "extension_counts": {
+          ".cjs": 3,
+          ".html": 1,
+          ".js": 40,
+          ".json": 10,
+          ".md": 6,
+          ".ts": 4,
+          ".tsx": 5,
+          "[no extension]": 2
+        }
+      },
+      "safety": {
+        "path_traversal": "PASS",
+        "absolute_paths": "PASS",
+        "symlinks": "PASS",
+        "duplicate_paths": "REJECTED",
+        "case_unicode_collisions": "REJECTED",
+        "file_directory_collisions": "REJECTED",
+        "special_files": "REJECTED",
+        "crc_test": "PASS",
+        "hash_source": "same_pinned_descriptor",
+        "extraction_performed": false,
+        "embedded_code_executed": false
+      },
+      "manifests": [],
+      "limits": {
+        "compressed_bytes": 268435456,
+        "entries": 50000,
+        "member_bytes": 134217728,
+        "total_uncompressed_bytes": 536870912,
+        "manifest_bytes": 2097152,
+        "compression_ratio": 1000
+      },
+      "provenance_class": "community_mit_experimental",
+      "branch_or_revision": "main branch archive; commit SHA not embedded in supplied ZIP"
+    },
+    {
+      "schema_version": 1,
+      "dataset_type": "bedrock_reference_archive",
+      "source_label": "User-supplied Actions resource pack",
+      "source_url": "user_supplied://conversation_upload",
+      "archive_name": "actions-stuff-1-12.mcpack.zip",
+      "archive_size_bytes": 30296641,
+      "archive_sha256": "64a4b5d60fa686dc6c0712725a447eb3527447f3671bc4755882b9ebf780a4c9",
+      "archive_stats": {
+        "entry_count": 10824,
+        "file_count": 10653,
+        "directory_count": 171,
+        "declared_uncompressed_bytes": 68577321,
+        "extension_counts": {
+          ".brarchive": 172,
+          ".json": 12,
+          ".lang": 1,
+          ".material": 3,
+          ".ogg": 954,
+          ".png": 9294,
+          ".tga": 217
+        }
+      },
+      "safety": {
+        "path_traversal": "PASS",
+        "absolute_paths": "PASS",
+        "symlinks": "PASS",
+        "duplicate_paths": "REJECTED",
+        "case_unicode_collisions": "REJECTED",
+        "file_directory_collisions": "REJECTED",
+        "special_files": "REJECTED",
+        "crc_test": "PASS",
+        "hash_source": "same_pinned_descriptor",
+        "extraction_performed": false,
+        "embedded_code_executed": false
+      },
+      "manifests": [
+        {
+          "path": "manifest.json",
+          "parse_status": "valid",
+          "name": "pack.name",
+          "header_version": "1.1.64",
+          "min_engine_version": "1.26.40",
+          "modules": [
+            {
+              "type": "resources",
+              "version": "1.1.64",
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [],
+          "capabilities": [
+            "pbr"
+          ],
+          "experiments": []
+        }
+      ],
+      "limits": {
+        "compressed_bytes": 268435456,
+        "entries": 50000,
+        "member_bytes": 134217728,
+        "total_uncompressed_bytes": 536870912,
+        "manifest_bytes": 2097152,
+        "compression_ratio": 1000
+      },
+      "provenance_class": "user_supplied_license_unverified",
+      "branch_or_revision": "user supplied archive; upstream revision unknown"
+    },
+    {
+      "schema_version": 1,
+      "dataset_type": "bedrock_reference_archive",
+      "source_label": "User-supplied Furniture add-on",
+      "source_url": "user_supplied://conversation_upload",
+      "archive_name": "FURNITURE Add-On (addon).mcaddon.zip",
+      "archive_size_bytes": 24869131,
+      "archive_sha256": "467e5c04d86c755c95c5c53fd2ef1945c7b42e5144f904f1cc631043a9deac22",
+      "archive_stats": {
+        "entry_count": 5037,
+        "file_count": 5037,
+        "directory_count": 0,
+        "declared_uncompressed_bytes": 23709419,
+        "extension_counts": {
+          ".js": 1,
+          ".json": 3669,
+          ".lang": 14,
+          ".material": 1,
+          ".mcstructure": 53,
+          ".ogg": 121,
+          ".png": 1178
+        }
+      },
+      "safety": {
+        "path_traversal": "PASS",
+        "absolute_paths": "PASS",
+        "symlinks": "PASS",
+        "duplicate_paths": "REJECTED",
+        "case_unicode_collisions": "REJECTED",
+        "file_directory_collisions": "REJECTED",
+        "special_files": "REJECTED",
+        "crc_test": "PASS",
+        "hash_source": "same_pinned_descriptor",
+        "extraction_performed": false,
+        "embedded_code_executed": false
+      },
+      "manifests": [
+        {
+          "path": "FURNITURE Add-On BP/manifest.json",
+          "parse_status": "valid",
+          "name": "pack.name",
+          "header_version": [
+            1,
+            0,
+            48
+          ],
+          "min_engine_version": [
+            1,
+            21,
+            40
+          ],
+          "modules": [
+            {
+              "type": "data",
+              "version": [
+                1,
+                0,
+                48
+              ],
+              "language": null
+            },
+            {
+              "type": "script",
+              "version": [
+                0,
+                0,
+                1
+              ],
+              "language": "javascript"
+            }
+          ],
+          "script_module_count": 1,
+          "script_api_dependencies": [
+            {
+              "module_name": "@minecraft/server",
+              "version": "2.4.0"
+            },
+            {
+              "module_name": "@minecraft/server-ui",
+              "version": "2.0.0"
+            }
+          ],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "56bb9e2f-ac07-4b3f-9480-7353afa21736",
+              "version": [
+                1,
+                0,
+                48
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "FURNITURE Add-On RP/manifest.json",
+          "parse_status": "valid",
+          "name": "pack.name",
+          "header_version": [
+            1,
+            0,
+            48
+          ],
+          "min_engine_version": [
+            1,
+            21,
+            40
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                0,
+                48
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "08beb2ae-47b1-4b65-ad97-26511c0e6cbc",
+              "version": [
+                1,
+                0,
+                48
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        }
+      ],
+      "limits": {
+        "compressed_bytes": 268435456,
+        "entries": 50000,
+        "member_bytes": 134217728,
+        "total_uncompressed_bytes": 536870912,
+        "manifest_bytes": 2097152,
+        "compression_ratio": 1000
+      },
+      "provenance_class": "user_supplied_license_unverified",
+      "branch_or_revision": "user supplied archive; upstream revision unknown"
+    },
+    {
+      "schema_version": 1,
+      "dataset_type": "bedrock_reference_archive",
+      "source_label": "User-supplied Cinematic Interactions add-on",
+      "source_url": "user_supplied://conversation_upload",
+      "archive_name": "CinematicInteractions_Bedrock_v1_24_1.mcaddon.zip",
+      "archive_size_bytes": 420617,
+      "archive_sha256": "ef8b65ea9e52c5d39c29f2ad280694ba3126ab24a3201e6e64f5c6f1ba443ad5",
+      "archive_stats": {
+        "entry_count": 183,
+        "file_count": 183,
+        "directory_count": 0,
+        "declared_uncompressed_bytes": 1112294,
+        "extension_counts": {
+          ".js": 32,
+          ".json": 98,
+          ".lang": 4,
+          ".png": 47,
+          ".txt": 2
+        }
+      },
+      "safety": {
+        "path_traversal": "PASS",
+        "absolute_paths": "PASS",
+        "symlinks": "PASS",
+        "duplicate_paths": "REJECTED",
+        "case_unicode_collisions": "REJECTED",
+        "file_directory_collisions": "REJECTED",
+        "special_files": "REJECTED",
+        "crc_test": "PASS",
+        "hash_source": "same_pinned_descriptor",
+        "extraction_performed": false,
+        "embedded_code_executed": false
+      },
+      "manifests": [
+        {
+          "path": "CinematicBP/manifest.json",
+          "parse_status": "valid",
+          "name": "Cinematic Interactions BP",
+          "header_version": [
+            1,
+            24,
+            1
+          ],
+          "min_engine_version": [
+            1,
+            21,
+            90
+          ],
+          "modules": [
+            {
+              "type": "data",
+              "version": [
+                1,
+                24,
+                1
+              ],
+              "language": null
+            },
+            {
+              "type": "script",
+              "version": [
+                1,
+                24,
+                1
+              ],
+              "language": "javascript"
+            }
+          ],
+          "script_module_count": 1,
+          "script_api_dependencies": [
+            {
+              "module_name": "@minecraft/server",
+              "version": "2.5.0"
+            },
+            {
+              "module_name": "@minecraft/server-ui",
+              "version": "2.0.0"
+            }
+          ],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "9e040909-87a6-4d1f-b86d-da1186dbed9d",
+              "version": [
+                1,
+                24,
+                1
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "CinematicRP/manifest.json",
+          "parse_status": "valid",
+          "name": "Cinematic Interactions RP",
+          "header_version": [
+            1,
+            24,
+            1
+          ],
+          "min_engine_version": [
+            1,
+            21,
+            90
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                1,
+                24,
+                1
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "97a17f3c-8461-4810-b37b-edc9ac17bfa5",
+              "version": [
+                1,
+                24,
+                1
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        }
+      ],
+      "limits": {
+        "compressed_bytes": 268435456,
+        "entries": 50000,
+        "member_bytes": 134217728,
+        "total_uncompressed_bytes": 536870912,
+        "manifest_bytes": 2097152,
+        "compression_ratio": 1000
+      },
+      "provenance_class": "restricted_license_notice_found",
+      "branch_or_revision": "user supplied archive; upstream revision unknown"
+    },
+    {
+      "schema_version": 1,
+      "dataset_type": "bedrock_reference_archive",
+      "source_label": "User-supplied Create Movement add-on",
+      "source_url": "user_supplied://conversation_upload",
+      "archive_name": "CreateMovement.mcaddon",
+      "archive_size_bytes": 2452209,
+      "archive_sha256": "504783df83ee584ba1a7a7cedc027b9c142be9eab5ada973bb1586ec6e61626b",
+      "archive_stats": {
+        "entry_count": 1013,
+        "file_count": 1013,
+        "directory_count": 0,
+        "declared_uncompressed_bytes": 8775001,
+        "extension_counts": {
+          ".js": 91,
+          ".json": 705,
+          ".lang": 5,
+          ".material": 1,
+          ".md": 2,
+          ".mjs": 2,
+          ".ogg": 3,
+          ".png": 196,
+          ".tga": 5,
+          ".txt": 3
+        }
+      },
+      "safety": {
+        "path_traversal": "PASS",
+        "absolute_paths": "PASS",
+        "symlinks": "PASS",
+        "duplicate_paths": "REJECTED",
+        "case_unicode_collisions": "REJECTED",
+        "file_directory_collisions": "REJECTED",
+        "special_files": "REJECTED",
+        "crc_test": "PASS",
+        "hash_source": "same_pinned_descriptor",
+        "extraction_performed": false,
+        "embedded_code_executed": false
+      },
+      "manifests": [
+        {
+          "path": "CreateMoveRP/manifest.json",
+          "parse_status": "valid",
+          "name": "Create Movement",
+          "header_version": [
+            0,
+            2,
+            209
+          ],
+          "min_engine_version": [
+            1,
+            21,
+            100
+          ],
+          "modules": [
+            {
+              "type": "resources",
+              "version": [
+                0,
+                2,
+                209
+              ],
+              "language": null
+            }
+          ],
+          "script_module_count": 0,
+          "script_api_dependencies": [],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "b59bc123-7500-4fe1-a238-0c50da2a3882",
+              "version": [
+                0,
+                2,
+                209
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        },
+        {
+          "path": "CreateMoveBP/manifest.json",
+          "parse_status": "valid",
+          "name": "Create Movement",
+          "header_version": [
+            0,
+            2,
+            209
+          ],
+          "min_engine_version": [
+            1,
+            21,
+            100
+          ],
+          "modules": [
+            {
+              "type": "data",
+              "version": [
+                0,
+                2,
+                209
+              ],
+              "language": null
+            },
+            {
+              "type": "script",
+              "version": [
+                0,
+                2,
+                209
+              ],
+              "language": "javascript"
+            }
+          ],
+          "script_module_count": 1,
+          "script_api_dependencies": [
+            {
+              "module_name": "@minecraft/server",
+              "version": "2.3.0"
+            },
+            {
+              "module_name": "@minecraft/server-ui",
+              "version": "2.0.0"
+            }
+          ],
+          "pack_uuid_dependencies": [
+            {
+              "uuid": "45a2cac2-72a4-4642-8286-c583f9315fd1",
+              "version": [
+                0,
+                2,
+                209
+              ]
+            }
+          ],
+          "capabilities": [],
+          "experiments": []
+        }
+      ],
+      "limits": {
+        "compressed_bytes": 268435456,
+        "entries": 50000,
+        "member_bytes": 134217728,
+        "total_uncompressed_bytes": 536870912,
+        "manifest_bytes": 2097152,
+        "compression_ratio": 1000
+      },
+      "provenance_class": "user_supplied_license_unverified",
+      "branch_or_revision": "user supplied archive; upstream revision unknown"
+    }
+  ],
+  "validation_note": "2.3.0 reindex: same pinned descriptor for SHA-256/member reads; CRC/decompression PASS; duplicate/case/Unicode/file-directory/symlink/special/encrypted path checks enforced."
+}

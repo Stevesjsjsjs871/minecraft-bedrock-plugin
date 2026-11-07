@@ -1,29 +1,27 @@
 ---
 name: package-integrity
-description: Use before publishing or updating Minecraft Bedrock Engineer to verify Skills-only package manifests, version parity, prompt parity, skill inventory, no-MCP architecture and bundled Mojang sample-index integrity.
+description: Use before changing, packaging or releasing Minecraft Bedrock Engineer to verify Skills-only manifests, domain registry coverage, script evidence, legacy source boundaries, Work Order/Domain Result contracts and sample-index integrity.
 ---
 
 # Skills-only Package Integrity Audit
 
-Run from the root of the extracted plugin package:
+Run the architecture checks and the package checks from the extracted plugin package root:
 
 ```bash
+python skills/bedrock-engineer-core/scripts/validate_domain_architecture.py .
+python skills/bedrock-engineer-core/scripts/plan_domain_work.py --list-profiles
 python skills/package-integrity/scripts/check_skills_package.py .
-python skills/package-integrity/scripts/test_check_skills_package.py -v
+python skills/package-integrity/scripts/check_skills_package.py . --strict-skills-only  # mandatory release gate
+python skills/package-integrity/scripts/run_skill_tests.py . --json skill-test-results.json
+python -m compileall -q .
 ```
 
-The checker is standard-library-only and read-only. It verifies:
-- Required package files and both plugin manifests parse as JSON.
-- Strict version parity across `plugin.json`, `.codex-plugin/plugin.json` and `VERSION`.
-- Plugin identity and exact default-prompt parity between manifests.
-- Both manifests point to `./skills`.
-- The Skills-only boundary: no MCP server declarations or `.mcp.json` / `mcp.json` configuration files.
-- Every `SKILL.md` has valid basic frontmatter with a unique skill name and non-empty description.
-- README version heading and explicit Skills-only architecture statement.
-- The bundled Mojang sample index decompresses and parses as JSON, with entry-count consistency when the index exposes a countable entries/files collection.
+The architecture validator verifies the Domain-Based Hybrid identity, Skills-only boundary, exact one-domain assignment for every discovered top-level Skill, matching Skill frontmatter, unique domain IDs, valid lead Skills, an acyclic domain dependency graph, valid workflow profiles, real capability-route options, Work Order/Domain Result contract schemas, the operational domain planner and its focused test suite, and the root architecture document. The planner must remain deterministic and must not depend on remote services or execute project code.
 
-The checker emits a JSON report and exits non-zero on failure. It does not install dependencies, execute add-on scripts, contact remote services, or launch Minecraft. The bundled regression tests use synthetic fixtures; they validate the checker, not game behavior.
+`plan_domain_work.py` expands an explicitly selected workflow profile into a dependency-safe domain order and shared Work Order. It includes only lead Skills by default; optional specialist Skills must be explicitly selected and must belong to a selected domain. It does not classify user intent, inspect projects, verify tools or execute domain work. Smoke-test each declared profile and validate an emitted Work Order against `work-order.schema.json` when the extracted package and a local executor are available.
 
-Legacy `check_package_integrity.py` and its tests validate the retired server/registry architecture and are retained only as historical source. Do not use them as the release gate for current Skills-only releases.
+The read-only package checker verifies required files, JSON manifests, identity, semantic-version parity, exact `defaultPrompt` parity, `./skills` paths, absence of MCP configuration declarations and protocol adapters, unique Skill frontmatter, stale tool invocations, retired deployment artifacts, README version/architecture, full Mojang sample-index gzip/JSON count, and required geometry/UV/PNG utilities/tests. Use `--strict-skills-only` as the mandatory release gate; it must pass before a package update.
 
-Static package checks do not prove Minecraft import, rendering, gameplay, multiplayer, Blockbench interoperability or Script API runtime behavior. Report those as `NOT RUN` unless actually tested.
+The historical `check_package_integrity.py` path is only a compatibility shim to `check_skills_package.py`. It does not validate or launch a remote service.
+
+For user-supplied legacy project migration, use the `legacy-source-migration` Skill to inventory files, hashes, manifests, dependencies, conflicts and preservation requirements without executing source code. Use the isolated Skills test runner for the full Skills test set; it launches each test file from its own directory to preserve sibling imports and avoid duplicate module-name collisions. The runner rejects symlinked Skills roots/test files and bounds timeout and test-file count. It executes package test code, so review the source before running it. Run focused tests for changed scripts. Static package checks do not prove Minecraft import, rendering, gameplay, multiplayer, Blockbench interoperability or Script API runtime; report those as `NOT RUN` unless actually tested.

@@ -1,8 +1,12 @@
 from __future__ import annotations
+import struct, zlib
 import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
+
+import reference_transfer as transfer_module
 
 from reference_transfer import (
     TransferError, decode_png_rgba, encode_rgba_png, extract_face_regions,
@@ -77,6 +81,14 @@ class PngCodecTests(unittest.TestCase):
     def test_wrong_rgba_buffer_rejected(self):
         with self.assertRaises(TransferError):
             encode_rgba_png(1, 1, b"\x00")
+
+    def test_png_chunk_count_limit(self):
+        data = encode_rgba_png(1, 1, bytes((1, 2, 3, 255)))
+        # Add many valid ancillary chunks before IEND; total bytes remain well below the file cap.
+        chunk = struct.pack(">I", 0) + b"tEXt" + struct.pack(">I", zlib.crc32(b"tEXt") & 0xffffffff)
+        payload = data[:-12] + chunk * (transfer_module.MAX_PNG_CHUNKS + 1) + data[-12:]
+        with self.assertRaisesRegex(TransferError, "chunk limit"):
+            decode_png_rgba(payload)
 
 
 class RequestValidationTests(unittest.TestCase):
@@ -157,6 +169,119 @@ class EndToEndTransferTests(unittest.TestCase):
         with self.assertRaisesRegex(TransferError, "matched no"):
             transfer(req, workspace=self.workspace)
         self.assertFalse((self.rp / "textures/entity/result.png").exists())
+
+    def test_duplicate_target_layering_requires_explicit_opt_in(self):
+        req = base_request()
+        req["mappings"].append(dict(req["mappings"][0]))
+        req["allow_uv_overlap"] = True
+        result = transfer(req, workspace=self.workspace)
+        self.assertEqual(result["status"], "PASS")
+        self.assertEqual(result["transfer"]["duplicate_region_selections"], 1)
+        self.assertTrue(any(w["code"] == "ORDERED_MAPPING_LAYERS" for w in result["transfer"]["warnings"]))
+
+    def test_geometry_uv_overlap_requires_opt_in(self):
+        geo_path = self.rp / "models/entity/test.geo.json"
+        geometry = json.loads(geo_path.read_text())
+        geometry["minecraft:geometry"][0]["bones"].append({"name": "overlay", "cubes": [{"origin": [0, 0, 0], "size": [1, 1, 1], "uv": [0, 0]}]})
+        geo_path.write_text(json.dumps(geometry))
+        with self.assertRaisesRegex(TransferError, "UV overlap"):
+            transfer(base_request(), workspace=self.workspace)
+
+    def test_base_texture_dimensions_must_match_geometry(self):
+        geo_path = self.rp / "models/entity/test.geo.json"
+        geometry = make_geometry(texture=(4, 4))
+        geo_path.write_text(json.dumps(geometry))
+        with self.assertRaisesRegex(TransferError, "geometry requires"):
+            transfer(base_request(), workspace=self.workspace)
+        self.assertFalse((self.rp / "textures/entity/result.png").exists())
+
+    def test_geometry_uv_out_of_bounds_refuses_output(self):
+        geo_path = self.rp / "models/entity/test.geo.json"
+        geo_path.write_text(json.dumps(make_geometry(uv=(3, 1))))
+        with self.assertRaisesRegex(TransferError, "exceed declared"):
+            transfer(base_request(), workspace=self.workspace)
+        self.assertFalse((self.rp / "textures/entity/result.png").exists())
+
+    def test_reference_and_base_paths_must_be_distinct_from_output(self):
+        req = base_request()
+        req["output_path"] = req["base_texture_path"]
+        with self.assertRaisesRegex(TransferError, "must be distinct"):
+            validate_request(req)
+
+    def test_base_texture_path_must_be_in_entity_texture_directory(self):
+        req = base_request()
+        req["base_texture_path"] = req["reference_image_path"]
+        with self.assertRaisesRegex(TransferError, "inside RP textures/entity"):
+            validate_request(req)
+
+    def test_invalid_sampling_type_is_rejected(self):
+        req = base_request()
+        req["mappings"][0]["sampling"] = []
+        with self.assertRaisesRegex(TransferError, "sampling"):
+            validate_request(req)
+
+    def test_invalid_selector_value_type_is_rejected(self):
+        req = base_request()
+        req["mappings"][0]["selector"]["face"] = ["north"]
+        with self.assertRaisesRegex(TransferError, "selector face"):
+            validate_request(req)
+
+    def test_boolean_opacity_and_rotation_are_rejected(self):
+        req = base_request()
+        req["mappings"][0]["opacity"] = True
+        with self.assertRaisesRegex(TransferError, "opacity"):
+            validate_request(req)
+        req = base_request()
+        req["mappings"][0]["rotation"] = True
+        with self.assertRaisesRegex(TransferError, "rotation"):
+            validate_request(req)
+
+    def test_non_boolean_flip_is_rejected(self):
+        req = base_request()
+        req["mappings"][0]["flip_x"] = 1
+        with self.assertRaisesRegex(TransferError, "flip_x/flip_y"):
+            validate_request(req)
+
+    def test_symlinked_reference_base_and_geometry_are_rejected(self):
+        outside = self.workspace / "outside.png"
+        outside.write_bytes((self.rp / "textures/references/source.png").read_bytes())
+        ref_link = self.rp / "textures/references/linked.png"
+        ref_link.symlink_to(outside)
+        req = base_request()
+        req["reference_image_path"] = "resource_packs/demo_RP/textures/references/linked.png"
+        with self.assertRaisesRegex(TransferError, "symlink"):
+            transfer(req, workspace=self.workspace)
+
+        base_link = self.rp / "textures/entity/linked-base.png"
+        base_link.symlink_to(self.rp / "textures/entity/base.png")
+        req = base_request()
+        req["base_texture_path"] = "resource_packs/demo_RP/textures/entity/linked-base.png"
+        with self.assertRaisesRegex(TransferError, "symlink"):
+            transfer(req, workspace=self.workspace)
+
+        geo_link = self.rp / "models/entity/linked.geo.json"
+        geo_link.symlink_to(self.rp / "models/entity/test.geo.json")
+        req = base_request()
+        req["geometry_path"] = "resource_packs/demo_RP/models/entity/linked.geo.json"
+        with self.assertRaisesRegex(TransferError, "symlink"):
+            transfer(req, workspace=self.workspace)
+
+    def test_bilinear_alpha_interpolation_avoids_rgb_halo(self):
+        # Transparent blue must not contaminate an opaque red sample's RGB.
+        source = bytes((255, 0, 0, 255, 0, 0, 255, 0))
+        sampled = transfer_module._bilinear(source, 2, {"x": 0, "y": 0, "width": 2, "height": 1}, 0.5, 0.5)
+        self.assertGreater(sampled[0], 245)
+        self.assertEqual(sampled[2], 0)
+        self.assertEqual(sampled[3], 128)
+
+    def test_overlap_scan_budget_fails_closed_without_opt_in(self):
+        req = base_request()
+        # Force an over-budget region inventory without constructing a huge model.
+        region = {"bone": "body", "cube_index": 0, "face": "north", "bounds": (0, 0, 1, 1), "mapping": "test", "uv_rotation": 0}
+        regions = [dict(region, cube_index=i) for i in range(710)]
+        with patch.object(transfer_module, "extract_face_regions", return_value=(regions, 710, [])):
+            with self.assertRaisesRegex(TransferError, "overlap found or overlap analysis hit its budget"):
+                transfer(req, workspace=self.workspace)
 
 
 if __name__ == "__main__":

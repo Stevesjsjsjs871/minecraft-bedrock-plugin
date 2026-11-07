@@ -1,60 +1,37 @@
-# Minecraft Bedrock Engineer — 1.8.0
+# Minecraft Bedrock Engineer — 2.3.4
 
-## Architecture
+**Status:** unpublished consolidated candidate. This package is Skills-and-instructions-only and does not use MCP. The live Plugin Creator release remains **2.1.11 (USER / PRIVATE)**; this package has not been published.
 
-Minecraft Bedrock Engineer is a Skills-and-instructions-only plugin. Its active architecture does not use MCP servers, registries, remote endpoints or a plugin-owned execution backend. Specialist skills define repeatable engineering workflows; they do not create tools, grant filesystem access, run code or work in the background. Bundled scripts are optional local utilities and run only when the host exposes a real executor and the package files are accessible. Historical server-side source files remain inert migration material and are not advertised as callable capabilities.
+## What changed in 2.3.4
 
-## Supported workflows
+Seven requested areas were consolidated into canonical Skill entry points while preserving distinct specialist procedures and their implementation contracts:
 
-- Version-aware BP/RP development and safe incremental changes to existing projects.
-- Entity authoring across BP behavior, RP client entity, model geometry, textures, animation clips, animation controllers and render controllers.
-- Entity resource-graph auditing with a standalone, conservative static JSON/alias validator.
-- Blocks, items, recipes, Script API guidance, manifests and pack dependencies.
-- RP UI-folder inventory, localization, bindings, button mappings, control graphs and cross-resource reference tracing.
-- Reference-pack analysis for UI, Subpacks, Skin Packs, PBR/Vibrant Visuals, fog/biomes, cooking add-ons, entity AI and Script API performance.
-- Geometry, models, classic/per-face UV analysis, transparent UV-guide rendering, texture painting and reviewed reference-to-UV mapping.
-- Archive, package, manifest, resource integrity, baseline and regression audits.
-- Mojang Samples indexing and official Creator documentation research with version/source provenance.
-- Release preparation, version governance, evidence reporting and Skills-only package integrity checks.
+- **Geometry & UV:** `geometry-uv-engine` provides audit, UV-template and PNG-check modes.
+- **Project Continuity:** `project-continuity` coordinates resume, reconcile and recovery; `project-state-management` remains the separate state utility contract.
+- **Baseline Regression:** baseline comparison is routed through `addon-baseline-diff`; broad project auditing remains separate.
+- **Creator Tools:** `creator-tools-bridge` distinguishes an actually connected host from explicitly authorized local CLI use.
+- **Add-on Authoring:** `addon-creation` is the entry point for new add-ons, existing-project features and coordinated bundles.
+- **Reference Texture Transfer:** `uv-texture-retargeting` coordinates the workflow; human mapping approval and deterministic transfer remain separate procedures.
+- **Release Engineering:** `release-artifact-workflow` prepares artifacts; `release-quality-gate` evaluates readiness. Add-on and plugin version governance remain distinct.
 
-## Execution contract
+## Current package facts
 
-1. Start with `skills/skills-first-execution/SKILL.md` and select only relevant specialist skills.
-2. Inspect supplied files or an actually connected workspace. Establish project root, target version and baseline before editing.
-3. Use native file/code capabilities only when actually available. Otherwise provide a complete patch or exact reproducible commands and mark work `NOT APPLIED` / `NOT RUN`.
-4. Preserve existing mechanics, UUIDs, identifiers, assets and unrelated files. No silent overwrite or deletion.
-5. Prefer exact-version official docs and Mojang samples; cite provenance. Bedrock 1.26.50 is the default target unless the user specifies otherwise.
-6. Re-open changed files and validate manifests, UUIDs, identifiers, resource references, PNG/UV/animation relationships as applicable.
-7. Report exact commands, exit codes, test counts, limitations and runtime status. Static checks do not prove Minecraft import/render/gameplay.
+- **59 Skills**, **14 domains**, **8 workflow profiles**.
+- **64 Python registry entries** with SHA-256 values checked against the packaged files.
+- **295 activation scenarios** (five per Skill) are designed; all remain `NOT RUN` on the target Plugin Host.
+- All **12 default prompts** and plugin identity are preserved.
+- No MCP service, server, remote execution backend or new runtime was added.
 
-## Entity pipeline audit
+## Validation evidence
 
-From a package checkout, run:
+- Python test suite: **32/32 files, 548/548 cases PASS**.
+- Architecture validator: **28/28 PASS**.
+- Strict package integrity: **20/20 PASS**, zero warnings.
+- Python compilation: PASS; Markdown relative-link scan: zero broken links.
+- Plugin Host activation, packaged-script integration, connected Creator Tools and Minecraft import/render/gameplay/multiplayer/performance: **NOT VERIFIED / NOT RUN**.
 
-```bash
-python skills/entity-authoring-pipeline/scripts/audit_entity_pipeline.py --bp-root <BP> --rp-root <RP>
-python skills/entity-authoring-pipeline/scripts/test_audit_entity_pipeline.py -v
-```
+See `RELEASE_NOTES_2.3.4.md`, `MIGRATION_REPORT_2.3.4.md`, `VALIDATION_REPORT_2.3.4.md`, and `DOCUMENTATION_CONSISTENCY_REPORT_2.3.4.md`. The authoritative domain membership and routing source is `skills/bedrock-engineer-core/references/domain-registry.json`.
 
-The entity audit checks JSON integrity and selected literal dependency edges. It is not a full Bedrock schema validator, does not evaluate Molang and does not prove runtime rendering or behavior.
+## Release boundary
 
-## Maintenance and validation
-
-Use `skills/skills-only-maintenance/SKILL.md` for plugin maintenance and `skills/version-governance/SKILL.md` for version decisions. Run the package checker and regression suite from the actual extracted package root:
-
-```bash
-python skills/package-integrity/scripts/check_skills_package.py .
-python skills/package-integrity/scripts/test_check_skills_package.py -v
-```
-
-The compressed Mojang Samples index and all unchanged binary assets are retained from the verified 1.7.3 source archive. Package integrity is checked from the full source checkout. Runtime, multiplayer and Blockbench checks must be reported as `NOT RUN` unless actually performed.
-
-## Legacy-source migration status
-
-Historical `server/` Python sources are retained solely as migration inputs. They are not registered, launched or invoked by the active plugin. Their dependency graph and algorithm reuse status are documented in `LEGACY_MIGRATION_AUDIT.md`. The old package-integrity entry points now delegate to the Skills-only checker. Do not treat retained protocol handlers or their tests as live capabilities.
-
-## Reference pack corpus and specialist audits
-
-Use `skills/reference-pack-corpus/SKILL.md` before analyzing user-supplied `.mcpack`/`.mcaddon`/ZIP reference materials. The read-only structural tool is `skills/reference-pack-corpus/scripts/reference_pack_audit.py`; run `--help` before use. It enforces archive path/expansion limits, records SHA-256, inspects manifests and distinguishes strict JSON from comment-aware JSON. It does not execute pack scripts, prove importability or measure FPS. The corpus inventory is a domain index, not certification that every uploaded archive has been exhaustively audited.
-
-Specialist workflows: `ui-resource-audit`, `subpack-engineering`, `visuals-fog-pbr-audit`, `script-api-performance-audit`, `skin-pack-engineering` and `cooking-addon-engineering`.
+This is a local candidate only. Do not treat local static tests as proof of target-host activation or Minecraft runtime behavior. Live publication requires separate explicit approval.

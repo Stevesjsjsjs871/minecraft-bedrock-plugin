@@ -1,46 +1,45 @@
 ---
 name: reference-mapping-review
-description: Use after visual reference analysis when region-to-geometry assignments need explicit semantic review before transfer to Bedrock entity UV faces.
+description: Use after visual reference analysis to manually approve semantic source-region to Bedrock geometry UV-face assignments before texture transfer.
 ---
 
 # Reference Mapping Review
 
-## Purpose
+## Purpose and capability boundary
 
-Use `minecraft-bedrock-reference-mapping-review` / `review_reference_mapping` as the human-in-the-loop gate between `analyze_visual_reference` and `map_reference_texture_to_uv`.
+This is a required **human/model visual-review step**, not an automated tool. The current package does not contain `review_reference_mapping`, `minecraft-bedrock-reference-mapping-review` or an automated semantic mapping planner. Do not call those historical names. Use the actual image-analysis output and geometry files available in the current environment; if the image or geometry cannot be inspected, mark the mapping `BLOCKED` rather than approving it from scores alone.
 
-The reviewer consumes the complete structured result from `analyze_visual_reference`, an exact `.geo.json` path and geometry identifier, an output texture path, and explicit decisions that connect a detected source region to one exact `(bone, cube_index, face)` target.
+## Inputs
 
-## Required workflow
+- The exact reference PNG and its SHA-256/pixel dimensions.
+- Full JSON output from `skills/visual-reference-analysis/scripts/analyze_visual_reference.py`, when executed with a real local Python executor.
+- Exact geometry JSON, geometry identifier, texture dimensions and UV-face inventory.
+- Explicit candidate source crop rectangles and target `(bone, cube_index, face)` selectors.
+- User-authored semantic labels and approval/rejection decisions.
 
-1. Run `analyze_visual_reference` on the reference PNG. Optionally supply the target geometry to receive shape/area candidate rankings.
-2. Inspect the source image and returned `regions`. Region IDs are arbitrary connected components, not semantic body parts.
-3. For every proposed mapping, send a decision with:
-   - `source_region_id` from analyzer output;
-   - exact target `bone`, `cube_index` and face (`north`, `south`, `east`, `west`, `up`, `down`);
-   - `decision`: `approve`, `reject` or `needs_review`;
-   - an optional user-authored `semantic_label` such as `front_head` or `left_arm_outer`;
-   - optional rotation, flips, nearest/bilinear sampling, opacity and blend mode.
-4. Call `review_reference_mapping` and inspect all returned decisions, warnings, coverage and the `mapping_plan`.
-5. Only when `review_status` is `approved` and `transfer_request` is non-null should the transfer request be passed unchanged to `map_reference_texture_to_uv`.
-6. Inspect the resulting PNG, then run UV and resource audits. Import and render in the exact target Bedrock build before claiming runtime success.
+## Manual review workflow
 
-## Integrity and validation
+1. Run the analyzer only when a real executor can access both the package and project. Its component IDs are arbitrary and do not denote body parts.
+2. Open the exact source PNG and inspect each proposed crop visually. Verify it is inside the image, includes the intended content, and is not an antialiasing speckle or unrelated region.
+3. Inspect the selected geometry/UV guide. Verify exact bone, cube index, face, UV bounds, texture canvas and orientation. Candidate scores based on aspect ratio/area are sorting hints only.
+4. For every proposed mapping, record `source_region_id` for provenance (in the review record only), exact `source_rect`, exact selector, semantic label authored by the reviewer, decision (`approve`, `reject`, `needs_review`), transformations, sampling, opacity and blend mode.
+5. Reject uncertain/misaligned assignments. Keep overlapping/shared UV mappings disabled unless their intended layering/mirroring is explicitly reviewed. Do not require full geometry coverage unless the user's goal actually needs it.
+6. Bind the review record to SHA-256 hashes of the reference and geometry. Any input change invalidates the approval and requires review again.
+7. Only after approval, translate approved mappings into the **actual** request shape documented by `skills/uv-texture-retargeting/references/reference-transfer.example.json`. Do not pass review-only fields to the transfer script; unknown keys are rejected by its request parser.
+8. Run the deterministic transfer script with a real executor, inspect the output PNG/report, then run UV, PNG and resource-link audits.
 
-- The reviewer binds the submitted analysis result to the actual reference PNG with its SHA-256 and exact pixel dimensions. Replacing the image after analysis invalidates the review.
-- It also fingerprints the exact geometry JSON bytes and the complete reviewed transfer configuration, including transformations and output/base texture settings.
-- It re-reads the selected geometry and requires every target selector to resolve to exactly one supported cube face.
-- A source region must exist in the analyzer result and its crop must remain inside the verified reference image.
-- Every approved mapping becomes one exact selector assignment. Multiple mappings to the same target face are rejected unless intentional ordered layering is explicitly enabled; layering also requires the downstream overlap opt-in.
-- `needs_review` decisions block the final `transfer_request`. `reject` decisions are retained in the review report and are never transferred.
-- `require_full_coverage` prevents a transfer-ready request while any supported geometry face remains unmapped.
-- A stable `review_manifest_sha256` fingerprints the reviewed decisions, geometry identity and reference image hash.
-- The tool is read-only. It prepares a request but never writes or applies a texture.
+## Actual transfer boundary
 
-## Interpretation limits
+The downstream implementation is `skills/uv-texture-retargeting/scripts/reference_transfer.py`, not `map_reference_texture_to_uv`. It accepts `project_directory`, `geometry_path`, optional `geometry_identifier`, `reference_image_path`, optional `base_texture_path`, `output_path`, optional `background_color`, `mappings`, and `allow_uv_overlap`. Each mapping uses a `selector`, `source_rect`, and supported transforms/options. Use its example JSON and CLI `--help` as the exact contract. The transfer utility writes a distinct output and does not perform semantic approval.
 
-Candidate scores are only aspect-ratio and relative-area heuristics. They are not semantic confidence, image understanding or part recognition. Semantic labels and approval/rejection decisions must come from explicit human review. The workflow does not infer 3D projection, normals, seams, face orientation, texture material or runtime renderer behavior. Cube-face UVs only; poly-mesh and texture-mesh scopes remain outside these tools.
+## Review integrity and interpretation
 
-## Example
+- Region IDs and geometric candidate rankings are not semantic labels or confidence.
+- A source region must exist in the analysis result; source crops must remain in the verified image bounds.
+- Every target selector must resolve to the intended supported cube face. Unsupported mesh/UV types stay out of scope.
+- Keep a written mapping table linking analysis region, crop, semantic rationale, target selector, decision and hash provenance.
+- Never state that a tool prepared a transfer request or approved a mapping; the reviewer records the decision manually.
 
-See `references/review-request.example.json`. Replace the analysis result with the full structured output from the analyzer and confirm that its image path and SHA-256 still match the file in the project.
+## Required report
+
+Return image and geometry hashes, dimensions/identifier, every reviewed crop/selector/semantic label/decision, rejected and unresolved assignments, overlap/coverage notes, transfer request path, exact static checks and runtime status. Import, face orientation, seam appearance, materials and Minecraft rendering remain `NOT RUN` until tested in the target game.

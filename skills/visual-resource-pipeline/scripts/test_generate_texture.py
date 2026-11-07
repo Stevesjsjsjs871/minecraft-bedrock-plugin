@@ -125,7 +125,11 @@ class TextureGeneratorTests(unittest.TestCase):
             self.assertTrue(output.is_file())
             err = subprocess.run([sys.executable, str(script), str(Path(tmp) / "bad.png"), "--width", "0"], capture_output=True, text=True, check=False)
             self.assertEqual(err.returncode, 2)
-            self.assertEqual(json.loads(err.stderr)["status"], "error")
+            # Some Python hosts inject startup diagnostics before the script's JSON
+            # error record. Parse the final non-empty line emitted by the CLI.
+            error_lines = [line for line in err.stderr.splitlines() if line.strip()]
+            self.assertTrue(error_lines, err.stderr)
+            self.assertEqual(json.loads(error_lines[-1])["status"], "error")
 
 
 if __name__ == "__main__":

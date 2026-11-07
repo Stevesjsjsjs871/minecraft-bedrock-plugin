@@ -1,6 +1,6 @@
 ---
 name: project-continuity
-description: Use when resuming an existing Minecraft Bedrock project, reconciling prior chats or library artifacts, managing known project state, tracking decisions and tests, or deciding which source version is authoritative.
+description: Use to resume, reconcile, persist, manage, or recover verified Minecraft Bedrock project state and continuity evidence.
 ---
 
 # Project Continuity and State Management
@@ -47,3 +47,13 @@ Do not include unrelated personal details in technical state files. For this use
 
 ## Output
 Give a concise state summary, cite/refer to the artifacts actually inspected where available, list blockers and next steps, and distinguish recovered context from verified current files.
+
+## Consolidated modes: Project Continuity & State
+
+This Skill is the canonical project resume/state entry. Choose one mode:
+
+- **resume/reconcile** — establish source-of-truth order, project identity, baseline, confirmed decisions, preserved features, constraints, defects and verification evidence; distinguish confirmed facts from inference.
+- **persist/manage-state** — when a real authorized write route exists, use the Core-owned `skills/bedrock-engineer-core/scripts/project_state.py` contract for `.mbe/` state, revisions, hash chain, snapshots, `verify/inspect/record/update/capture/restore/recover/link-work-order`, category statuses and Work Order linkage. Preserve its safety semantics and tests; do not move or duplicate the utility.
+- **recover/repair-state** — recover or reconcile metadata/state records from available evidence. This is not restoration of BP/RP source files and must never be described as source rollback.
+
+Inputs include current files/manifests, candidate and baseline archives/hashes, target Bedrock version, BP/RP roots, prior reports and optional `.mbe/project-state.json`. Outputs include compact verified state, optional `PROJECT_STATE.md`/`.mbe` records only when writes are supported and authorized, drift/recovery report, unknowns and next steps. The `project_state.py` implementation and `test_project_state.py` remain Core-owned and unchanged.

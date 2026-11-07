@@ -1,0 +1,565 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Minecraft Bedrock Engineer Work Order",
+  "description": "Shared task envelope created by Core and reused by every selected domain Skill. It is a data contract, not an executable tool or persistent database.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "task",
+    "project",
+    "capability",
+    "plan",
+    "changes",
+    "evidence",
+    "status"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "request",
+        "language",
+        "task_type"
+      ],
+      "properties": {
+        "request": {
+          "type": "string",
+          "minLength": 1
+        },
+        "language": {
+          "type": "string",
+          "minLength": 2
+        },
+        "task_type": {
+          "type": "string",
+          "minLength": 2
+        },
+        "acceptance_criteria": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "source_of_truth",
+        "target_game_version"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_of_truth": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_game_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "edition": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "pack_roots": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "baseline": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "required": [
+            "artifact",
+            "verified"
+          ],
+          "properties": {
+            "artifact": {
+              "type": "string"
+            },
+            "sha256": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[A-Fa-f0-9]{64}$"
+            },
+            "verified": {
+              "type": "boolean"
+            }
+          }
+        },
+        "constraints": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "preserve": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "capability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "route",
+        "verified"
+      ],
+      "properties": {
+        "route": {
+          "enum": [
+            "conversation_files",
+            "connected_workspace",
+            "local_executor",
+            "creator_tools_cli",
+            "no_execution_route"
+          ]
+        },
+        "verified": {
+          "type": "boolean"
+        },
+        "available_tools": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selected_domains",
+        "ordered_skills",
+        "steps"
+      ],
+      "properties": {
+        "selected_domains": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "ordered_skills": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "action",
+              "status"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "action": {
+                "type": "string"
+              },
+              "status": {
+                "enum": [
+                  "PLANNED",
+                  "PASS",
+                  "FAIL",
+                  "BLOCKED",
+                  "NOT RUN",
+                  "PARTIAL",
+                  "NOT APPLIED"
+                ]
+              },
+              "owner_domain": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "changes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "files"
+      ],
+      "properties": {
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "path",
+              "action",
+              "status"
+            ],
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "action": {
+                "enum": [
+                  "added",
+                  "modified",
+                  "removed",
+                  "inspected"
+                ]
+              },
+              "status": {
+                "enum": [
+                  "PLANNED",
+                  "APPLIED",
+                  "NOT APPLIED",
+                  "VERIFIED",
+                  "INSPECTED"
+                ]
+              },
+              "reason": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "domain_results": {
+      "type": "array",
+      "items": {
+        "$ref": "domain-result.schema.json"
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "items",
+        "runtime_status"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "check",
+              "status"
+            ],
+            "properties": {
+              "check": {
+                "type": "string"
+              },
+              "status": {
+                "enum": [
+                  "PASS",
+                  "FAIL",
+                  "BLOCKED",
+                  "NOT RUN",
+                  "NOT APPLIED",
+                  "CONFIRMED_IN_SOURCE",
+                  "STATICALLY VERIFIED",
+                  "RUNTIME TESTED",
+                  "INFERRED",
+                  "UNVERIFIED",
+                  "PLANNED"
+                ]
+              },
+              "command": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "exit_code": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "details": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "runtime_status": {
+          "enum": [
+            "RUNTIME TESTED",
+            "PARTIAL",
+            "NOT RUN"
+          ]
+        }
+      }
+    },
+    "status": {
+      "enum": [
+        "PLANNED",
+        "IN_PROGRESS",
+        "COMPLETE",
+        "PARTIAL",
+        "BLOCKED"
+      ]
+    },
+    "integration": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Deterministic integration report generated from validated Domain Results.",
+      "required": [
+        "status",
+        "summary",
+        "domain_coverage",
+        "domain_statuses",
+        "acceptance",
+        "conflicts",
+        "next_domains",
+        "runtime_status"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "PLANNED",
+            "IN_PROGRESS",
+            "COMPLETE",
+            "REVIEW",
+            "BLOCKED"
+          ]
+        },
+        "summary": {
+          "type": "string"
+        },
+        "domain_coverage": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "expected",
+            "reported",
+            "missing"
+          ],
+          "properties": {
+            "expected": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "reported": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "missing": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "domain_statuses": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "domain_id",
+              "status"
+            ],
+            "properties": {
+              "domain_id": {
+                "type": "string"
+              },
+              "status": {
+                "enum": [
+                  "PASS",
+                  "FAIL",
+                  "BLOCKED",
+                  "NOT RUN",
+                  "NOT APPLIED",
+                  "PARTIAL"
+                ]
+              }
+            }
+          }
+        },
+        "acceptance": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "criterion",
+              "status",
+              "domain_ids",
+              "evidence"
+            ],
+            "properties": {
+              "criterion": {
+                "type": "string"
+              },
+              "status": {
+                "enum": [
+                  "MET",
+                  "NOT MET",
+                  "CONFLICT",
+                  "UNVERIFIED"
+                ]
+              },
+              "domain_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "conflicts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "code",
+              "severity",
+              "path",
+              "domain_ids",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "enum": [
+                  "CASE_COLLISION",
+                  "REMOVE_VS_WRITE",
+                  "ACTION_CONFLICT",
+                  "OVERLAPPING_WRITE"
+                ]
+              },
+              "severity": {
+                "enum": [
+                  "HIGH",
+                  "BLOCKER"
+                ]
+              },
+              "path": {
+                "type": "string"
+              },
+              "paths": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "domain_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "message": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "next_domains": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "runtime_status": {
+          "enum": [
+            "RUNTIME TESTED",
+            "PARTIAL",
+            "NOT RUN"
+          ]
+        }
+      }
+    },
+    "project_state": {
+      "type": "object",
+      "description": "Optional integrity link to the current .mbe/project-state.json revision. Refresh after any state mutation.",
+      "additionalProperties": false,
+      "required": [
+        "project_id",
+        "revision",
+        "state_path",
+        "state_sha256",
+        "latest_snapshot_id",
+        "latest_snapshot_sha256"
+      ],
+      "properties": {
+        "project_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "state_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "state_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "latest_snapshot_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "latest_snapshot_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    }
+  }
+}

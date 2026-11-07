@@ -11,7 +11,7 @@
 | EVAL-007 | Report coverage metadata | Partial/not-implemented areas are explicit and schema-valid | Overstated coverage/schema regression |
 | EVAL-008 | Runtime status | Static-only report says `NOT RUN` | False runtime-success claim |
 | EVAL-009 | Resource graph filters | Geometry, animations, controllers, textures, UI and localization filters select edges by real schema fields | Filter contract regression |
-| EVAL-010 | Shared archive safety | CLI and MCP use common compressed/member/per-member/total size limits before reading payloads | Resource-exhaustion protection regression |
+| EVAL-010 | Static Bedrock archive auditor | Enforces compressed/member/per-member/total size limits before payload reads and pins one opened file for its inspection | Resource-exhaustion or archive-source consistency regression |
 | EVAL-011 | Single version source | Root manifest, compatibility manifest, MCP initialize response, analyzer report and README agree with `VERSION` | Version drift |
 | EVAL-012 | Golden graph projection | Valid synthetic pack produces exactly the expected source pointers, edge kinds, target domains, statuses and counts | Silent reference-graph semantic regression |
 | EVAL-013 | Domain filter isolation | Explicit `target_domain` is authoritative; UI paths cannot leak into geometry/textures merely because text matches | Cross-domain false positives |
@@ -133,3 +133,8 @@ The scaffold tests validate file creation and static manifest relationships only
 | RECIPE-006 | Tool schema and defaults | Write-capable annotation, closed schema and default result count are correct |
 
 These are synthetic static tests; they do not verify recipe unlocking or crafting in the Minecraft engine.
+
+
+| EVAL-032 | Archive path changes between lstat/open, after open, or during inspection | Reject a pre-open inode swap; after-open path replacement cannot redirect reads; in-place mutation is detected before audit completion | Archive TOCTOU / source-integrity regression |
+
+The pinned-descriptor tests use temporary synthetic ZIPs. They prove the local helper/auditor behavior on the tested OS and Python runtime; they do not claim installed-host or Minecraft runtime coverage.

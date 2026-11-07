@@ -4,14 +4,14 @@ Does not extract files, launch Minecraft, or claim runtime correctness.
 Python 3 standard library only. Model-format assumptions are intentionally conservative.
 """
 from __future__ import annotations
-import argparse, hashlib, json, re, sys, zipfile
+import argparse, hashlib, json, re, stat, sys, zipfile
 from pathlib import Path, PurePosixPath
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[3]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
-from archive_safety import validate_zip_limits
+from archive_safety import open_bounded_zip
 
 VERSION_FILE = ROOT / "VERSION"
 TOOL_VERSION = VERSION_FILE.read_text(encoding="utf-8").strip()
@@ -19,11 +19,6 @@ PATH_KEYS = {"texture", "texture_path", "path", "file", "sound", "particle_effec
 IDENTIFIER_KEYS = {"geometry", "animation", "animations", "animation_controller", "animation_controllers", "render_controllers", "materials"}
 
 def sha256(raw: bytes) -> str: return hashlib.sha256(raw).hexdigest()
-def sha256_file(path: str) -> str:
-    h=hashlib.sha256()
-    with open(path,'rb') as f:
-        for b in iter(lambda:f.read(1024*1024),b''): h.update(b)
-    return h.hexdigest()
 def finding(severity,confidence,title,evidence,path=None,impact='',recommendation=''):
     return {"severity":severity,"confidence":confidence,"title":title,"path":path,"evidence":evidence,"impact":impact,"recommendation":recommendation}
 def walk(obj, pointer='$'):
@@ -34,36 +29,198 @@ def walk(obj, pointer='$'):
             yield from walk(v,p)
     elif isinstance(obj,list):
         for i,v in enumerate(obj): yield from walk(v,f'{pointer}/{i}')
+def _canonical_member_name(name: str) -> str:
+    """Validate a raw ZIP path without silently normalizing ambiguous segments."""
+    if not isinstance(name, str) or not name or "\x00" in name:
+        raise ValueError("empty or NUL-containing ZIP member name")
+    if "\\" in name:
+        raise ValueError("backslash in ZIP member path")
+    if name.startswith("/") or re.match(r"^[A-Za-z]:", name):
+        raise ValueError("absolute ZIP member path")
+    trimmed = name[:-1] if name.endswith("/") else name
+    parts = trimmed.split("/")
+    if not trimmed or any(part in {"", ".", ".."} for part in parts):
+        raise ValueError("empty, dot, or parent ZIP path segment")
+    return PurePosixPath(*parts).as_posix()
+
+
 def load_archive(path, findings):
     meta={"path":path,"sha256":None,"archive_valid":False}; files={}
     try:
-        validate_zip_limits(path)
-        meta["sha256"] = sha256_file(path)
-        with zipfile.ZipFile(path) as z:
+        with open_bounded_zip(path) as (z, limits):
+            meta["sha256"] = str(limits["sha256"])
+            infos = z.infolist()
+            seen = {}
+            file_keys = set()
+            directory_keys = set()
+            safe_members = []
+            structural_errors = 0
+
+            # Validate central-directory metadata before CRC checks or member
+            # decompression. ZIP consumers disagree about path normalization,
+            # case sensitivity and Unix symlink interpretation.
+            for info in infos:
+                raw_name = info.filename
+                try:
+                    name = _canonical_member_name(raw_name)
+                except ValueError as exc:
+                    findings.append(finding(
+                        "BLOCKER", "HIGH", "Unsafe archive member path",
+                        f"Unsafe path {raw_name!r}: {exc}.", raw_name,
+                        "Archive member names are ambiguous or can escape the pack root.",
+                        "Rebuild the archive with unique, relative POSIX paths."
+                    ))
+                    structural_errors += 1
+                    continue
+
+                key = name.casefold()
+                if key in seen:
+                    findings.append(finding(
+                        "HIGH", "HIGH", "Duplicate archive path",
+                        f"Member {raw_name!r} collides with {seen[key]!r} after case-insensitive path normalization.",
+                        raw_name, "Different filesystems or pack importers may select different content.",
+                        "Keep exactly one member for each case-insensitive path."
+                    ))
+                    structural_errors += 1
+                else:
+                    seen[key] = raw_name
+
+                mode = (info.external_attr >> 16) & 0xffff
+                if stat.S_ISLNK(mode):
+                    findings.append(finding(
+                        "BLOCKER", "HIGH", "Symlink archive member",
+                        f"ZIP member {raw_name!r} is encoded as a symbolic link.", raw_name,
+                        "A pack importer may resolve the link outside the intended archive path.",
+                        "Replace symlink members with regular files after reviewing their targets."
+                    ))
+                    structural_errors += 1
+                    continue
+
+                if info.is_dir():
+                    directory_keys.add(key)
+                else:
+                    file_keys.add(key)
+                    safe_members.append((info, name))
+
+            collisions = file_keys & directory_keys
+            for file_key in file_keys:
+                parts = file_key.split("/")
+                for index in range(1, len(parts)):
+                    parent = "/".join(parts[:index])
+                    if parent in file_keys:
+                        collisions.add(parent)
+            for key in sorted(collisions):
+                raw_name = seen.get(key, key)
+                findings.append(finding(
+                    "BLOCKER", "HIGH", "Archive file/directory path collision",
+                    f"Archive path {raw_name!r} is used as both a file and a directory path or as a file parent.",
+                    raw_name, "The pack cannot be represented consistently by ordinary filesystems.",
+                    "Rename or remove the conflicting archive members."
+                ))
+                structural_errors += 1
+
+            # Do not decompress an archive whose member namespace is unsafe.
+            if structural_errors:
+                return files, meta
+
             bad=z.testzip()
             if bad:
-                findings.append(finding('BLOCKER','HIGH','Archive CRC failure',f'ZIP integrity failed at {bad!r}.',bad,'Archive may be corrupt.','Rebuild the archive.')); return files,meta
-            seen=set()
-            for info in z.infolist():
-                name=info.filename.replace('\\','/'); pp=PurePosixPath(name)
-                if name in seen: findings.append(finding('HIGH','HIGH','Duplicate archive path',f'Duplicate member {name!r}.',name,'Different unpackers may select different data.','Remove duplicate members.'))
-                seen.add(name)
-                if pp.is_absolute() or '..' in pp.parts or re.match(r'^[A-Za-z]:',name):
-                    findings.append(finding('BLOCKER','HIGH','Unsafe archive member path',f'Unsafe path {name!r}.',name,'Path traversal/absolute path issue.','Rebuild with safe relative paths.')); continue
-                if info.is_dir(): continue
-                try: files[name]=z.read(info)
-                except Exception as e: findings.append(finding('HIGH','HIGH','Could not read archive member',str(e),name,'Member could not be audited.','Repair the archive.'))
+                findings.append(finding('BLOCKER','HIGH','Archive CRC failure',f'ZIP integrity failed at {bad!r}.',bad,'Archive may be corrupt.','Rebuild the archive.'))
+                return files,meta
+
+            for info, name in safe_members:
+                try:
+                    files[name]=z.read(info)
+                except Exception as e:
+                    findings.append(finding('HIGH','HIGH','Could not read archive member',str(e),name,'Member could not be audited.','Repair the archive.'))
+                    return {},meta
             meta['archive_valid']=True
     except (OSError,zipfile.BadZipFile,RuntimeError,ValueError) as e:
         findings.append(finding('BLOCKER','HIGH','Archive cannot be opened safely',str(e),path,'Archive contents unavailable or exceeded the declared resource limits.','Supply a valid ZIP-compatible archive within documented limits.'))
     return files,meta
+
+class DuplicateJSONKeyError(ValueError):
+    pass
+
+def _reject_duplicate_pairs(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise DuplicateJSONKeyError(f'duplicate object key {key!r}')
+        result[key] = value
+    return result
+
+def _strip_jsonc_comments(text):
+    """Remove // and /* */ comments without touching quoted strings."""
+    out=[]; i=0; in_string=False; escaped=False
+    while i < len(text):
+        ch=text[i]
+        if in_string:
+            out.append(ch)
+            if escaped: escaped=False
+            elif ch == '\\': escaped=True
+            elif ch == '"': in_string=False
+            i+=1; continue
+        if ch == '"': in_string=True; out.append(ch); i+=1; continue
+        if ch == '/' and i+1 < len(text) and text[i+1] == '/':
+            out.extend('  '); i+=2
+            while i < len(text) and text[i] not in '\r\n': out.append(' '); i+=1
+            continue
+        if ch == '/' and i+1 < len(text) and text[i+1] == '*':
+            out.extend('  '); i+=2; closed=False
+            while i < len(text):
+                if text[i] == '*' and i+1 < len(text) and text[i+1] == '/':
+                    out.extend('  '); i+=2; closed=True; break
+                out.append(text[i] if text[i] in '\r\n' else ' '); i+=1
+            if not closed: raise ValueError('unterminated block comment')
+            continue
+        out.append(ch); i+=1
+    if in_string: raise ValueError('unterminated JSON string')
+    return ''.join(out)
+
+def _remove_jsonc_trailing_commas(text):
+    out=[]; i=0; in_string=False; escaped=False
+    while i < len(text):
+        ch=text[i]
+        if in_string:
+            out.append(ch)
+            if escaped: escaped=False
+            elif ch == '\\': escaped=True
+            elif ch == '"': in_string=False
+            i+=1; continue
+        if ch == '"': in_string=True; out.append(ch); i+=1; continue
+        if ch == ',':
+            j=i+1
+            while j < len(text) and text[j].isspace(): j+=1
+            if j < len(text) and text[j] in '}]': out.append(' '); i+=1; continue
+        out.append(ch); i+=1
+    return ''.join(out)
+
 def parse_json(files,findings):
-    parsed={}
+    parsed={}; modes={'strict':0,'jsonc':0,'invalid':0}
     for path,raw in files.items():
-        if path.lower().endswith('.json'):
-            try: parsed[path]=json.loads(raw.decode('utf-8-sig'))
-            except Exception as e: findings.append(finding('HIGH','HIGH','Invalid JSON',f'{type(e).__name__}: {e}',path,'The game may not parse this file.','Fix JSON syntax.'))
-    return parsed
+        if not path.lower().endswith('.json'): continue
+        try:
+            text=raw.decode('utf-8-sig')
+            try:
+                parsed[path]=json.loads(text, object_pairs_hook=_reject_duplicate_pairs, parse_constant=lambda x: (_ for _ in ()).throw(ValueError(f'non-finite number {x}')))
+                modes['strict']+=1
+            except (json.JSONDecodeError, ValueError) as strict_error:
+                if isinstance(strict_error, DuplicateJSONKeyError): raise strict_error
+                cleaned=_remove_jsonc_trailing_commas(_strip_jsonc_comments(text))
+                parsed[path]=json.loads(cleaned, object_pairs_hook=_reject_duplicate_pairs, parse_constant=lambda x: (_ for _ in ()).throw(ValueError(f'non-finite number {x}')))
+                modes['jsonc']+=1
+                findings.append(finding('INFO','LOW','JSONC comments or trailing commas accepted',
+                    f'Strict JSON parser rejected this file ({type(strict_error).__name__}); comment-aware JSONC parsing succeeded.',
+                    path,'The file uses comment/trailing-comma syntax tolerated by this static parser; target-engine acceptance is not inferred.',
+                    'Preserve the source and verify this format against the exact Bedrock target version.'))
+        except Exception as e:
+            modes['invalid']+=1
+            title='Duplicate JSON object key' if isinstance(e,DuplicateJSONKeyError) else 'Invalid JSON/JSONC'
+            findings.append(finding('HIGH','HIGH',title,f'{type(e).__name__}: {e}',path,
+                'The file could not be parsed by strict JSON or the conservative comment-aware JSONC parser.',
+                'Review the exact syntax and duplicate keys; do not auto-rewrite the source.'))
+    return parsed,modes
 def audit_manifests(parsed,findings):
     manifests=[(p,d) for p,d in parsed.items() if PurePosixPath(p).name.lower()=='manifest.json' and isinstance(d,dict)]
     if not manifests:
@@ -998,7 +1155,7 @@ def diff_files(cand,base):
     return {'added':sorted(cs-bs),'removed':sorted(bs-cs),'modified':sorted(p for p in cs&bs if sha256(cand[p])!=sha256(base[p]))}
 def main():
     ap=argparse.ArgumentParser(description=__doc__); ap.add_argument('candidate'); ap.add_argument('--baseline'); ap.add_argument('--report'); args=ap.parse_args()
-    findings=[]; files,meta=load_archive(args.candidate,findings); parsed=parse_json(files,findings); audit_manifests(parsed,findings)
+    findings=[]; files,meta=load_archive(args.candidate,findings); parsed,json_modes=parse_json(files,findings); audit_manifests(parsed,findings)
     for p,d in parsed.items():
         if p.lower().endswith('.geo.json') or 'geometry' in PurePosixPath(p).parts: audit_geometry(p,d,findings)
         if 'animations' in PurePosixPath(p).parts or 'animation' in PurePosixPath(p).name.lower(): audit_animation(p,d,findings)
@@ -1023,7 +1180,7 @@ def main():
     recommendation='HOLD' if blocker or high else ('REVIEW' if medium else ('INSUFFICIENT EVIDENCE' if not meta.get('archive_valid') else 'STATIC CHECKS PASSED — RUNTIME NOT VERIFIED'))
     checks=[
       {'name':'archive_integrity_and_paths','status':'PASS' if meta.get('archive_valid') and not any(f['title'] in ('Archive CRC failure','Unsafe archive member path','Archive cannot be opened') for f in findings) else 'FAIL','details':'ZIP CRC and safe relative paths; no extraction.'},
-      {'name':'json_parse','status':'FAIL' if any(f['title']=='Invalid JSON' for f in findings) else 'PASS','details':f'Parsed {sum(p.lower().endswith(".json") for p in files)} JSON files.'},
+      {'name':'json_parse','status':'FAIL' if json_modes['invalid'] else 'PASS','details':f"Parsed strict={json_modes['strict']}, JSONC={json_modes['jsonc']}, invalid={json_modes['invalid']} JSON files."},
       {'name':'manifest_checks','status':'WARN' if any('Manifest' in f['title'] or 'UUID' in f['title'] for f in findings) else 'PASS','details':'Manifest, UUID and dependency checks.'},
       {'name':'geometry_bone_uv_checks','status':'WARN' if any(any(x in f['title'].lower() for x in ('geometry','bone','cube','uv')) for f in findings) else 'PASS','details':'Conservative geometry/bone/vector/cube/UV structural checks; not a complete engine validator.'},
       {'name':'animation_resource_checks','status':'WARN' if any('animation' in f['title'].lower() or 'identifier' in f['title'].lower() for f in findings) else 'PASS','details':'Animation shape and selected cross-resource reference checks.'},
@@ -1034,7 +1191,7 @@ def main():
       {'name':'baseline_comparison','status':'NOT RUN' if not args.baseline or basefiles is None else 'PASS','details':'File inventory and SHA-256 comparison.'},
       {'name':'reference_graph','status':'PASS' if reference_graph.get('edge_count',0)>=0 else 'WARN','details':f"Indexed {reference_graph.get('edge_count',0)} edges; partial coverage is listed in reference_graph.scope.coverage."},
       {'name':'minecraft_runtime','status':'NOT RUN','details':'This script does not launch Minecraft.'}]
-    report={'tool_version':TOOL_VERSION,'candidate':meta,'baseline':basemeta,'checks':checks,'findings':findings,'file_diff':diff,'reference_graph':reference_graph,'runtime_status':'NOT RUN','recommendation':recommendation}
+    report={'tool_version':TOOL_VERSION,'candidate':meta,'baseline':basemeta,'checks':checks,'json_parse_modes':json_modes,'findings':findings,'file_diff':diff,'reference_graph':reference_graph,'runtime_status':'NOT RUN','recommendation':recommendation}
     out=json.dumps(report,indent=2,ensure_ascii=False)
     if args.report:
         with open(args.report,'w',encoding='utf-8') as f:f.write(out+'\n')

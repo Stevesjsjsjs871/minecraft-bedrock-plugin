@@ -1,0 +1,9 @@
+group,canonical_skill,retired_entry_skills,retained_specialists
+Geometry & UV,geometry-uv-engine,geometry-uv-audit;geometry-uv-template-authoring,
+Project Continuity,project-continuity,project-state-recovery,project-state-management
+Baseline Regression,addon-baseline-diff,baseline-regression-workflow,project-audit
+Creator Tools,creator-tools-bridge,creator-tools-cli-bridge;creator-tools-orchestrator,workflow-execution-engine
+Add-on Authoring,addon-creation,addon-bundle-authoring;bedrock-content-pipeline,entity-authoring-pipeline;recipe-authoring;ui-resource-engineering
+Reference Texture Transfer,uv-texture-retargeting,uv-mapping-assistant,reference-mapping-review;reference-texture-transfer
+Release Engineering,release-artifact-workflow,build-release,addon-versioning;version-governance
+Release Readiness,release-quality-gate,release-readiness,

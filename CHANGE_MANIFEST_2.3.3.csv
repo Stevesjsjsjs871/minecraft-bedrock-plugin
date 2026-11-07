@@ -1,0 +1,25 @@
+path,change,reason
+skills/entity-authoring-pipeline/SKILL.md,modified,absorbed focused entity-authoring procedure as a scoped mode; expanded description and boundaries
+skills/entity-authoring-pipeline/references/basic-geometry.example.json,added,preserved former entity-authoring geometry example
+skills/entity-authoring-pipeline/scripts/README.md,modified,documented canonical Skill modes and static utility role
+skills/entity-authoring/SKILL.md,removed,unique instructions migrated into canonical Skill
+skills/entity-authoring/references/basic-geometry.example.json,removed,preserved at canonical Skill references path
+skills/bedrock-engineer-core/SKILL.md,modified,updated domain routing summary
+skills/bedrock-engineer-core/references/domain-registry.json,modified,removed retired Skill from entity_animation domain
+skills/animation-pipeline-audit/SKILL.md,modified,updated canonical Skill reference
+skills/animation-controller-authoring/SKILL.md,modified,updated canonical Skill reference
+skills/animated-entity-bundle-authoring/SKILL.md,modified,updated canonical Skill reference
+skills/animation-clip-authoring/SKILL.md,modified,updated canonical Skill reference
+SKILL_INVENTORY.csv,modified,removed duplicate Skill entry and refreshed canonical metadata
+SKILL_ACTIVATION_TEST_MATRIX.csv,modified,removed retired Skill scenarios and updated canonical authoring scenarios
+plugin.json,modified,version 2.3.3; topical keyword retained
+.codex-plugin/plugin.json,modified,version 2.3.3; topical keyword retained
+VERSION,modified,bumped candidate version to 2.3.3
+CHANGELOG.md,modified,added 2.3.3 migration entry
+VERSION_HISTORY.md,modified,recorded 2.3.3 candidate change
+ARCHITECTURE.md,modified,updated canonical Skill count and entity domain composition
+README.md,modified,updated current version summary and validation results
+skills/bedrock-engineer-core/scripts/test_validate_domain_architecture.py,modified,updated current Skill-count regression assertion and explicit merged-Skill membership checks
+SCRIPT_EXECUTION_REGISTRY.csv,modified,refreshed SHA-256 for changed architecture test file
+ENTITY_AUTHORING_MIGRATION_2.3.3.md,added,"records source-to-target migration, routing and evidence"
+RELEASE_NOTES_2.3.3.md,added,candidate release notes

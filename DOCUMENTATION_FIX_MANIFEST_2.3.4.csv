@@ -1,0 +1,12 @@
+path,change,reason
+README.md,modified,Replace stale 2.3.3 summary with accurate 2.3.4 scope and current package facts
+ARCHITECTURE.md,modified,Correct current Skill count from 70 to 59 and identify candidate status
+skills/bedrock-engineer-core/SKILL.md,modified,Remove stale Skill count and duplicated manually maintained routing table; defer to canonical domain registry
+TARGET_ENVIRONMENT_ACCEPTANCE_PLAN.md,modified,Update plan version and activation scenario count to 2.3.4 / 295
+TOOL_REGISTRY.md,modified,Replace stale 2.3.1 capability snapshot with current 2.3.4 validation evidence and limitations
+TOOL_REGISTRY.csv,modified,Refresh capability status and counts for current candidate
+CHANGELOG.md,modified,Expand 2.3.4 entry with exact consolidation and validation facts
+RELEASE_NOTES_2.3.4.md,modified,Document complete scope, preserved contracts and evidence boundaries
+VALIDATION_REPORT_2.3.4.md,added,Record current package-level verification and untested target environments
+DOCUMENTATION_CONSISTENCY_REPORT_2.3.4.md,added,Record drift findings, corrections and historical evidence policy
+DOCUMENTATION_FIX_MANIFEST_2.3.4.csv,added,Track documentation correction scope

@@ -1,0 +1,209 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Minecraft Bedrock Engineer Domain Result",
+  "description": "Standard specialist hand-off returned to Core. Only claims supported by observed work and evidence belong here.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "domain_id",
+    "status",
+    "summary",
+    "findings",
+    "changed_files",
+    "evidence",
+    "limitations"
+  ],
+  "properties": {
+    "domain_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "PASS",
+        "FAIL",
+        "BLOCKED",
+        "NOT RUN",
+        "NOT APPLIED",
+        "PARTIAL"
+      ]
+    },
+    "summary": {
+      "type": "string"
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "severity",
+          "message",
+          "confidence"
+        ],
+        "properties": {
+          "severity": {
+            "enum": [
+              "BLOCKER",
+              "HIGH",
+              "MEDIUM",
+              "LOW",
+              "INFO"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "confidence": {
+            "enum": [
+              "CONFIRMED",
+              "HIGH",
+              "MEDIUM",
+              "LOW",
+              "INFERRED"
+            ]
+          },
+          "path": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pointer": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "recommended_action": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "changed_files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "path",
+          "action"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "action": {
+            "enum": [
+              "added",
+              "modified",
+              "removed",
+              "inspected"
+            ]
+          },
+          "status": {
+            "enum": [
+              "PLANNED",
+              "APPLIED",
+              "NOT APPLIED",
+              "VERIFIED",
+              "INSPECTED"
+            ],
+            "description": "Explicit file state. When omitted, the integrator treats non-inspected actions as APPLIED unless the domain result is BLOCKED, NOT RUN or NOT APPLIED."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "check",
+          "status"
+        ],
+        "properties": {
+          "check": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "PASS",
+              "FAIL",
+              "BLOCKED",
+              "NOT RUN",
+              "NOT APPLIED",
+              "CONFIRMED_IN_SOURCE",
+              "STATICALLY VERIFIED",
+              "RUNTIME TESTED",
+              "INFERRED",
+              "UNVERIFIED",
+              "PLANNED"
+            ]
+          },
+          "details": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "next_domains": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "runtime_status": {
+      "enum": [
+        "RUNTIME TESTED",
+        "PARTIAL",
+        "NOT RUN"
+      ],
+      "description": "Explicit Minecraft/host runtime state for this domain. Omission is conservatively interpreted as NOT RUN."
+    },
+    "criterion_results": {
+      "type": "array",
+      "description": "Evidence-backed assessment of exact acceptance-criterion strings from the parent Work Order.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "criterion",
+          "status",
+          "evidence"
+        ],
+        "properties": {
+          "criterion": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "enum": [
+              "MET",
+              "NOT MET",
+              "UNVERIFIED"
+            ]
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  }
+}

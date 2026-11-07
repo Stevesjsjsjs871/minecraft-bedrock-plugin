@@ -1,0 +1,190 @@
+{
+  "schema_version": "1.0",
+  "candidate_version": "2.1.0",
+  "source_release": "pluginrel_6aeef187613c819193b9fd1d4ef333e2",
+  "summary": {
+    "workflow_profiles": 8,
+    "profiles_passed": 8,
+    "domains_registered": 14,
+    "domains_covered_by_plans": 14,
+    "all_domains_covered": true,
+    "specialist_domain_execution": "NOT_RUN",
+    "real_addon_tasks": "NOT_RUN"
+  },
+  "domains_registered": [
+    "core_orchestration",
+    "project_continuity",
+    "bp_rp_authoring",
+    "ui_engineering",
+    "entity_animation",
+    "geometry_uv",
+    "visual_resources",
+    "script_api",
+    "compatibility_research",
+    "reference_pack_analysis",
+    "audit_validation",
+    "release_governance",
+    "creator_tools_bridge",
+    "plugin_maintenance"
+  ],
+  "domains_covered": [
+    "audit_validation",
+    "bp_rp_authoring",
+    "compatibility_research",
+    "core_orchestration",
+    "creator_tools_bridge",
+    "entity_animation",
+    "geometry_uv",
+    "plugin_maintenance",
+    "project_continuity",
+    "reference_pack_analysis",
+    "release_governance",
+    "script_api",
+    "ui_engineering",
+    "visual_resources"
+  ],
+  "profiles": [
+    {
+      "profile": "addon_release",
+      "status": "PASS",
+      "work_order_schema_valid": true,
+      "selected_domains": [
+        "core_orchestration",
+        "project_continuity",
+        "audit_validation",
+        "release_governance",
+        "compatibility_research",
+        "bp_rp_authoring",
+        "ui_engineering",
+        "geometry_uv",
+        "entity_animation",
+        "visual_resources",
+        "script_api"
+      ],
+      "execution_status": "PLANNED_ONLY",
+      "note": "Deterministic planning and schema validation only; specialist task execution was not simulated."
+    },
+    {
+      "profile": "entity_animation_change",
+      "status": "PASS",
+      "work_order_schema_valid": true,
+      "selected_domains": [
+        "core_orchestration",
+        "project_continuity",
+        "compatibility_research",
+        "bp_rp_authoring",
+        "geometry_uv",
+        "entity_animation",
+        "audit_validation",
+        "visual_resources",
+        "script_api"
+      ],
+      "execution_status": "PLANNED_ONLY",
+      "note": "Deterministic planning and schema validation only; specialist task execution was not simulated."
+    },
+    {
+      "profile": "existing_addon_change",
+      "status": "PASS",
+      "work_order_schema_valid": true,
+      "selected_domains": [
+        "core_orchestration",
+        "project_continuity",
+        "audit_validation",
+        "compatibility_research",
+        "bp_rp_authoring",
+        "ui_engineering",
+        "geometry_uv",
+        "entity_animation",
+        "visual_resources",
+        "script_api"
+      ],
+      "execution_status": "PLANNED_ONLY",
+      "note": "Deterministic planning and schema validation only; specialist task execution was not simulated."
+    },
+    {
+      "profile": "new_addon",
+      "status": "PASS",
+      "work_order_schema_valid": true,
+      "selected_domains": [
+        "core_orchestration",
+        "compatibility_research",
+        "project_continuity",
+        "bp_rp_authoring",
+        "audit_validation",
+        "ui_engineering",
+        "geometry_uv",
+        "entity_animation",
+        "visual_resources",
+        "script_api",
+        "reference_pack_analysis"
+      ],
+      "execution_status": "PLANNED_ONLY",
+      "note": "Deterministic planning and schema validation only; specialist task execution was not simulated."
+    },
+    {
+      "profile": "plugin_maintenance",
+      "status": "PASS",
+      "work_order_schema_valid": true,
+      "selected_domains": [
+        "core_orchestration",
+        "project_continuity",
+        "audit_validation",
+        "release_governance",
+        "plugin_maintenance",
+        "compatibility_research",
+        "creator_tools_bridge"
+      ],
+      "execution_status": "PLANNED_ONLY",
+      "note": "Deterministic planning and schema validation only; specialist task execution was not simulated."
+    },
+    {
+      "profile": "research_only",
+      "status": "PASS",
+      "work_order_schema_valid": true,
+      "selected_domains": [
+        "core_orchestration",
+        "compatibility_research",
+        "project_continuity",
+        "bp_rp_authoring",
+        "script_api",
+        "reference_pack_analysis"
+      ],
+      "execution_status": "PLANNED_ONLY",
+      "note": "Deterministic planning and schema validation only; specialist task execution was not simulated."
+    },
+    {
+      "profile": "texture_uv_change",
+      "status": "PASS",
+      "work_order_schema_valid": true,
+      "selected_domains": [
+        "core_orchestration",
+        "project_continuity",
+        "compatibility_research",
+        "bp_rp_authoring",
+        "geometry_uv",
+        "visual_resources",
+        "audit_validation",
+        "reference_pack_analysis",
+        "entity_animation"
+      ],
+      "execution_status": "PLANNED_ONLY",
+      "note": "Deterministic planning and schema validation only; specialist task execution was not simulated."
+    },
+    {
+      "profile": "ui_change",
+      "status": "PASS",
+      "work_order_schema_valid": true,
+      "selected_domains": [
+        "core_orchestration",
+        "project_continuity",
+        "compatibility_research",
+        "bp_rp_authoring",
+        "ui_engineering",
+        "audit_validation",
+        "release_governance"
+      ],
+      "execution_status": "PLANNED_ONLY",
+      "note": "Deterministic planning and schema validation only; specialist task execution was not simulated."
+    }
+  ]
+}

@@ -1,23 +1,38 @@
 # Geometry & UV Engine scripts
 
 ## Geometry analyzer
+
 ```bash
 python skills/geometry-uv-engine/scripts/geometry_engine.py path/to/entity.geo.json
 python skills/geometry-uv-engine/scripts/geometry_engine.py path/to/entity.geo.json --geometry-identifier geometry.example --report uv-audit.json
 ```
 
+Parses a `.geo.json`, selects an exact geometry identifier when needed, checks classic/per-face cube UV extents against the declared canvas and reports overlaps as review warnings. Mesh UV projection and entity/render binding checks are outside scope.
+
 ## UV template renderer
+
 ```bash
 python skills/geometry-uv-engine/scripts/uv_template_engine.py path/to/entity.geo.json path/to/uv-guide.png --pixel-scale 4
 python skills/geometry-uv-engine/scripts/uv_template_engine.py path/to/entity.geo.json path/to/uv-guide.png --geometry-identifier geometry.example --pixel-scale 2 --max-pixels 16000000
 ```
-The renderer creates a transparent PNG guide, labels each face by bone/cube/face, bounds memory with a pixel budget, and refuses to overwrite existing output files. It supports classic box and per-face cube UV only.
 
-Run focused tests with:
+Renders a separate transparent PNG guide with a subtle texel grid and bone/cube/face labels. The renderer refuses to overwrite output files and enforces pixel-scale and total-pixel limits. It supports classic box and per-face cube UV rectangles; it does not emulate renderer face orientation or mirrored sampling.
+
+## PNG validation
+
+Use the canonical validator at `skills/visual-resource-pipeline/scripts/png_engine.py`:
+
 ```bash
-python -m unittest discover -s skills/geometry-uv-engine/scripts -p 'test_*.py' -v
+python skills/visual-resource-pipeline/scripts/png_engine.py path/to/uv-guide.png
 ```
 
-`png_engine.py` separately validates PNG integrity. Mesh projection, client-entity binding, actual PNG/canvas matching, Blockbench and game renderer behavior remain outside these CLIs.
+## Tests
 
-`uv_template_engine.py` renders guides with a transparent canvas, a subtle texel grid and bitmap face labels. The current renderer uses rectangle bounds; it does not simulate Bedrock UV face orientation or mirror sampling.
+Run the focused suites from the plugin root:
+
+```bash
+python -m unittest discover -s skills/geometry-uv-engine/scripts -p 'test_*.py' -v
+python -m unittest discover -s skills/visual-resource-pipeline/scripts -p 'test_*.py' -v
+```
+
+Minecraft rendering, Blockbench interoperability, mesh projection, client-entity binding and texture-to-canvas matching remain outside these standalone CLIs.

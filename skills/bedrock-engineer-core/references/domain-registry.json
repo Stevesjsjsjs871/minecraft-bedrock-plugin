@@ -1,0 +1,553 @@
+{
+  "registry_version": "1.0.0",
+  "architecture": {
+    "id": "domain-based-hybrid",
+    "name": "Domain-Based Hybrid",
+    "integration_model": "skills-only",
+    "summary": "A central coordinator composes focused domain Skills, versioned reference material, bounded optional local utilities, and evidence-based validation into one dependency-aware workflow.",
+    "planes": {
+      "control": "bedrock-engineer-core and skills-first-execution classify, route, sequence and reconcile the task.",
+      "domain": "Specialist Skills own domain-specific procedures and acceptance checks.",
+      "knowledge": "Versioned references, schemas, examples, source indexes and provenance records support decisions.",
+      "execution": "Only real host-provided file/workspace capabilities, code executors or explicitly authorized local Creator Tools may execute work. Bundled scripts are optional local utilities.",
+      "evidence": "Static validation, regression tests, benchmark evidence and runtime checks remain separately identified."
+    },
+    "hard_boundaries": [
+      "No MCP server, client, registry, endpoint, transport or plugin-owned backend.",
+      "No historical server/protocol implementation or MCP configuration is shipped in the package.",
+      "Skills are instructions and do not grant filesystem access, tool execution, installation, persistence or background work.",
+      "Never select a capability because its name appears in a Skill; verify that the host actually exposes it.",
+      "Treat user-supplied legacy projects as untrusted data; inspect statically and never execute their code during migration review."
+    ],
+    "selection_policy": {
+      "core_skills_always_read": [
+        "bedrock-engineer-core",
+        "skills-first-execution"
+      ],
+      "project_resume_skills": [
+        "project-continuity"
+      ],
+      "minimum_domain_set": true,
+      "one_primary_domain_per_skill": true,
+      "domain_dependencies_are_ordering_hints": true,
+      "do_not_read_every_skill_by_default": true,
+      "shared_baseline_across_domains": true,
+      "one_coordinated_change_plan": true
+    }
+  },
+  "domains": [
+    {
+      "id": "core_orchestration",
+      "name": "Core orchestration",
+      "purpose": "Own task intake, capability truth, domain selection, execution ordering, shared task state and final evidence reconciliation.",
+      "lead_skill": "bedrock-engineer-core",
+      "skills": [
+        "bedrock-engineer-core",
+        "skills-first-execution",
+        "domain-result-integration",
+        "process-self-monitoring",
+        "workflow-execution-engine"
+      ],
+      "requires": [],
+      "output_contract": [
+        "task classification",
+        "selected domains and reason",
+        "capability route",
+        "acceptance criteria",
+        "shared work packet",
+        "validated Domain Results",
+        "cross-domain conflict report",
+        "acceptance-criterion disposition",
+        "integrated Work Order status"
+      ]
+    },
+    {
+      "id": "project_continuity",
+      "name": "Project continuity and state",
+      "purpose": "Recover authoritative project state, reconcile baselines and preserve confirmed decisions, features, constraints and verification evidence.",
+      "lead_skill": "project-continuity",
+      "skills": [
+        "project-continuity",
+        "project-preflight-planner",
+        "project-state-management"
+      ],
+      "requires": [
+        "core_orchestration"
+      ],
+      "output_contract": [
+        "source-of-truth record",
+        "project/version identity",
+        "baseline and hash",
+        "known defects and preserved features",
+        "revisioned project state and file-inventory snapshot",
+        "integrity and drift report",
+        "Work Order project-state link"
+      ]
+    },
+    {
+      "id": "bp_rp_authoring",
+      "name": "BP/RP content authoring",
+      "purpose": "Design and implement behavior/resource pack content, manifests, blocks, items, recipes and coordinated content features.",
+      "lead_skill": "bedrock-development",
+      "skills": [
+        "addon-creation",
+        "bedrock-development",
+        "recipe-authoring",
+        "cooking-addon-engineering"
+      ],
+      "requires": [
+        "project_continuity",
+        "compatibility_research"
+      ],
+      "output_contract": [
+        "implementation plan",
+        "complete BP/RP file set",
+        "manifest/dependency changes",
+        "focused validation evidence"
+      ]
+    },
+    {
+      "id": "ui_engineering",
+      "name": "RP UI engineering",
+      "purpose": "Inventory and work across the full relevant RP UI tree, including imports, controls, bindings, localization and textures.",
+      "lead_skill": "ui-resource-engineering",
+      "skills": [
+        "ui-resource-engineering",
+        "ui-resource-audit"
+      ],
+      "requires": [
+        "project_continuity",
+        "bp_rp_authoring"
+      ],
+      "output_contract": [
+        "complete UI inventory",
+        "reference map",
+        "scoped changed files",
+        "before/after static validation"
+      ]
+    },
+    {
+      "id": "entity_animation",
+      "name": "Entities and animation",
+      "purpose": "Design and author focused Bedrock entities, then create and validate complete connected BP/RP entity and animation chains across behavior, client entities, geometry, textures, clips, controllers and render controllers.",
+      "lead_skill": "entity-authoring-pipeline",
+      "skills": [
+        "entity-authoring-pipeline",
+        "animated-entity-bundle-authoring",
+        "animation-clip-authoring",
+        "animation-controller-authoring",
+        "animation-pipeline-audit",
+        "model-animation"
+      ],
+      "requires": [
+        "project_continuity",
+        "bp_rp_authoring",
+        "geometry_uv"
+      ],
+      "output_contract": [
+        "entity/resource dependency chain",
+        "exact identifiers and aliases",
+        "animation/controller graph",
+        "static/runtime test status"
+      ]
+    },
+    {
+      "id": "geometry_uv",
+      "name": "Geometry and UV",
+      "purpose": "Analyze Bedrock geometry, bone/cube structure, classic and per-face UVs, texture canvas bounds and generate deterministic UV guides.",
+      "lead_skill": "geometry-uv-engine",
+      "skills": [
+        "geometry-uv-engine"
+      ],
+      "requires": [
+        "project_continuity",
+        "bp_rp_authoring"
+      ],
+      "output_contract": [
+        "geometry inventory",
+        "UV bounds/overlap findings",
+        "guide or mapping plan",
+        "exact PNG/geometry provenance"
+      ]
+    },
+    {
+      "id": "visual_resources",
+      "name": "Visual resources and texture workflows",
+      "purpose": "Generate, paint, analyze, map and retarget PNG assets against actual geometry UV selectors while preserving source pixels and provenance.",
+      "lead_skill": "visual-resource-pipeline",
+      "skills": [
+        "visual-resource-pipeline",
+        "texture-painting-pipeline",
+        "uv-texture-retargeting",
+        "visual-reference-analysis",
+        "reference-mapping-review",
+        "reference-texture-transfer"
+      ],
+      "requires": [
+        "project_continuity",
+        "geometry_uv"
+      ],
+      "output_contract": [
+        "source image/hash",
+        "reviewed mapping",
+        "separate output asset",
+        "PNG and UV verification"
+      ]
+    },
+    {
+      "id": "script_api",
+      "name": "Script API engineering",
+      "purpose": "Review Script API usage, version dependencies, scheduling, query costs, unsafe assumptions and performance risks.",
+      "lead_skill": "script-api-performance-audit",
+      "skills": [
+        "script-api-performance-audit"
+      ],
+      "requires": [
+        "project_continuity",
+        "compatibility_research"
+      ],
+      "output_contract": [
+        "API/version evidence",
+        "code findings",
+        "performance risk and severity",
+        "runtime checks required"
+      ]
+    },
+    {
+      "id": "compatibility_research",
+      "name": "Version compatibility and research",
+      "purpose": "Resolve version-sensitive behavior from official Creator documentation and exact-version Mojang samples with explicit confidence and citations.",
+      "lead_skill": "research-versions",
+      "skills": [
+        "research-versions",
+        "version-aware-compatibility",
+        "mojang-samples-authoring"
+      ],
+      "requires": [
+        "core_orchestration"
+      ],
+      "output_contract": [
+        "target version facts",
+        "source links and provenance",
+        "compatibility matrix",
+        "confirmed versus inferred behavior"
+      ]
+    },
+    {
+      "id": "reference_pack_analysis",
+      "name": "Reference pack analysis",
+      "purpose": "Inspect reference add-ons, skin packs, subpacks, Vibrant Visuals/PBR, fog, biomes and domain-specific examples without blindly copying assets.",
+      "lead_skill": "reference-pack-corpus",
+      "skills": [
+        "reference-pack-corpus",
+        "skin-pack-engineering",
+        "subpack-engineering",
+        "visuals-fog-pbr-audit"
+      ],
+      "requires": [
+        "project_continuity",
+        "compatibility_research"
+      ],
+      "output_contract": [
+        "reference inventory",
+        "provenance/permission notes",
+        "reusable pattern findings",
+        "version caveats"
+      ]
+    },
+    {
+      "id": "audit_validation",
+      "name": "Audit, dependency graph and validation",
+      "purpose": "Provide static integrity, identifier/reference closure, baseline regression, benchmark, test selection and evidence reporting across domains.",
+      "lead_skill": "project-audit",
+      "skills": [
+        "addon-baseline-diff",
+        "audit-benchmark",
+        "automated-validation",
+        "dependency-closure-audit",
+        "end-to-end-validation-matrix",
+        "project-audit",
+        "regression-evals",
+        "resource-integrity-audit",
+        "resource-reference-graph",
+        "test-evidence-reporting",
+        "validation-runbook",
+        "change-impact-analysis",
+        "deep-evidence-analysis",
+        "fast-project-analysis",
+        "outcome-quality-assessment"
+      ],
+      "requires": [
+        "project_continuity"
+      ],
+      "output_contract": [
+        "inventory and graph coverage",
+        "findings with paths/pointers/confidence",
+        "baseline delta",
+        "exact commands and test counts",
+        "static dependency graph and reverse-impact closure"
+      ]
+    },
+    {
+      "id": "release_governance",
+      "name": "Release and version governance",
+      "purpose": "Align add-on versions/titles, prepare artifacts, enforce package/release gates and report a traceable release decision.",
+      "lead_skill": "release-quality-gate",
+      "skills": [
+        "addon-versioning",
+        "release-artifact-workflow",
+        "package-integrity",
+        "release-quality-gate",
+        "v100-release-engineering",
+        "version-governance"
+      ],
+      "requires": [
+        "project_continuity",
+        "audit_validation"
+      ],
+      "output_contract": [
+        "version/title parity",
+        "artifact inventory and hash",
+        "quality gate",
+        "READY/HOLD/REVIEW recommendation"
+      ]
+    },
+    {
+      "id": "creator_tools_bridge",
+      "name": "Optional Creator Tools bridge",
+      "purpose": "Coordinate native capabilities only when an actual connected tool or explicitly authorized local CLI is exposed by the host.",
+      "lead_skill": "creator-tools-bridge",
+      "skills": [
+        "creator-tools-bridge"
+      ],
+      "requires": [
+        "core_orchestration"
+      ],
+      "output_contract": [
+        "verified tool identity/version",
+        "authorized action scope",
+        "actual tool evidence",
+        "unsupported actions marked NOT RUN"
+      ]
+    },
+    {
+      "id": "plugin_maintenance",
+      "name": "Plugin architecture and maintenance",
+      "purpose": "Maintain the Skills-only package, migrate useful legacy algorithms safely and keep architecture, inventory, tests and releases coherent.",
+      "lead_skill": "skills-only-maintenance",
+      "skills": [
+        "legacy-source-migration",
+        "skills-only-maintenance"
+      ],
+      "requires": [
+        "core_orchestration",
+        "audit_validation",
+        "release_governance"
+      ],
+      "output_contract": [
+        "source classification",
+        "migration/deletion evidence",
+        "architecture test result",
+        "versioned package update"
+      ]
+    }
+  ],
+  "workflow_profiles": {
+    "new_addon": {
+      "required_domains": [
+        "core_orchestration",
+        "compatibility_research",
+        "bp_rp_authoring",
+        "audit_validation"
+      ],
+      "optional_domains": [
+        "ui_engineering",
+        "entity_animation",
+        "geometry_uv",
+        "visual_resources",
+        "script_api",
+        "reference_pack_analysis"
+      ],
+      "delivery_gates": [
+        "manifest/dependency validation",
+        "resource graph validation",
+        "addon version/title alignment",
+        "artifact integrity"
+      ]
+    },
+    "existing_addon_change": {
+      "required_domains": [
+        "core_orchestration",
+        "project_continuity",
+        "audit_validation"
+      ],
+      "optional_domains": [
+        "bp_rp_authoring",
+        "ui_engineering",
+        "entity_animation",
+        "geometry_uv",
+        "visual_resources",
+        "script_api",
+        "compatibility_research"
+      ],
+      "delivery_gates": [
+        "baseline recorded",
+        "scope-specific validation",
+        "baseline regression review",
+        "addon version/title alignment at delivery"
+      ]
+    },
+    "ui_change": {
+      "required_domains": [
+        "core_orchestration",
+        "project_continuity",
+        "ui_engineering",
+        "audit_validation"
+      ],
+      "optional_domains": [
+        "bp_rp_authoring",
+        "compatibility_research",
+        "release_governance"
+      ],
+      "delivery_gates": [
+        "full relevant UI tree inventoried",
+        "imports and localizations traced",
+        "before/after comparison"
+      ]
+    },
+    "entity_animation_change": {
+      "required_domains": [
+        "core_orchestration",
+        "project_continuity",
+        "entity_animation",
+        "geometry_uv",
+        "audit_validation"
+      ],
+      "optional_domains": [
+        "visual_resources",
+        "script_api",
+        "compatibility_research"
+      ],
+      "delivery_gates": [
+        "entity chain resolved",
+        "geometry/texture compatibility checked",
+        "animation/controller graph checked",
+        "runtime scenarios reported"
+      ]
+    },
+    "texture_uv_change": {
+      "required_domains": [
+        "core_orchestration",
+        "project_continuity",
+        "geometry_uv",
+        "visual_resources",
+        "audit_validation"
+      ],
+      "optional_domains": [
+        "reference_pack_analysis",
+        "entity_animation"
+      ],
+      "delivery_gates": [
+        "source geometry/hash recorded",
+        "mapping explicitly reviewed",
+        "PNG dimensions/alpha/hash verified",
+        "source asset preserved"
+      ]
+    },
+    "research_only": {
+      "required_domains": [
+        "core_orchestration",
+        "compatibility_research"
+      ],
+      "optional_domains": [
+        "bp_rp_authoring",
+        "script_api",
+        "reference_pack_analysis"
+      ],
+      "delivery_gates": [
+        "exact target version",
+        "source citations",
+        "confidence labels"
+      ]
+    },
+    "addon_release": {
+      "required_domains": [
+        "core_orchestration",
+        "project_continuity",
+        "audit_validation",
+        "release_governance"
+      ],
+      "optional_domains": [
+        "compatibility_research",
+        "bp_rp_authoring",
+        "ui_engineering",
+        "entity_animation",
+        "geometry_uv",
+        "visual_resources",
+        "script_api"
+      ],
+      "delivery_gates": [
+        "known-good baseline",
+        "all removals reviewed",
+        "BP/RP version and visible title parity",
+        "release artifact verified",
+        "runtime status disclosed"
+      ]
+    },
+    "plugin_maintenance": {
+      "required_domains": [
+        "core_orchestration",
+        "plugin_maintenance",
+        "audit_validation",
+        "release_governance"
+      ],
+      "optional_domains": [
+        "compatibility_research",
+        "creator_tools_bridge"
+      ],
+      "delivery_gates": [
+        "current source/release verified",
+        "domain registry and all Skills reconciled",
+        "focused architecture tests",
+        "package integrity",
+        "manifest/prompt parity",
+        "source read-back"
+      ]
+    }
+  },
+  "capability_routes": [
+    {
+      "id": "conversation_files",
+      "meaning": "Files attached to the current conversation and actually accessible in the runtime."
+    },
+    {
+      "id": "connected_workspace",
+      "meaning": "A connected file/workspace tool explicitly exposed and authorized for this task."
+    },
+    {
+      "id": "local_executor",
+      "meaning": "A real Python/terminal executor with the package/project files mounted."
+    },
+    {
+      "id": "creator_tools_cli",
+      "meaning": "An installed local Creator Tools CLI explicitly authorized by the user, after checking its version and help."
+    },
+    {
+      "id": "no_execution_route",
+      "meaning": "No usable file/edit/execute capability; return an unapplied patch or exact instructions and mark work NOT APPLIED/NOT RUN."
+    }
+  ],
+  "status_vocabulary": [
+    "PASS",
+    "FAIL",
+    "BLOCKED",
+    "NOT RUN",
+    "NOT APPLIED",
+    "CONFIRMED_IN_SOURCE",
+    "STATICALLY VERIFIED",
+    "RUNTIME TESTED",
+    "INFERRED",
+    "UNVERIFIED",
+    "PLANNED"
+  ]
+}
